@@ -219,14 +219,6 @@ print(struct environment_t *environment, struct object_t *args)
             print(environment, CAR(args));
             printf(" ");
             print(environment, CDR(args));
-/*
-            if (CDR(args) != empty_pair && CDR(args) != NULL)
-            {
-                printf(" ");
-                print(CDR(args));
-            }
-
-            printf(")");*/
             return args + 1;
         case TAG_SPECIAL_FUNCTION:
             printf("<special function>");

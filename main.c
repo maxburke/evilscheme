@@ -43,13 +43,6 @@ main(void)
         result = eval(global_environment, object);
         print(global_environment, result);
         printf("\n");
-                
-        /*while (head) 
-        {
-            printf("%s ", head->text);
-            head = (struct token_t *)head->link.next;
-        }
-        */
     }
 
     return 0;
