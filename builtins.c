@@ -114,7 +114,7 @@ apply(struct environment_t *environment, struct object_t *args)
     switch (function_obj->tag_count.tag)
     {
         case TAG_SPECIAL_FUNCTION:
-            return function_obj->special_function_value(environment, function_args);
+            return function_obj->value.special_function_value(environment, function_args);
         case TAG_PROCEDURE:
             BREAK();
             break;
@@ -141,7 +141,7 @@ eval(struct environment_t *environment, struct object_t *args)
     switch (first_arg->tag_count.tag)
     {
         case TAG_SPECIAL_FUNCTION:
-            return first_arg->special_function_value(environment, CDR(args));
+            return first_arg->value.special_function_value(environment, CDR(args));
         case TAG_BOOLEAN:
         case TAG_CHAR:
         case TAG_VECTOR:
@@ -184,10 +184,10 @@ print(struct environment_t *environment, struct object_t *args)
     switch (args->tag_count.tag)
     {
         case TAG_BOOLEAN:
-            printf("%s", args->boolean_value ? "#t" : "#f");
+            printf("%s", args->value.boolean_value ? "#t" : "#f");
             return args + 1;
         case TAG_CHAR:
-            printf("%c", args->char_value);
+            printf("%c", args->value.char_value);
             return args + 1;
         case TAG_VECTOR:
             {
@@ -195,26 +195,26 @@ print(struct environment_t *environment, struct object_t *args)
                 struct object_t *object = args + 1;
 
                 printf("#(");
-                for (i = 0; i < args->tag_count.tag; ++i)
+                for (i = 0; i < args->tag_count.count; ++i)
                     object = print(environment, object);
                 printf(")");
                 return object;
             }
         case TAG_FIXNUM:
-            printf("%ld", args->fixnum_value);
+            printf("%ld", args->value.fixnum_value);
             return args + 1;
         case TAG_FLONUM:
-            printf("%f", args->flonum_value);
+            printf("%f", args->value.flonum_value);
             return args + 1;
         case TAG_PROCEDURE:
             printf("<procedure>");
             return args + 1;
         case TAG_STRING:
-            printf("\"%s\"", args->string_value);
-            return (struct object_t *)((char *)(args + 1) + strlen(args->string_value));
+            printf("\"%s\"", args->value.string_value);
+            return (struct object_t *)((char *)(args + 1) + strlen(args->value.string_value));
         case TAG_SYMBOL:
-            printf("%s", args->string_value);
-            return (struct object_t *)((char *)(args + 1) + strlen(args->string_value));
+            printf("%s", args->value.string_value);
+            return (struct object_t *)((char *)(args + 1) + strlen(args->value.string_value));
         case TAG_PAIR:
             print(environment, CAR(args));
             printf(" ");

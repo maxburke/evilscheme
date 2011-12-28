@@ -36,7 +36,7 @@ main(void)
     
         args = allocate_object(TAG_PAIR, 0);
         input_object = allocate_object(TAG_STRING, input_length);
-        memmove(input_object->string_value, inputs[i], input_length);
+        memmove(input_object->value.string_value, inputs[i], input_length);
         CAR(args) = input_object;
 
         object = read(global_environment, args);

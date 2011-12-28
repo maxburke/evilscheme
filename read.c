@@ -142,14 +142,14 @@ object_from_symbol(const struct token_t *input)
         if (next_char == 't' || next_char == 'f')
         {
             object = allocate_object(TAG_BOOLEAN, 0);
-            object->boolean_value = next_char == 't';
+            object->value.boolean_value = next_char == 't';
             return object;
         }
 
         /* #\blat -> char */
         assert(next_char == '\\');
         object = allocate_object(TAG_CHAR, 0);
-        object->char_value = strstr(input->text, "newline") != NULL ? '\n' : input->text[2];
+        object->value.char_value = strstr(input->text, "newline") != NULL ? '\n' : input->text[2];
         return object;
     }
     else if (is_number(input)) 
@@ -157,12 +157,12 @@ object_from_symbol(const struct token_t *input)
         if (strstr(input->text, ".") == NULL)
         {
             object = allocate_object(TAG_FIXNUM, 0);
-            object->fixnum_value = strtol(input->text, NULL, 0);
+            object->value.fixnum_value = strtol(input->text, NULL, 0);
         }
         else
         {
             object = allocate_object(TAG_FLONUM, 0);
-            object->flonum_value = strtod(input->text, NULL);
+            object->value.flonum_value = strtod(input->text, NULL);
         }
         return object;
     }
@@ -172,7 +172,7 @@ object_from_symbol(const struct token_t *input)
        at runtime. */
     string_length = strlen(input->text);
     object = allocate_object(input->type == TOKEN_STRING ? TAG_STRING : TAG_SYMBOL, string_length);
-    memmove(object->string_value, input->text, string_length);
+    memmove(object->value.string_value, input->text, string_length);
     return object;
 }
 
@@ -411,7 +411,7 @@ read(struct environment_t *environment, struct object_t *args)
     UNUSED(environment);
     assert(args->tag_count.tag == TAG_PAIR);
 
-    head = tokenize(CAR(args)->string_value);
+    head = tokenize(CAR(args)->value.string_value);
     return create_object_from_token_stream(head);
 }
 

@@ -38,7 +38,7 @@ get_bound_location(struct environment_t *environment, struct object_t *symbol, i
             for (i = 0; i < NUM_ENTRIES_PER_FRAGMENT; ++i)
             {
                 if (entries[i].symbol 
-                        && strcmp(entries[i].symbol->string_value, symbol->string_value) == 0)
+                        && strcmp(entries[i].symbol->value.string_value, symbol->value.string_value) == 0)
                     return &entries[i].object;
             }
         }
@@ -123,10 +123,10 @@ initialize_global_environment(struct environment_t *environment)
         struct object_t *symbol = allocate_object(TAG_SYMBOL, name_length);
         struct object_t *function = allocate_object(TAG_SPECIAL_FUNCTION, 0);
         struct object_t **place;
-        memmove(symbol->string_value, initializers[i].name, name_length);
+        memmove(symbol->value.string_value, initializers[i].name, name_length);
 
         CAR(p0) = symbol;
-        function->special_function_value = initializers[i].function;
+        function->value.special_function_value = initializers[i].function;
         place = bind(environment, p0);
         *place = function;
     }
