@@ -85,6 +85,8 @@ define(struct environment_t *environment, struct object_t *args)
     }
     else
     {
+        BREAK();
+        /* Here is where the "place" evaluates to a function + lambda list */
     }
 
     return value;
