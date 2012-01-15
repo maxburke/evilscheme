@@ -1,11 +1,13 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "object.h"
 #include "builtins.h"
 #include "environment.h"
 #include "read.h"
+#include "runtime.h"
 
 /*
  * main!
@@ -23,8 +25,16 @@ main(void)
     };
     size_t i;
 
-    create_environment(&global_environment);
-    initialize_global_environment(global_environment);
+    struct environment_t *environment;
+    void *stack;
+    void *heap;
+    size_t stack_size = 1024 * sizeof(void *);
+    size_t heap_size = 1024 * 1024;
+
+    stack = malloc(stack_size);
+    posix_memalign(&heap, 4096, heap_size);
+
+    environment = create_environment(stack, stack_size, heap, heap_size);
 
     for (i = 0; i < sizeof inputs / sizeof inputs[0]; ++i)
     {
@@ -39,9 +49,9 @@ main(void)
         memmove(input_object->value.string_value, inputs[i], input_length);
         CAR(args) = input_object;
 
-        object = read(global_environment, args);
-        result = eval(global_environment, object);
-        print(global_environment, result);
+        object = read(environment, args);
+        result = eval(environment, object);
+        print(environment, result);
         printf("\n");
     }
 

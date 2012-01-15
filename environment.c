@@ -7,15 +7,6 @@
 #include "builtins.h"
 #include "read.h"
 
-struct environment_t *global_environment;
-
-void
-create_environment(struct environment_t **environment_ptr)
-{
-    struct environment_t *environment = calloc(sizeof(struct environment_t), 1);
-    *environment_ptr = environment;
-}
-
 struct object_t **
 get_bound_location(struct environment_t *environment, struct object_t *symbol, int recurse)
 {
@@ -89,47 +80,6 @@ bind(struct environment_t *environment, struct object_t *args)
     new_fragment->entries[0].symbol = symbol;
 
     return &new_fragment->entries[0].object;
-}
-
-void
-initialize_global_environment(struct environment_t *environment)
-{
-    struct special_function_initializer_t
-    {
-        const char *name;
-        special_function_t function;
-    };
-
-    static struct special_function_initializer_t initializers[] = 
-    {
-        { "quote", quote },
-        { "read", read },
-        { "eval", eval },
-        { "print", print },
-        { "set!", set },
-        { "cons", cons },
-        { "car", car },
-        { "cdr", cdr },
-        { "define", define },
-        { "lambda", lambda },
-    };
-    #define NUM_INITIALIZERS (sizeof initializers / sizeof initializers[0])
-    size_t i;
-
-    for (i = 0; i < NUM_INITIALIZERS; ++i)
-    {
-        size_t name_length = strlen(initializers[i].name);
-        struct object_t *p0 = allocate_object(TAG_PAIR, 0);
-        struct object_t *symbol = allocate_object(TAG_SYMBOL, name_length);
-        struct object_t *function = allocate_object(TAG_SPECIAL_FUNCTION, 0);
-        struct object_t **place;
-        memmove(symbol->value.string_value, initializers[i].name, name_length);
-
-        CAR(p0) = symbol;
-        function->value.special_function_value = initializers[i].function;
-        place = bind(environment, p0);
-        *place = function;
-    }
 }
 
 
