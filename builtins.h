@@ -34,5 +34,8 @@ lambda(struct environment_t *environment, struct object_t *object);
 struct object_t *
 apply(struct environment_t *environment, struct object_t *object);
 
+struct object_t *
+vector(struct environment_t *environment, struct object_t *object);
+
 #endif
 

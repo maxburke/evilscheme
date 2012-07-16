@@ -1,8 +1,11 @@
 #ifndef GC_H
 #define GC_H
 
+#include "object.h"
+
 struct heap_t
 {
+    struct tag_count_t tag_count;
     void *base;
     void *top;
     void *ptr;
@@ -16,6 +19,6 @@ struct object_t *
 gc_alloc(struct heap_t *heap, enum tag_t type, size_t extra_bytes);
 
 void
-gc_collect(struct environment_t *env);
+gc_collect(struct heap_t *heap);
 
 #endif

@@ -6,6 +6,7 @@
 #include "object.h"
 #include "builtins.h"
 #include "read.h"
+#include "runtime.h"
 
 struct object_t **
 get_bound_location(struct environment_t *environment, struct object_t *symbol, int recurse)
@@ -81,5 +82,4 @@ bind(struct environment_t *environment, struct object_t *args)
 
     return &new_fragment->entries[0].object;
 }
-
 

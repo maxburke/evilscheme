@@ -15,7 +15,9 @@ enum tag_t
     TAG_FLONUM,
     TAG_STRING,
     TAG_PROCEDURE,
-    TAG_SPECIAL_FUNCTION
+    TAG_SPECIAL_FUNCTION,
+    TAG_ENVIRONMENT,
+    TAG_HEAP
 };
 
 struct tag_count_t
@@ -47,9 +49,6 @@ struct object_t
 };
 
 extern struct object_t *empty_pair;
-
-struct object_t *
-allocate_object(enum tag_t tag, size_t extra_size);
 
 #define CAR(x) ((x)->value.pair[0])
 #define CDR(x) ((x)->value.pair[1])

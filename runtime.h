@@ -17,11 +17,13 @@ struct symbol_table_fragment_t;
 
 struct environment_t
 {
+    struct tag_count_t tag_count;
     void *stack_top;
     void *stack_bottom;
     void *stack_ptr;
     struct heap_t *heap;
-    struct symbol_table_fragment_t *symbol_table;
+    struct environment_t *parent_environment;
+    struct symbol_table_fragment_t *symbol_table_fragment;
 };
 
 struct environment_t *

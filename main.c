@@ -6,6 +6,7 @@
 #include "object.h"
 #include "builtins.h"
 #include "environment.h"
+#include "gc.h"
 #include "read.h"
 #include "runtime.h"
 
@@ -34,7 +35,7 @@ main(void)
     stack = malloc(stack_size);
     posix_memalign(&heap, 4096, heap_size);
 
-    environment = create_environment(stack, stack_size, heap, heap_size);
+    environment = environment_create(stack, stack_size, heap, heap_size);
 
     for (i = 0; i < sizeof inputs / sizeof inputs[0]; ++i)
     {
@@ -44,8 +45,8 @@ main(void)
         struct object_t *args;
         size_t input_length = strlen(inputs[i]);
     
-        args = allocate_object(TAG_PAIR, 0);
-        input_object = allocate_object(TAG_STRING, input_length);
+        args = gc_alloc(environment->heap, TAG_PAIR, 0);
+        input_object = gc_alloc(environment->heap, TAG_STRING, input_length);
         memmove(input_object->value.string_value, inputs[i], input_length);
         CAR(args) = input_object;
 

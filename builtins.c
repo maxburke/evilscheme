@@ -4,8 +4,10 @@
 
 #include "base.h"
 #include "builtins.h"
-#include "object.h"
 #include "environment.h"
+#include "gc.h"
+#include "object.h"
+#include "runtime.h"
 
 struct object_t *
 quote(struct environment_t *environment, struct object_t *args)
@@ -26,7 +28,7 @@ cons(struct environment_t *environment, struct object_t *args)
     assert(args->tag_count.tag == TAG_PAIR);
     assert(CDR(args)->tag_count.tag == TAG_PAIR);
 
-    object = allocate_object(TAG_PAIR, 0);
+    object = gc_alloc(environment->heap, TAG_PAIR, 0);
 
     CAR(object) = CAR(args);
     CDR(object) = CAR(CDR(args));
@@ -90,6 +92,16 @@ define(struct environment_t *environment, struct object_t *args)
     }
 
     return value;
+}
+
+struct object_t *
+vector(struct environment_t *environment, struct object_t *args)
+{
+    UNUSED(environment);
+    UNUSED(args);
+    BREAK();
+
+    return NULL;
 }
 
 struct object_t *

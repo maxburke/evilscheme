@@ -4,8 +4,10 @@
 #include <stdlib.h>
 
 #include "base.h"
-#include "read.h"
+#include "gc.h"
 #include "object.h"
+#include "read.h"
+#include "runtime.h"
 
 /*
  * Singly linked list used for storage of the intermediate tokens.
@@ -130,7 +132,7 @@ is_number(const struct token_t *input)
  * of a Scheme true value.
  */
 static struct object_t *
-object_from_symbol(const struct token_t *input)
+object_from_symbol(struct environment_t *environment, const struct token_t *input)
 {
     struct object_t *object;
     size_t string_length;
@@ -141,14 +143,14 @@ object_from_symbol(const struct token_t *input)
         char next_char = tolower(input->text[1]);
         if (next_char == 't' || next_char == 'f')
         {
-            object = allocate_object(TAG_BOOLEAN, 0);
+            object = gc_alloc(environment->heap, TAG_BOOLEAN, 0);
             object->value.boolean_value = next_char == 't';
             return object;
         }
 
         /* #\blat -> char */
         assert(next_char == '\\');
-        object = allocate_object(TAG_CHAR, 0);
+        object = gc_alloc(environment->heap, TAG_CHAR, 0);
         object->value.char_value = strstr(input->text, "newline") != NULL ? '\n' : input->text[2];
         return object;
     }
@@ -156,12 +158,12 @@ object_from_symbol(const struct token_t *input)
     {
         if (strstr(input->text, ".") == NULL)
         {
-            object = allocate_object(TAG_FIXNUM, 0);
+            object = gc_alloc(environment->heap, TAG_FIXNUM, 0);
             object->value.fixnum_value = strtol(input->text, NULL, 0);
         }
         else
         {
-            object = allocate_object(TAG_FLONUM, 0);
+            object = gc_alloc(environment->heap, TAG_FLONUM, 0);
             object->value.flonum_value = strtod(input->text, NULL);
         }
         return object;
@@ -171,27 +173,27 @@ object_from_symbol(const struct token_t *input)
        be a symbol or a string. Vectors, pairs, and procedures are allocated
        at runtime. */
     string_length = strlen(input->text);
-    object = allocate_object(input->type == TOKEN_STRING ? TAG_STRING : TAG_SYMBOL, string_length);
+    object = gc_alloc(environment->heap, input->type == TOKEN_STRING ? TAG_STRING : TAG_SYMBOL, string_length);
     memmove(object->value.string_value, input->text, string_length);
     return object;
 }
 
 static struct object_t * 
-recursive_create_object_from_token_stream(const struct token_t **input)
+recursive_create_object_from_token_stream(struct environment_t *environment, const struct token_t **input)
 {
     if (*input == NULL)
         return empty_pair;
 
     if ((*input)->type == TOKEN_LPAREN)
     {
-        struct object_t *pair = allocate_object(TAG_PAIR, 0);
+        struct object_t *pair = gc_alloc(environment->heap, TAG_PAIR, 0);
         *input = (const struct token_t *)(*input)->link.next;
 
-        CAR(pair) = recursive_create_object_from_token_stream(input);
+        CAR(pair) = recursive_create_object_from_token_stream(environment, input);
 
         if (*input)
         {
-            CDR(pair) = recursive_create_object_from_token_stream(input);
+            CDR(pair) = recursive_create_object_from_token_stream(environment, input);
             return pair;
         }
         else
@@ -206,19 +208,19 @@ recursive_create_object_from_token_stream(const struct token_t **input)
     }
     else
     {
-        struct object_t *pair = allocate_object(TAG_PAIR, 0);
-        CAR(pair) = object_from_symbol(*input);
+        struct object_t *pair = gc_alloc(environment->heap, TAG_PAIR, 0);
+        CAR(pair) = object_from_symbol(environment, *input);
 
         *input = (const struct token_t *)(*input)->link.next;
-        CDR(pair) = recursive_create_object_from_token_stream(input);
+        CDR(pair) = recursive_create_object_from_token_stream(environment, input);
         return pair;
     }
 }
 
 static struct object_t *
-create_object_from_token_stream(const struct token_t *input)
+create_object_from_token_stream(struct environment_t *environment, const struct token_t *input)
 {
-    struct object_t *object = recursive_create_object_from_token_stream(&input);
+    struct object_t *object = recursive_create_object_from_token_stream(environment, &input);
     return object;
 }
 
@@ -412,6 +414,6 @@ read(struct environment_t *environment, struct object_t *args)
     assert(args->tag_count.tag == TAG_PAIR);
 
     head = tokenize(CAR(args)->value.string_value);
-    return create_object_from_token_stream(head);
+    return create_object_from_token_stream(environment, head);
 }
 
