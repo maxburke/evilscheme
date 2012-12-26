@@ -17,7 +17,8 @@ enum tag_t
     TAG_PROCEDURE,
     TAG_SPECIAL_FUNCTION,
     TAG_ENVIRONMENT,
-    TAG_HEAP
+    TAG_HEAP,
+    TAG_REFERENCE
 };
 
 struct tag_count_t

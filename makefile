@@ -1,5 +1,5 @@
 CC = gcc -Wall -Wextra -pedantic -g
-OBJS = environment.o object.o read.o builtins.o main.o runtime.o gc.o lambda.o
+OBJS = environment.o read.o builtins.o main.o runtime.o gc.o lambda.o
 HEADERS = base.h builtins.h environment.h object.h read.h
 
 %.o : %.c $(HEADERS)

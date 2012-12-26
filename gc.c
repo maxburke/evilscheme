@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "base.h"
 #include "runtime.h"
@@ -64,12 +65,9 @@ struct object_t *
 gc_alloc_vector(struct heap_t *heap, size_t count)
 {
     /* A vector is similar to an object but doesn't have the same contained data. It 
-       has the tag_count header but following that the vector contains an array of objects. 
-
-       I just realized that this makes objects of strings or symbols kinda difficult to allocate
-       as you don't know the size of the string/symbol/embedded vector.
-       ...
-       dang */
+       has the tag_count header but following that the vector contains an array of simple
+       objects or references to complex objects (strings/symbols/functions/etc.)
+    */
     size_t total_alloc_size = (count * sizeof(struct object_t)) + sizeof(struct tag_count_t);
     struct object_t *object=  gc_perform_alloc(heap, total_alloc_size);
 

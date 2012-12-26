@@ -58,7 +58,7 @@ struct environment_t *
 environment_create(void *stack, size_t stack_size, void *heap_mem, size_t heap_size)
 {
     struct heap_t *heap = gc_create(heap_mem, heap_size);
-    struct environment_t *env = gc_alloc(heap, TAG_ENVIRONMENT, 0);
+    struct environment_t *env = (struct envionment_t *)gc_alloc(heap, TAG_ENVIRONMENT, 0);
 
     env->stack_bottom = stack;
     env->stack_top = (char *)stack + stack_size;

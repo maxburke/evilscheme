@@ -9,7 +9,8 @@ lambda(struct environment_t *environment, struct object_t *args)
     UNUSED(args);
 
     print(environment, args);
-//    BREAK();
+
+    BREAK(); 
     return NULL;
 }
 
