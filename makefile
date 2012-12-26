@@ -1,12 +1,12 @@
 CC = gcc -Wall -Wextra -pedantic -g
-OBJS = environment.o read.o builtins.o main.o runtime.o gc.o lambda.o
-HEADERS = base.h builtins.h environment.h object.h read.h
+OBJS = $(patsubst %.c,%.o,$(wildcard *.c))
+HEADERS = $(wildcard *.h)
 
 %.o : %.c $(HEADERS)
 	$(CC) -c -o $@ $< $(CFLAGS)
 
 r4rs : $(OBJS)
-	gcc -o $@ $^ $(CFLAGS)
+	gcc -g -o $@ $^ $(CFLAGS)
 
 clean :
 	rm *.o
