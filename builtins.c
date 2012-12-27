@@ -8,6 +8,7 @@
 #include "gc.h"
 #include "object.h"
 #include "runtime.h"
+#include "vm.h"
 
 struct object_t *
 quote(struct environment_t *environment, struct object_t *args)
@@ -121,8 +122,7 @@ apply(struct environment_t *environment, struct object_t *args)
         case TAG_SPECIAL_FUNCTION:
             return function_obj->value.special_function_value(environment, function_args);
         case TAG_PROCEDURE:
-            BREAK();
-            break;
+            return vm_run(environment, args);
         default:
             BREAK();
             break;
