@@ -173,8 +173,19 @@ object_from_symbol(struct environment_t *environment, const struct token_t *inpu
        be a symbol or a string. Vectors, pairs, and procedures are allocated
        at runtime. */
     string_length = strlen(input->text);
-    object = gc_alloc(environment->heap, input->type == TOKEN_STRING ? TAG_STRING : TAG_SYMBOL, string_length);
-    memmove(object->value.string_value, input->text, string_length);
+
+    if (input->type == TOKEN_STRING)
+    {
+        object = gc_alloc(environment->heap, TAG_STRING, string_length);
+        memmove(object->value.string_value, input->text, string_length);
+    }
+    else
+    {
+        assert(input->type == TOKEN_SYMBOL);
+        object = gc_alloc(environment->heap, TAG_SYMBOL, 0);
+        object->value.symbol_hash = hash_bytes(input->text, string_length);
+    }
+
     return object;
 }
 

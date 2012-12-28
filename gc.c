@@ -47,7 +47,7 @@ gc_alloc(struct heap_t *heap, enum tag_t type, size_t extra_bytes)
     size_t size = (type != TAG_ENVIRONMENT) ? sizeof(struct object_t) + extra_bytes : sizeof(struct environment_t);
     struct object_t *object = gc_perform_alloc(heap, size);
 
-    if (type == TAG_STRING || type == TAG_SYMBOL)
+    if (type == TAG_STRING)
     {
         assert(extra_bytes < 65536);
         object->tag_count.count = extra_bytes;

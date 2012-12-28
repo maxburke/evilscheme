@@ -45,7 +45,8 @@ environment_initialize(struct environment_t *environment)
         struct object_t *symbol = gc_alloc(environment->heap, TAG_SYMBOL, name_length);
         struct object_t *function = gc_alloc(environment->heap, TAG_SPECIAL_FUNCTION, 0);
         struct object_t **place;
-        memmove(symbol->value.string_value, initializers[i].name, name_length);
+
+        symbol->value.symbol_hash = hash_string(initializers[i].name);
 
         CAR(p0) = symbol;
         function->value.special_function_value = initializers[i].function;
