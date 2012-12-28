@@ -1,15 +1,19 @@
+#include <assert.h>
+#include <string.h>
+
 #include "base.h"
 #include "environment.h"
 #include "object.h"
+#include "runtime.h"
 #include "vm.h"
 
 extern struct object_t *empty_pair;
 
-void *
+int
 push_args_to_stack(struct environment_t *environment, struct object_t *args)
 {
     struct object_t *i;
-    struct object_t *stack;
+    struct object_t *stack_ptr;
     struct object_t *ptr;
     int count;
 
@@ -73,6 +77,29 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
 
     for (;;)
     {
+        switch (*pc)
+        {
+            case OPCODE_LDARG:
+            case OPCODE_LDIMM_1:
+            case OPCODE_LDIMM_4:
+            case OPCODE_LDIMM_8:
+            case OPCODE_LDSTR:
+            case OPCODE_SET:
+            case OPCODE_NEWOBJ:
+            case OPCODE_CMP:
+            case OPCODE_BRANCH:
+            case OPCODE_COND_BRANCH:
+            case OPCODE_CALL:
+            case OPCODE_GET_BOUND_LOCATION:
+            case OPCODE_ADD:
+            case OPCODE_SUB:
+            case OPCODE_MUL:
+            case OPCODE_DIV:
+            default:
+                BREAK();
+                break;
+        }
+
         if (pc == NULL)
             break;
     }
