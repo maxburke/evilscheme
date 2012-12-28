@@ -30,7 +30,7 @@ get_bound_location(struct environment_t *environment, struct object_t *symbol, i
             for (i = 0; i < NUM_ENTRIES_PER_FRAGMENT; ++i)
             {
                 if (entries[i].symbol 
-                        && strcmp(entries[i].symbol->value.string_value, symbol->value.string_value) == 0)
+                        && entries[i].symbol->value.symbol_hash == symbol->value.symbol_hash)
                     return &entries[i].object;
             }
         }

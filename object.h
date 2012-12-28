@@ -2,6 +2,7 @@
 #define OBJECT_H
 
 #include <stddef.h>
+#include <stdint.h>
 
 enum tag_t
 {
@@ -39,6 +40,7 @@ union object_value_t
     double flonum_value;
     char char_value;
     special_function_t special_function_value;
+    uint64_t symbol_hash;
     char string_value[1];
     struct object_t *pair[2];
     char procedure_data[1];
@@ -51,6 +53,12 @@ struct object_t
 };
 
 extern struct object_t *empty_pair;
+
+uint64_t
+hash_string(const char *string);
+
+uint64_t
+hash_bytes(const void *bytes, size_t num_bytes);
 
 #define CAR(x) ((x)->value.pair[0])
 #define CDR(x) ((x)->value.pair[1])
