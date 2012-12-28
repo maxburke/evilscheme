@@ -41,6 +41,7 @@ union object_value_t
     special_function_t special_function_value;
     char string_value[1];
     struct object_t *pair[2];
+    char procedure_data[1];
 };
 
 struct object_t

@@ -109,20 +109,25 @@ struct object_t *
 apply(struct environment_t *environment, struct object_t *args)
 {
     struct object_t **bound_location;
-    struct object_t *function_obj;
     struct object_t *function_args;
+    struct object_t *function;
 
-    bound_location = get_bound_location(environment, CAR(args), 1);
-    assert(bound_location != NULL);
+    function = CAR(args);
     function_args = CDR(args);
-    function_obj = *bound_location;
 
-    switch (function_obj->tag_count.tag)
+    if (function->tag_count.tag == TAG_SYMBOL)
+    {
+        bound_location = get_bound_location(environment, function, 1);
+        assert(bound_location != NULL);
+        function = *bound_location;
+    }
+
+    switch (function->tag_count.tag)
     {
         case TAG_SPECIAL_FUNCTION:
-            return function_obj->value.special_function_value(environment, function_args);
+            return function->value.special_function_value(environment, function_args);
         case TAG_PROCEDURE:
-            return vm_run(environment, args);
+            return vm_run(environment, function, args);
         default:
             BREAK();
             break;
