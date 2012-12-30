@@ -7,6 +7,77 @@
 #include "runtime.h"
 #include "vm.h"
 
+#define ENABLE_VM_ASSERTS 1
+
+#if ENABLE_VM_ASSERTS
+    #define VM_ASSERT(x) if (!(x)) { fprintf(stderr, "%s:%d: Assertion failed: %s", __FILE__, __LINE__, #x); BREAK(); } else (void)0
+#else
+    #define VM_ASSERT(x)
+#endif
+
+#define STACK_PUSH(stack, x) do { *(--stack) = x; } while (0)
+#define STACK_POP(stack) *(stack++) 
+#ifndef NDEBUG
+#   define VALIDATE_STACK(env) do { \
+        assert(env->stack_ptr >= env->stack_bottom && env->stack_ptr < env->stack_top); } while(0)
+#else
+#   define VALIDATE_STACK(env)
+#endif
+
+#define LDIMM_1_IMPL(FIELD, TYPE, TAG) {        \
+        sp->tag_count.tag = TAG;                \
+        sp->tag_count.flag = 0;                 \
+        sp->tag_count.count = 1;                \
+        sp->value.FIELD = (TYPE)(*pc++);        \
+        --sp;                                   \
+    }
+
+#define LDIMM_1_BOOLEAN()   LDIMM_1_IMPL(fixnum_value, int64_t, TAG_BOOLEAN)
+#define LDIMM_1_CHAR()      LDIMM_1_IMPL(fixnum_value, int64_t, TAG_CHAR)
+#define LDIMM_1_FIXNUM()    LDIMM_1_IMPL(fixnum_value, int64_t, TAG_FIXNUM)
+#define LDIMM_1_FLONUM()    LDIMM_1_IMPL(flonum_value, double, TAG_FLONUM)
+
+union four_byte_union_t
+{
+    unsigned char bytes[4];
+    int fixnum_value;
+    float flonum_value;
+};
+
+#define LDIMM_4_IMPL(TAG, FIELD) {                                                          \
+        union four_byte_union_t fb;                                                         \
+        sp->tag_count.tag = TAG;                                                            \
+        sp->tag_count.flag = 0;                                                             \
+        sp->tag_count.count = 1;                                                            \
+        fb.bytes[0] = *pc++; fb.bytes[1] = *pc++; fb.bytes[2] = *pc++; fb.bytes[3] = *pc++; \
+        sp->value.FIELD = fb.FIELD;                                                         \
+    }
+
+#define LDIMM_4_FIXNUM() LDIMM_4_IMPL(TAG_FIXNUM, fixnum_value)
+#define LDIMM_4_FLONUM() LDIMM_4_IMPL(TAG_FLONUM, flonum_value)
+
+union eight_byte_union_t
+{
+    unsigned char bytes[8];
+    int64_t fixnum_value;
+    double flonum_value;
+    uint64_t symbol_hash;
+};
+
+#define LDIMM_8_IMPL(TAG, FIELD) {                                                          \
+        union eight_byte_union_t fb;                                                        \
+        sp->tag_count.tag = TAG;                                                            \
+        sp->tag_count.flag = 0;                                                             \
+        sp->tag_count.count = 1;                                                            \
+        fb.bytes[0] = *pc++; fb.bytes[1] = *pc++; fb.bytes[2] = *pc++; fb.bytes[3] = *pc++; \
+        fb.bytes[4] = *pc++; fb.bytes[5] = *pc++; fb.bytes[6] = *pc++; fb.bytes[7] = *pc++; \
+        sp->value.FIELD = fb.FIELD;                                                         \
+    }
+
+#define LDIMM_8_FIXNUM() LDIMM_8_IMPL(TAG_FIXNUM, fixnum_value)
+#define LDIMM_8_FLONUM() LDIMM_8_IMPL(TAG_FLONUM, flonum_value)
+#define LDIMM_8_SYMBOL() LDIMM_8_IMPL(TAG_SYMBOL, symbol_hash)
+
 static int
 push_args_to_stack(struct environment_t *environment, struct object_t *args)
 {
@@ -106,15 +177,38 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
         switch (byte)
         {
             case OPCODE_LDARG_X:
+                {
+                    unsigned char arg_index = *pc++;
+                    STACK_PUSH(sp, program_area[arg_index]);
+                }
+                break;
             case OPCODE_LDIMM_1_BOOL:
+                LDIMM_1_BOOLEAN()
+                break;
             case OPCODE_LDIMM_1_CHAR:
+                LDIMM_1_CHAR()
+                break;
             case OPCODE_LDIMM_1_FIXNUM:
+                LDIMM_1_FIXNUM()
+                break;
             case OPCODE_LDIMM_1_FLONUM:
+                LDIMM_1_FLONUM()
+                break;
             case OPCODE_LDIMM_4_FIXNUM:
+                LDIMM_4_FIXNUM()
+                break;
             case OPCODE_LDIMM_4_FLONUM:
+                LDIMM_4_FLONUM()
+                break;
             case OPCODE_LDIMM_8_FIXNUM:
+                LDIMM_8_FIXNUM()
+                break;
             case OPCODE_LDIMM_8_FLONUM:
+                LDIMM_8_FLONUM()
+                break;
             case OPCODE_LDIMM_8_SYMBOL:
+                LDIMM_8_SYMBOL()
+                break;
             case OPCODE_LDSTR:
             case OPCODE_SET:
             case OPCODE_NEW:
