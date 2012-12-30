@@ -35,15 +35,13 @@ typedef struct object_t *(*special_function_t)(struct environment_t *, struct ob
 
 union object_value_t
 {
-    int boolean_value;
-    long fixnum_value;
+    int64_t fixnum_value;
     double flonum_value;
-    char char_value;
-    special_function_t special_function_value;
     uint64_t symbol_hash;
+    special_function_t special_function_value;
     char string_value[1];
     struct object_t *pair[2];
-    char procedure_data[1];
+    struct object_t *ref;
 };
 
 struct object_t

@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
+#include <inttypes.h>
 
 #include "base.h"
 #include "builtins.h"
@@ -194,10 +195,10 @@ print(struct environment_t *environment, struct object_t *args)
     switch (args->tag_count.tag)
     {
         case TAG_BOOLEAN:
-            printf("%s", args->value.boolean_value ? "#t" : "#f");
+            printf("%s", args->value.fixnum_value ? "#t" : "#f");
             return args + 1;
         case TAG_CHAR:
-            printf("%c", args->value.char_value);
+            printf("%c", (char)args->value.fixnum_value);
             return args + 1;
         case TAG_VECTOR:
             {
@@ -211,7 +212,7 @@ print(struct environment_t *environment, struct object_t *args)
                 return object;
             }
         case TAG_FIXNUM:
-            printf("%ld", args->value.fixnum_value);
+            printf("%" PRId64, args->value.fixnum_value);
             return args + 1;
         case TAG_FLONUM:
             printf("%f", args->value.flonum_value);

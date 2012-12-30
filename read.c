@@ -144,14 +144,14 @@ object_from_symbol(struct environment_t *environment, const struct token_t *inpu
         if (next_char == 't' || next_char == 'f')
         {
             object = gc_alloc(environment->heap, TAG_BOOLEAN, 0);
-            object->value.boolean_value = next_char == 't';
+            object->value.fixnum_value = next_char == 't';
             return object;
         }
 
         /* #\blat -> char */
         assert(next_char == '\\');
         object = gc_alloc(environment->heap, TAG_CHAR, 0);
-        object->value.char_value = strstr(input->text, "newline") != NULL ? '\n' : input->text[2];
+        object->value.fixnum_value = strstr(input->text, "newline") != NULL ? '\n' : input->text[2];
         return object;
     }
     else if (is_number(input)) 
