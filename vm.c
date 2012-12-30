@@ -7,6 +7,11 @@
 #include "runtime.h"
 #include "vm.h"
 
+/*
+ * Stack etiquette:
+ * The stack pointer points to the first available slot in the stack (ie: use first, then decrement).
+ */
+
 #define ENABLE_VM_ASSERTS 1
 
 #if ENABLE_VM_ASSERTS
@@ -15,7 +20,7 @@
     #define VM_ASSERT(x)
 #endif
 
-#define STACK_PUSH(stack, x) do { *(--stack) = x; } while (0)
+#define STACK_PUSH(stack, x) do { *(stack--) = x; } while (0)
 #define STACK_POP(stack) *(stack++) 
 #ifndef NDEBUG
 #   define VALIDATE_STACK(env) do { \
@@ -112,7 +117,7 @@ push_args_to_stack(struct environment_t *environment, struct object_t *args)
 
     stack_ptr -= count;
 
-    memcpy(stack_ptr,
+    memmove(stack_ptr,
             environment->stack_bottom,
             count * sizeof(struct object_t));
 
@@ -120,7 +125,7 @@ push_args_to_stack(struct environment_t *environment, struct object_t *args)
             0,
             count * sizeof(struct object_t));
 
-    environment->stack_ptr = stack_ptr;
+    environment->stack_ptr = stack_ptr - 1;
 
     return count;
 }
