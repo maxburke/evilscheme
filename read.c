@@ -10,13 +10,16 @@
 #include "runtime.h"
 
 /*
+ * TODO: Remove use of calloc.
+ */
+
+/*
  * Singly linked list used for storage of the intermediate tokens.
  */
 struct slist_t
 {
     struct slist_t *next;
 };
-
 
 /*
  * Helper function to add a new link to the specified slist.
@@ -139,7 +142,9 @@ object_from_symbol(struct environment_t *environment, const struct token_t *inpu
 
     if (input->text[0] == '#') 
     {
-        /* #t/#f -> boolean */
+        /* 
+         * #t/#f -> boolean
+         */
         char next_char = tolower(input->text[1]);
         if (next_char == 't' || next_char == 'f')
         {
@@ -148,7 +153,9 @@ object_from_symbol(struct environment_t *environment, const struct token_t *inpu
             return object;
         }
 
-        /* #\blat -> char */
+        /*
+         * #\blat -> char
+         */
         assert(next_char == '\\');
         object = gc_alloc(environment->heap, TAG_CHAR, 0);
         object->value.fixnum_value = strstr(input->text, "newline") != NULL ? '\n' : input->text[2];
@@ -169,9 +176,11 @@ object_from_symbol(struct environment_t *environment, const struct token_t *inpu
         return object;
     }
 
-    /* If it's not a boolean, char, or number that we've parsed then it must 
-       be a symbol or a string. Vectors, pairs, and procedures are allocated
-       at runtime. */
+    /*
+     * If it's not a boolean, char, or number that we've parsed then it must 
+     * be a symbol or a string. Vectors, pairs, and procedures are allocated
+     * at runtime.
+     */
     string_length = strlen(input->text);
 
     if (input->type == TOKEN_STRING)
@@ -248,26 +257,36 @@ expand_to(struct token_t *input, const char *expansion)
     size_t expansion_string_length = strlen(expansion);
     size_t paren_level = 0;
 
-    /* Allocate expansion token */
+    /*
+     * Allocate expansion token
+     */
     expansion_token = calloc(sizeof(struct token_t) + expansion_string_length, 1);
     expansion_token->type = TOKEN_SYMBOL;
     memmove((void *)(&expansion_token->text), expansion, expansion_string_length);
 
-    /* Allocate matching rparen token */
+    /*
+     * Allocate matching rparen token
+     */
     matching_rparen = calloc(sizeof(struct token_t) + strlen(expansion), 1);
     matching_rparen->type = TOKEN_RPAREN;
     ((char *)matching_rparen->text)[0] = ')';
 
-    /* 1. change current token to an lparen */
+    /*
+     * 1. change current token to an lparen
+     */
     input->type = TOKEN_LPAREN;
     ((char *)input->text)[0] = '(';
     ((char *)input->text)[1] = '\0';
 
-    /* 2. insert the expansion symbol */
+    /*
+     * 2. insert the expansion symbol
+     */
     expansion_token->link.next = input->link.next;
     input->link.next = (struct slist_t *)expansion_token;
 
-    /* 3. find matching end paren location, if it is necessary to do so.*/
+    /*
+     * 3. find matching end paren location, if it is necessary to do so.
+     */
     current = (struct token_t *)expansion_token->link.next;
 
     if (current->type == TOKEN_LPAREN)
@@ -287,7 +306,9 @@ expand_to(struct token_t *input, const char *expansion)
             current = (struct token_t *)current->link.next;
         }
 
-    /* 4. insert rparen. */
+    /*
+     * 4. insert rparen.
+     */
     matching_rparen->link.next = current->link.next;
     current->link.next = (struct slist_t *)matching_rparen;
 }
@@ -325,13 +346,17 @@ apply_expansions(struct token_t *input)
     {
         if (iter->text[0] == '\'')
         {
-            /* 'EXPR -> (quote EXPR) */
+            /*
+             * 'EXPR -> (quote EXPR)
+             */
             split_symbol_token(iter, 1);
             expand_to(iter, "quote");
         }
         else if (iter->text[0] == '`')
         {
-            /* `TEMPLATE -> (quasiquote TEMPLATE) */
+            /*
+             * `TEMPLATE -> (quasiquote TEMPLATE)
+             */
             split_symbol_token(iter, 1);
             expand_to(iter, "quasiquote");
         }
@@ -340,8 +365,10 @@ apply_expansions(struct token_t *input)
             struct token_t *vector_token;
             struct slist_t *next = iter->link.next->next;
 
-            /* #(CONTENTS) -> (vector CONTENTS) */
-            /* Change current token to an LPAREN */
+            /*
+             * #(CONTENTS) -> (vector CONTENTS)
+             * Change current token to an LPAREN
+             */
             assert(iter->text[1] == '\0');
             iter->type = TOKEN_LPAREN;
             ((char *)iter->text)[0] = '(';
