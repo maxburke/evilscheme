@@ -1,5 +1,10 @@
 #include "object.h"
 
+/*
+ * Symbols are a value type that have their string representation stored
+ * hashed. The hashing algorithm below is the FNV-1 hash algorithm.
+ */
+
 #define PRIME UINT64_C(1099511628211)
 
 uint64_t
