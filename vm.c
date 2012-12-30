@@ -52,7 +52,7 @@ push_args_to_stack(struct environment_t *environment, struct object_t *args)
     return count;
 }
 
-static void
+static inline void
 push_ref(struct environment_t *environment, void *ref)
 {
     struct object_t return_address;
@@ -83,7 +83,12 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
 
     /*
      * Stack layout for VM:
+     * [high addresses]............................................................................[low addresses]
      * [arg n - 1][...][arg 1][arg 0][return address][program area chain][stack chain][stack top]...[stack_bottom]
+     *                                      ^                                               ^
+     *                  program_area -------+                                     sp -------+
+     *
+     * arg0 is at program_area[1]
      */
 
     num_args = push_args_to_stack(environment, args);
