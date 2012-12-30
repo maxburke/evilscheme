@@ -51,6 +51,7 @@ union four_byte_union_t
         sp->tag_count.count = 1;                                                            \
         fb.bytes[0] = *pc++; fb.bytes[1] = *pc++; fb.bytes[2] = *pc++; fb.bytes[3] = *pc++; \
         sp->value.FIELD = fb.FIELD;                                                         \
+        --sp;                                                                               \
     }
 
 #define LDIMM_4_FIXNUM() LDIMM_4_IMPL(TAG_FIXNUM, fixnum_value)
@@ -72,6 +73,7 @@ union eight_byte_union_t
         fb.bytes[0] = *pc++; fb.bytes[1] = *pc++; fb.bytes[2] = *pc++; fb.bytes[3] = *pc++; \
         fb.bytes[4] = *pc++; fb.bytes[5] = *pc++; fb.bytes[6] = *pc++; fb.bytes[7] = *pc++; \
         sp->value.FIELD = fb.FIELD;                                                         \
+        --sp;                                                                               \
     }
 
 #define LDIMM_8_FIXNUM() LDIMM_8_IMPL(TAG_FIXNUM, fixnum_value)
