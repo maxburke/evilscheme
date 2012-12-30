@@ -18,9 +18,16 @@ struct symbol_table_fragment_t;
 struct environment_t
 {
     struct tag_count_t tag_count;
-    void *stack_top;
-    void *stack_bottom;
-    void *stack_ptr;
+    
+    /*
+     * These fields hold the saved VM state in case execution is interrupted
+     * or postponed.
+     */
+    struct object_t *stack_top;
+    struct object_t *stack_bottom;
+    struct object_t *stack_ptr;
+    unsigned int condition_flags;
+
     struct heap_t *heap;
     struct environment_t *parent_environment;
     struct symbol_table_fragment_t *symbol_table_fragment;
