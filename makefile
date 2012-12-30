@@ -1,12 +1,21 @@
-CC = gcc -Wall -Wextra -pedantic -g
+CC = gcc
+LD = gcc
+CFLAGS = -Wall -Wextra -pedantic -g
+LDFLAGS = -g
 OBJS = $(patsubst %.c,%.o,$(wildcard *.c))
 HEADERS = $(wildcard *.h)
 
+ifndef CHECK89
+    CFLAGS := $(CFLAGS) -Werror -std=c99
+else
+    CFLAGS := $(CFLAGS) -std=c89
+endif
+
 %.o : %.c $(HEADERS)
-	$(CC) -c -o $@ $< $(CFLAGS)
+	$(CC) $(CFLAGS) -c -o $@ $< $(CFLAGS)
 
 r4rs : $(OBJS)
-	gcc -g -o $@ $^ $(CFLAGS)
+	$(LD) $(LDFLAGS) -o $@ $^ $(CFLAGS)
 
 clean :
 	rm *.o
