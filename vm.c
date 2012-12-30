@@ -7,9 +7,7 @@
 #include "runtime.h"
 #include "vm.h"
 
-extern struct object_t *empty_pair;
-
-int
+static int
 push_args_to_stack(struct environment_t *environment, struct object_t *args)
 {
     struct object_t *i;
@@ -54,58 +52,96 @@ push_args_to_stack(struct environment_t *environment, struct object_t *args)
     return count;
 }
 
+static void
+push_ref(struct environment_t *environment, void *ref)
+{
+    struct object_t return_address;
+
+    return_address.tag_count.tag = TAG_REFERENCE;
+    return_address.tag_count.flag = 0;
+    return_address.tag_count.count = 1;
+    return_address.value.ref = ref;
+
+    *(environment->stack_ptr) = return_address;
+}
+
 struct object_t *
 vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *args)
 {
-    void *fn_mem;
     struct procedure_t *procedure;
-    void *old_stack;
+    struct object_t *program_area;
+    struct object_t *sp;
+    struct object_t *old_stack;
     int num_args;
-    char *pc;
+    unsigned char *pc;
+   
+    procedure = (struct procedure_t *)fn;
+    old_stack = environment->stack_ptr;
+    sp = old_stack;
+    program_area = old_stack;
+    pc = procedure->byte_code;
 
     /*
-     * Working around initialization-via-unrelated-type-cast warning.
+     * Stack layout for VM:
+     * [arg n - 1][...][arg 1][arg 0][return address][program area chain][stack chain][stack top]...[stack_bottom]
      */
-    fn_mem = fn;
-    procedure = fn_mem;
-    pc = NULL;
-
-    old_stack = environment->stack_ptr;
 
     num_args = push_args_to_stack(environment, args);
     assert(num_args == procedure->num_args);
-
+    push_ref(environment, NULL);    /* return address */
+    push_ref(environment, NULL);    /* program area chain */
+    push_ref(environment, NULL);    /* stack chain */
+    sp = environment->stack_ptr;
+    fn = environment->stack_ptr;
+    
     for (;;)
     {
-        switch (*pc)
+        unsigned byte = *pc++;
+
+        switch (byte)
         {
-            case OPCODE_LDARG:
-            case OPCODE_LDIMM_1:
-            case OPCODE_LDIMM_4:
-            case OPCODE_LDIMM_8:
+            case OPCODE_LDARG_X:
+            case OPCODE_LDIMM_1_BOOL:
+            case OPCODE_LDIMM_1_CHAR:
+            case OPCODE_LDIMM_1_FIXNUM:
+            case OPCODE_LDIMM_1_FLONUM:
+            case OPCODE_LDIMM_4_FIXNUM:
+            case OPCODE_LDIMM_4_FLONUM:
+            case OPCODE_LDIMM_8_FIXNUM:
+            case OPCODE_LDIMM_8_FLONUM:
+            case OPCODE_LDIMM_8_SYMBOL:
             case OPCODE_LDSTR:
             case OPCODE_SET:
-            case OPCODE_NEWOBJ:
+            case OPCODE_NEW:
+            case OPCODE_NEW_VECTOR:
             case OPCODE_CMP:
-            case OPCODE_BRANCH:
-            case OPCODE_COND_BRANCH:
+            case OPCODE_BRANCH_1:
+            case OPCODE_BRANCH_2:
+            case OPCODE_COND_BRANCH_1:
+            case OPCODE_COND_BRANCH_2:
             case OPCODE_CALL:
+            case OPCODE_TAILCALL:
+            case OPCODE_RETURN:
             case OPCODE_GET_BOUND_LOCATION:
             case OPCODE_ADD:
             case OPCODE_SUB:
             case OPCODE_MUL:
             case OPCODE_DIV:
+            case OPCODE_DUP_X:
+            case OPCODE_POP_X:
+            case OPCODE_SWAP_X:
             default:
                 BREAK();
                 break;
         }
-
-        if (pc == NULL)
-            break;
     }
 
     environment->stack_ptr = old_stack;
 
+    /*
+     * This should probably cons the last return value on the stack and
+     * return that instead.
+     */
     return NULL;
 }
 
