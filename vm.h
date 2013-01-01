@@ -9,6 +9,8 @@
 
 enum opcode_t
 {
+    OPCODE_INVALID,
+
     /*
      * OPCODE_LDARG_X [arg #] | -> [value]
      * Copy argument X (0 .. n-1) to the top of the stack
