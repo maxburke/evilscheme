@@ -86,7 +86,7 @@ union eight_byte_union_t
 #define LDIMM_8_SYMBOL() LDIMM_8_IMPL(TAG_SYMBOL, symbol_hash)
 
 static int
-push_args_to_stack(struct environment_t *environment, struct object_t *args)
+vm_push_args_to_stack(struct environment_t *environment, struct object_t *args)
 {
     struct object_t *i;
     struct object_t *stack_ptr;
@@ -94,7 +94,7 @@ push_args_to_stack(struct environment_t *environment, struct object_t *args)
     int count;
 
     /*
-     * push_args_to_stack pushes the args in forward order to the bottom of
+     * vm_push_args_to_stack pushes the args in forward order to the bottom of
      * the stack and then memcpy's them to where they need to be. This allows
      * them to be in the correct order without having to do some complex
      * push + reversal.
@@ -131,7 +131,7 @@ push_args_to_stack(struct environment_t *environment, struct object_t *args)
 }
 
 static inline void
-push_ref(struct environment_t *environment, void *ref)
+vm_push_ref(struct environment_t *environment, void *ref)
 {
     struct object_t return_address;
 
@@ -141,6 +141,35 @@ push_ref(struct environment_t *environment, void *ref)
     return_address.value.ref = ref;
 
     *(environment->stack_ptr) = return_address;
+}
+
+static inline void
+vm_demote_numeric(struct object_t *obj)
+{
+    VM_ASSERT(obj->tag_count.tag == TAG_FLONUM);
+
+    obj->tag_count.tag = TAG_FLONUM;
+    obj->value.flonum_value = (double)(obj->value.fixnum_value);
+}
+
+static inline unsigned int
+vm_compare(struct object_t *a, struct object_t *b)
+{
+    const unsigned char a_tag = a->tag_count.tag;
+    const unsigned char b_tag = b->tag_count.tag;
+    const unsigned short combined_tags = ((unsigned short)a_tag) << 8 | (unsigned short)b_tag;
+
+    switch (combined_tags)
+    {
+        case (((unsigned short)TAG_FIXNUM) << 8 | (unsigned short)TAG_FLONUM):
+            vm_demote_numeric(a);
+            break;
+        case (((unsigned short)TAG_FLONUM) << 8 | (unsigned short)TAG_FIXNUM):
+            vm_demote_numeric(b);
+            break;
+    }
+
+#error finish this shit
 }
 
 struct object_t *
@@ -169,11 +198,11 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
      * arg0 is at program_area[1]
      */
 
-    num_args = push_args_to_stack(environment, args);
+    num_args = vm_push_args_to_stack(environment, args);
     assert(num_args == procedure->num_args);
-    push_ref(environment, NULL);    /* return address */
-    push_ref(environment, NULL);    /* program area chain */
-    push_ref(environment, NULL);    /* stack chain */
+    vm_push_ref(environment, NULL);    /* return address */
+    vm_push_ref(environment, NULL);    /* program area chain */
+    vm_push_ref(environment, NULL);    /* stack chain */
     sp = environment->stack_ptr;
     fn = environment->stack_ptr;
     
@@ -183,6 +212,9 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
 
         switch (byte)
         {
+            case OPCODE_INVALID:
+                BREAK();
+                break;
             case OPCODE_LDARG_X:
                 {
                     unsigned char arg_index = *pc++;
@@ -217,7 +249,21 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
                 LDIMM_8_SYMBOL()
                 break;
             case OPCODE_LDSTR:
+                {
+                    struct object_t *string_obj;
+                    size_t string_length;
+
+                    string_length = strlen(pc);
+                    string_obj = gc_alloc(environment->heap, TAG_STRING, string_length);
+                    strcpy(string_obj->string_value, pc);
+                    vm_push_ref(environment, string_obj);
+
+                    pc += string_length + 1;
+                }
+                break;
             case OPCODE_SET:
+            case OPCODE_SET_CAR:
+            case OPCODE_SET_CDR:
             case OPCODE_NEW:
             case OPCODE_NEW_VECTOR:
             case OPCODE_CMP:
