@@ -59,7 +59,12 @@ enum opcode_t
     OPCODE_LDSTR,
 
     /*
-     * OPCODE_SET | [reference] [slot reference] -> 
+     * OPCODE_MAKE_REF | [reference] [index] -> [slot reference]
+     */
+    OPCODE_MAKE_REF,
+
+    /*
+     * OPCODE_SET | [reference|value] [slot reference] -> 
      * Set the slot reference to the reference provided.
      */
     OPCODE_SET,

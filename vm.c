@@ -1,8 +1,10 @@
 #include <assert.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "base.h"
 #include "environment.h"
+#include "gc.h"
 #include "object.h"
 #include "runtime.h"
 #include "vm.h"
@@ -130,17 +132,50 @@ vm_push_args_to_stack(struct environment_t *environment, struct object_t *args)
     return count;
 }
 
-static inline void
-vm_push_ref(struct environment_t *environment, void *ref)
+static inline struct object_t *
+vm_push_ref(struct object_t *sp, struct object_t *object)
 {
     struct object_t return_address;
 
     return_address.tag_count.tag = TAG_REFERENCE;
     return_address.tag_count.flag = 0;
     return_address.tag_count.count = 1;
-    return_address.value.ref = ref;
+    return_address.value.ref.object = object;
 
-    *(environment->stack_ptr) = return_address;
+#ifdef ENABLE_VM_ASSERTS
+    return_address.value.ref.index = 0;
+#endif
+
+    *(sp--) = return_address;
+
+    return sp;
+}
+
+static inline struct object_t
+vm_create_inner_reference(struct object_t *object, int64_t index)
+{
+    struct object_t inner_reference;
+
+    inner_reference.tag_count.tag = TAG_INNER_REFERENCE;
+    inner_reference.tag_count.flag = 0;
+    inner_reference.tag_count.count = 1;
+    inner_reference.value.ref.object = object;
+    inner_reference.value.ref.index = index;
+
+    return inner_reference;
+}
+
+static inline unsigned char
+vm_reference_type(struct object_t *ref)
+{
+    const struct object_t *referenced_object = ref->value.ref.object;
+
+#ifdef ENABLE_VM_ASSERTS
+    const unsigned char ref_type = ref->tag_count.tag;
+    VM_ASSERT(ref_type == TAG_REFERENCE || ref_type == TAG_INNER_REFERENCE);
+#endif
+
+    return referenced_object->tag_count.tag;
 }
 
 static inline void
@@ -172,6 +207,18 @@ vm_compare(struct object_t *a, struct object_t *b)
 #error finish this shit
 }
 
+static inline struct object_t *
+vm_vector_index(struct object_t *vector, int64_t index)
+{
+    struct tag_count_t *header;
+    void *vector_element_base;
+    
+    header = &vector->tag_count;
+    vector_element_base = header + 1;
+
+    return (struct object_t *)vector_element_base + index;
+}
+
 struct object_t *
 vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *args)
 {
@@ -200,9 +247,9 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
 
     num_args = vm_push_args_to_stack(environment, args);
     assert(num_args == procedure->num_args);
-    vm_push_ref(environment, NULL);    /* return address */
-    vm_push_ref(environment, NULL);    /* program area chain */
-    vm_push_ref(environment, NULL);    /* stack chain */
+    sp = vm_push_ref(sp, NULL);    /* return address */
+    sp = vm_push_ref(sp, NULL);    /* program area chain */
+    sp = vm_push_ref(sp, NULL);    /* stack chain */
     sp = environment->stack_ptr;
     fn = environment->stack_ptr;
     
@@ -253,15 +300,58 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
                     struct object_t *string_obj;
                     size_t string_length;
 
-                    string_length = strlen(pc);
+                    string_length = strlen((const char *)pc);
                     string_obj = gc_alloc(environment->heap, TAG_STRING, string_length);
-                    strcpy(string_obj->string_value, pc);
-                    vm_push_ref(environment, string_obj);
+                    strcpy(string_obj->value.string_value, (const char *)pc);
+                    sp = vm_push_ref(sp, string_obj);
 
                     pc += string_length + 1;
                 }
                 break;
+            case OPCODE_MAKE_REF:
+                {
+                    struct object_t * const ref = sp - 2;
+                    struct object_t * const index = sp - 1;
+                    VM_ASSERT(ref->tag_count.tag == TAG_REFERENCE);
+                    VM_ASSERT(index->tag_count.tag == TAG_FIXNUM);
+
+                    *ref = vm_create_inner_reference(ref->value.ref.object, index->value.fixnum_value);
+                    --sp;
+                }
+                break;
             case OPCODE_SET:
+                {
+                    struct object_t *source = sp - 2;
+                    struct object_t *ref = sp - 1;
+                    struct object_t *ref_obj = ref->value.ref.object;
+                    int64_t ref_index = ref->value.ref.index;
+
+                    const unsigned char target_type = ref_obj->tag_count.tag; 
+
+                    VM_ASSERT(target_type == TAG_STRING || target_type == TAG_VECTOR);
+
+                    if (target_type == TAG_STRING)
+                    {
+                        char *target;
+                        char source_value;
+                        
+                        VM_ASSERT(source->tag_count.tag == TAG_CHAR);
+                        target = &ref_obj->value.string_value[ref_index];
+                        source_value = (char)source->value.fixnum_value;
+
+                        *target = source_value;
+                    }
+                    else
+                    {
+                        struct object_t *target;
+
+                        target = vm_vector_index(ref_obj, ref_index);
+                        *target = *source;
+                    }
+
+                    sp -= 2;
+                }
+                break;
             case OPCODE_SET_CAR:
             case OPCODE_SET_CDR:
             case OPCODE_NEW:
