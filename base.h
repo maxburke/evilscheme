@@ -12,7 +12,7 @@
     /*
      * CL doesn't provide inline but it provides __inline
      */
-    #define inline 
+    #define inline __inline
 #elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
     /*
      * C99 compliant compiler does not need inline to be defined.
@@ -22,6 +22,12 @@
      * GCC in C89 mode doesn't have inline but it does have __inline__
      */
     #define inline __inline__
+#endif
+
+#ifdef _MSC_VER
+    #define PRId64 "I64d"
+#else
+    #include <inttypes.h>
 #endif
 
 #define UNUSED(x) (void)x
