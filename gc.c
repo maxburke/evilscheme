@@ -50,7 +50,7 @@ gc_alloc(struct heap_t *heap, enum tag_t type, size_t extra_bytes)
     if (type == TAG_STRING)
     {
         assert(extra_bytes < 65536);
-        object->tag_count.count = extra_bytes;
+        object->tag_count.count = (unsigned short)extra_bytes;
     }
     else
     {
@@ -70,10 +70,10 @@ gc_alloc_vector(struct heap_t *heap, size_t count)
      * objects or references to complex objects (strings/symbols/functions/etc.)
      */
     size_t total_alloc_size = (count * sizeof(struct object_t)) + sizeof(struct tag_count_t);
-    struct object_t *object=  gc_perform_alloc(heap, total_alloc_size);
+    struct object_t *object = gc_perform_alloc(heap, total_alloc_size);
 
     object->tag_count.tag = TAG_VECTOR;
-    object->tag_count.count = count;
+    object->tag_count.count = (unsigned short)count;
 
     return object;
 }

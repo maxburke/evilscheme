@@ -10,6 +10,35 @@
 #include "read.h"
 #include "runtime.h"
 
+#ifdef _MSC_VER
+    #include <malloc.h>
+
+    static int
+    posix_memalign(void **ptr, size_t alignment, size_t size)
+    {
+        void *mem;
+
+        mem = _aligned_malloc(size, alignment);
+        *ptr = mem;
+
+        return mem != 0;
+    }
+
+    static void
+    posix_memfree(void *ptr)
+    {
+        _aligned_free(ptr);
+    }
+#else
+    static void
+    posix_memfree(void *ptr)
+    {
+        free(ptr);
+    }
+#endif
+
+
+
 /*
  * main!
  */
@@ -55,6 +84,8 @@ main(void)
         print(environment, result);
         printf("\n");
     }
+
+    posix_memfree(heap);
 
     return 0;
 }

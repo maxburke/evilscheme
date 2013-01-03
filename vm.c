@@ -205,6 +205,7 @@ vm_compare(struct object_t *a, struct object_t *b)
     }
 
 #error finish this shit
+    return 0;
 }
 
 static inline struct object_t *

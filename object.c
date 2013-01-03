@@ -13,8 +13,12 @@ hash_string(const char *string)
     uint64_t hash = UINT64_C(14695981039346656037);
     char c;
 
-    while ((c = *string++))
+    for (;;)
     {
+        c = *string++;
+        if (c == 0)
+            break;
+
         hash = (hash * PRIME) ^ (uint64_t)(unsigned char)c;
     }
 

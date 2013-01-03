@@ -145,7 +145,7 @@ object_from_symbol(struct environment_t *environment, const struct token_t *inpu
         /* 
          * #t/#f -> boolean
          */
-        char next_char = tolower(input->text[1]);
+        char next_char = (char)tolower(input->text[1]);
         if (next_char == 't' || next_char == 'f')
         {
             object = gc_alloc(environment->heap, TAG_BOOLEAN, 0);

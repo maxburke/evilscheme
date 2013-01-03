@@ -2,7 +2,7 @@
 #define BASE_H
 
 #ifdef _MSC_VER
-#   define BREAK() __asm int 3
+#   define BREAK() __debugbreak()
 #else
 #   include <signal.h>
 #   define BREAK() raise(SIGTRAP)
@@ -12,7 +12,7 @@
     /*
      * CL doesn't provide inline but it provides __inline
      */
-    #define inline __inline
+    #define inline 
 #elif defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
     /*
      * C99 compliant compiler does not need inline to be defined.
