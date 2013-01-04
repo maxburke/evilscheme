@@ -90,6 +90,39 @@ union eight_byte_union_t
 #define LDIMM_8_FLONUM() LDIMM_8_IMPL(TAG_FLONUM, flonum_value)
 #define LDIMM_8_SYMBOL() LDIMM_8_IMPL(TAG_SYMBOL, symbol_hash)
 
+#ifdef ENABLE_VM_ASSERTS
+    #define ENSURE_NUMERIC(X) VM_ASSERT(X ## _tag == TAG_FIXNUM || X ## _tag == TAG_FLONUM) 
+#else
+    #define ENSURE_NUMERIC(X)
+#endif
+
+#define CONDITIONAL_DEMOTE(A, B) do {                                                       \
+        if (a_tag == TAG_FIXNUM && b_tag == TAG_FLONUM)                                     \
+        {                                                                                   \
+            vm_demote_numeric(A);                                                           \
+        }                                                                                   \
+        else if (a_tag == TAG_FLONUM && b_tag == TAG_FIXNUM)                                \
+        {                                                                                   \
+            vm_demote_numeric(B);                                                           \
+        }                                                                                   \
+    } while (0)
+
+#define CMPN_IMPL(OP) {                                                                     \
+        struct object_t *a = sp + 1;                                                        \
+        struct object_t *b = sp + 2;                                                        \
+        unsigned char a_tag = a->tag_count.tag;                                             \
+        unsigned char b_tag = b->tag_count.tag;                                             \
+        int result;                                                                         \
+                                                                                            \
+        ENSURE_NUMERIC(a);                                                                  \
+        ENSURE_NUMERIC(b);                                                                  \
+        CONDITIONAL_DEMOTE(a, b);                                                           \
+        result = (a_tag == TAG_FIXNUM)                                                      \
+            ? (a->value.fixnum_value OP b->value.fixnum_value)                              \
+            : (a->value.flonum_value OP b->value.flonum_value);                             \
+        sp = vm_push_bool(sp + 2, result);                                                  \
+    }
+
 static int
 vm_push_args_to_stack(struct environment_t *environment, struct object_t *args)
 {
@@ -486,10 +519,20 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
                 }
                 break;
             case OPCODE_CMPN_EQ:
+                CMPN_IMPL(=)
+                break;
             case OPCODE_CMPN_LT:
+                CMPN_IMPL(<)
+                break;
             case OPCODE_CMPN_GT:
-            case OPCODE_CMPN_LTE:
-            case OPCODE_CMPN_GTE:
+                CMPN_IMPL(>)
+                break;
+            case OPCODE_CMPN_LE:
+                CMPN_IMPL(<=)
+                break;
+            case OPCODE_CMPN_GE:
+                CMPN_IMPL(>=)
+                break;
             case OPCODE_BRANCH_1:
             case OPCODE_BRANCH_2:
             case OPCODE_COND_BRANCH_1:

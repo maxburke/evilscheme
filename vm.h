@@ -103,8 +103,8 @@ enum opcode_t
     OPCODE_CMPN_EQ,
     OPCODE_CMPN_LT,
     OPCODE_CMPN_GT,
-    OPCODE_CMPN_LTE,
-    OPCODE_CMPN_GTE,
+    OPCODE_CMPN_LE,
+    OPCODE_CMPN_GE,
 
     /*
      * OPCODE_BRANCH_N [offset bytes 0 .. (N - 1)]
