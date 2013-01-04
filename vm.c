@@ -9,8 +9,6 @@
 #include "runtime.h"
 #include "vm.h"
 
-#error NOTE: Your stack movement is all buggered up. The vm loop code that pops elements off is decrementing, as is the code that is pushing elements on. Fix it!
-
 /*
  * Stack etiquette:
  * The stack pointer points to the first available slot in the stack (ie: use first, then decrement).
@@ -450,19 +448,19 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
                 break;
             case OPCODE_MAKE_REF:
                 {
-                    struct object_t * const ref = sp - 2;
-                    struct object_t * const index = sp - 1;
+                    struct object_t * const ref = sp + 2;
+                    struct object_t * const index = sp + 1;
                     VM_ASSERT(ref->tag_count.tag == TAG_REFERENCE);
                     VM_ASSERT(index->tag_count.tag == TAG_FIXNUM);
 
                     *ref = vm_create_inner_reference(ref->value.ref.object, index->value.fixnum_value);
-                    --sp;
+                    ++sp;
                 }
                 break;
             case OPCODE_SET:
                 {
-                    struct object_t *source = sp - 2;
-                    struct object_t *ref = sp - 1;
+                    struct object_t *source = sp + 2;
+                    struct object_t *ref = sp + 1;
                     struct object_t *ref_obj = ref->value.ref.object;
                     int64_t ref_index = ref->value.ref.index;
 
@@ -489,7 +487,7 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
                         *target = *source;
                     }
 
-                    sp -= 2;
+                    sp += 2;
                 }
                 break;
             case OPCODE_SET_CAR:
@@ -500,14 +498,12 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
                 break;
             case OPCODE_CMP_EQUAL:
                 {
-                    struct object_t *b = sp - 2;
-                    struct object_t *a = sp - 1;
+                    struct object_t *b = sp + 2;
+                    struct object_t *a = sp + 1;
                     int is_equal;
                     
-                    sp -= 2;
-
                     is_equal = vm_compare_equal(a, b);
-                    sp = vm_push_bool(sp, is_equal);
+                    sp = vm_push_bool(sp + 2, is_equal);
                 }
                 break;
             case OPCODE_CMPN_EQ:
