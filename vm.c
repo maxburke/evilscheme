@@ -336,27 +336,6 @@ vm_compare_equal(const struct object_t *a, const struct object_t *b)
     return 0;
 }
 
-static inline unsigned int
-vm_compare(struct object_t *a, struct object_t *b)
-{
-    const unsigned char a_tag = a->tag_count.tag;
-    const unsigned char b_tag = b->tag_count.tag;
-    const unsigned short combined_tags = ((unsigned short)a_tag) << 8 | (unsigned short)b_tag;
-
-    switch (combined_tags)
-    {
-        case (((unsigned short)TAG_FIXNUM) << 8 | (unsigned short)TAG_FLONUM):
-            vm_demote_numeric(a);
-            break;
-        case (((unsigned short)TAG_FLONUM) << 8 | (unsigned short)TAG_FIXNUM):
-            vm_demote_numeric(b);
-            break;
-    }
-
-#error finish this shit
-    return 0;
-}
-
 struct object_t *
 vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *args)
 {
