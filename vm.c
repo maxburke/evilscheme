@@ -9,6 +9,8 @@
 #include "runtime.h"
 #include "vm.h"
 
+#error NOTE: Your stack movement is all buggered up. The vm loop code that pops elements off is decrementing, as is the code that is pushing elements on. Fix it!
+
 /*
  * Stack etiquette:
  * The stack pointer points to the first available slot in the stack (ie: use first, then decrement).
@@ -30,6 +32,9 @@
 #else
 #   define VALIDATE_STACK(env)
 #endif
+
+static inline int
+vm_compare_equal(const struct object_t *a, const struct object_t *b);
 
 #define LDIMM_1_IMPL(FIELD, TYPE, TAG) {        \
         sp->tag_count.tag = TAG;                \
@@ -108,12 +113,12 @@ vm_push_args_to_stack(struct environment_t *environment, struct object_t *args)
 
     for (i = args; CAR(i) != empty_pair; i = CDR(i))
     {
-        struct object_t *obj;
+        struct object_t *object;
         
-        obj = CAR(i);
-        assert(obj->tag_count.count == 1);
+        object = CAR(i);
+        assert(object->tag_count.count == 1);
         assert(ptr < stack_ptr);
-        *ptr++ = *obj;
+        *ptr++ = *object;
         ++count;
     }
 
@@ -151,6 +156,21 @@ vm_push_ref(struct object_t *sp, struct object_t *object)
     return sp;
 }
 
+static inline struct object_t *
+vm_push_bool(struct object_t *sp, int val)
+{
+    struct object_t boolean;
+
+    boolean.tag_count.tag = TAG_BOOLEAN;
+    boolean.tag_count.flag = 0;
+    boolean.tag_count.count = 1;
+    boolean.value.fixnum_value = val;
+
+    *(sp--) = boolean;
+
+    return sp;
+}
+
 static inline struct object_t
 vm_create_inner_reference(struct object_t *object, int64_t index)
 {
@@ -179,12 +199,143 @@ vm_reference_type(struct object_t *ref)
 }
 
 static inline void
-vm_demote_numeric(struct object_t *obj)
+vm_demote_numeric(struct object_t *object)
 {
-    VM_ASSERT(obj->tag_count.tag == TAG_FLONUM);
+    VM_ASSERT(object->tag_count.tag == TAG_FLONUM);
 
-    obj->tag_count.tag = TAG_FLONUM;
-    obj->value.flonum_value = (double)(obj->value.fixnum_value);
+    object->tag_count.tag = TAG_FLONUM;
+    object->value.flonum_value = (double)(object->value.fixnum_value);
+}
+
+static inline const struct object_t *
+vm_flatten_reference(const struct object_t *object)
+{
+    VM_ASSERT(object->tag_count.tag != TAG_INNER_REFERENCE);
+
+    if (object->tag_count.tag != TAG_REFERENCE)
+        return object;
+
+    return object->value.ref.object;
+}
+
+static inline struct object_t *
+vm_vector_index(struct object_t *vector, int64_t index)
+{
+    struct tag_count_t *header;
+    void *vector_element_base;
+    
+    header = &vector->tag_count;
+    vector_element_base = header + 1;
+
+    return (struct object_t *)vector_element_base + index;
+}
+
+static inline int
+vm_compare_equal_reference_type(const struct object_t *a, const struct object_t *b)
+{
+    const unsigned char a_tag = a->tag_count.tag;
+    const unsigned char b_tag = b->tag_count.tag;
+
+    VM_ASSERT(a_tag != TAG_REFERENCE && b_tag != TAG_REFERENCE);
+
+    /*
+     * If the references point to the same object, they are equal.
+     */
+    if (a == b)
+        return 1;
+
+    /*
+     * If the objects are of different types, they are NOT equal.
+     */
+    if (a_tag != b_tag)
+        return 0;
+
+    /*
+     * Equal objects should have an equal count field. For non-aggregates
+     * this should be 1 and for aggregates this should be the number of
+     * contained elements (byte code bytes, vector elements, etc.)
+     */
+    if (a->tag_count.count != b->tag_count.count)
+        return 0;
+
+    switch (a_tag)
+    {
+        case TAG_PROCEDURE:
+            {
+                const struct procedure_t *proc_a = (const struct procedure_t *)a;
+                const struct procedure_t *proc_b = (const struct procedure_t *)b;
+
+                return memcmp(proc_a->byte_code, proc_b->byte_code, a->tag_count.count) == 0;
+            }
+        case TAG_SPECIAL_FUNCTION:
+            return a->value.special_function_value == b->value.special_function_value;
+        case TAG_ENVIRONMENT:
+            return 0;
+        case TAG_HEAP:
+            return 0;
+        case TAG_PAIR:
+            return a->value.pair[0] == b->value.pair[0] 
+                && a->value.pair[1] == b->value.pair[1];
+        case TAG_VECTOR:
+            {
+                unsigned short i, e;
+
+                for (i = 0, e = a->tag_count.count; i != e; ++i)
+                {
+                    if (!vm_compare_equal(
+                                vm_vector_index((struct object_t *)a, i),
+                                vm_vector_index((struct object_t *)b, i)))
+                        return 0;
+                }
+
+                return 1;
+            }
+            return 0;
+        case TAG_STRING:
+            return memcmp(a->value.string_value, b->value.string_value, a->tag_count.count) == 0;
+        default:
+            BREAK();
+            break;
+    }
+
+    return 0;
+}
+
+static inline int
+vm_compare_equal(const struct object_t *a, const struct object_t *b)
+{
+    const unsigned char a_tag = a->tag_count.tag;
+    const unsigned char b_tag = b->tag_count.tag;
+
+    if (a_tag != b_tag)
+        return 0;
+
+    switch (a_tag)
+    {
+        case TAG_BOOLEAN:
+        case TAG_CHAR:
+        case TAG_FIXNUM:
+            return a->value.fixnum_value == b->value.fixnum_value;
+        case TAG_FLONUM:
+            return a->value.flonum_value == b->value.flonum_value;
+        case TAG_SYMBOL:
+            return a->value.symbol_hash == b->value.symbol_hash;
+        case TAG_REFERENCE:
+            return vm_compare_equal_reference_type(
+                    vm_flatten_reference(a), 
+                    vm_flatten_reference(b));
+        case TAG_INNER_REFERENCE:
+            if (b_tag == TAG_INNER_REFERENCE)
+            {
+                return a->value.ref.object == b->value.ref.object
+                    && a->value.ref.index == b->value.ref.index;
+            }
+            return 0;
+        default:
+            BREAK();
+    }
+
+    return 0;
 }
 
 static inline unsigned int
@@ -206,18 +357,6 @@ vm_compare(struct object_t *a, struct object_t *b)
 
 #error finish this shit
     return 0;
-}
-
-static inline struct object_t *
-vm_vector_index(struct object_t *vector, int64_t index)
-{
-    struct tag_count_t *header;
-    void *vector_element_base;
-    
-    header = &vector->tag_count;
-    vector_element_base = header + 1;
-
-    return (struct object_t *)vector_element_base + index;
 }
 
 struct object_t *
@@ -357,7 +496,25 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
             case OPCODE_SET_CDR:
             case OPCODE_NEW:
             case OPCODE_NEW_VECTOR:
-            case OPCODE_CMP:
+                BREAK();
+                break;
+            case OPCODE_CMP_EQUAL:
+                {
+                    struct object_t *b = sp - 2;
+                    struct object_t *a = sp - 1;
+                    int is_equal;
+                    
+                    sp -= 2;
+
+                    is_equal = vm_compare_equal(a, b);
+                    sp = vm_push_bool(sp, is_equal);
+                }
+                break;
+            case OPCODE_CMPN_EQ:
+            case OPCODE_CMPN_LT:
+            case OPCODE_CMPN_GT:
+            case OPCODE_CMPN_LTE:
+            case OPCODE_CMPN_GTE:
             case OPCODE_BRANCH_1:
             case OPCODE_BRANCH_2:
             case OPCODE_COND_BRANCH_1:

@@ -90,10 +90,21 @@ enum opcode_t
     OPCODE_NEW_VECTOR,
 
     /*
-     * OPCODE_CMP | [value/ref b] [value/ref a] -> 
-     * Evaluates a CMP b and sets the appropriate condition flags.
+     * OPCODE_CMP_EQUAL | [value/ref b] [value/ref a] -> boolean
+     * Compares if two values on the stack are equal? (ie: (equal? a b).
      */
-    OPCODE_CMP,
+    OPCODE_CMP_EQUAL,
+
+    /*
+     * OPCODE_CMPN_<condition> | [value b] [value a] -> boolean
+     * Performs a numeric comparison of the two values on the stack. 
+     * Raises an error if non-numeric types are involved.
+     */
+    OPCODE_CMPN_EQ,
+    OPCODE_CMPN_LT,
+    OPCODE_CMPN_GT,
+    OPCODE_CMPN_LTE,
+    OPCODE_CMPN_GTE,
 
     /*
      * OPCODE_BRANCH_N [offset bytes 0 .. (N - 1)]
