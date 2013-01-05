@@ -599,6 +599,9 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
             case OPCODE_TAILCALL:
             case OPCODE_RETURN:
             case OPCODE_GET_BOUND_LOCATION:
+                BREAK();
+                break;
+
             case OPCODE_ADD:
                 FIXNUM_BINOP(+)
                 break;
