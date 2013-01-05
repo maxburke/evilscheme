@@ -108,15 +108,18 @@ enum opcode_t
 
     /*
      * OPCODE_BRANCH_N [offset bytes 0 .. (N - 1)]
-     * Sets the PC to (byteCodeBase + offsetValue).
+     * Sets the PC to (pc + offsetValue). The base pc value is the one after
+     * the decoded instruction. The offset value is either a 1 or 2 byte
+     * signed integer.
      */
     OPCODE_BRANCH_1,
     OPCODE_BRANCH_2,
 
     /*
-     * OPCODE_COND_BRANCH_N [condition] [offset bytes 0 .. (N - 1)]
-     * Sets the PC to (byteCodeBase + offsetValue) if the specified condition
-     * flags match the condition register.
+     * OPCODE_COND_BRANCH_N [offset bytes 0 .. (N - 1)] | [bool] ->
+     * Sets the PC to (pc + offsetValue) if the boolean value on the top of
+     * the stack is true. As with the branch instruction, the offset value
+     * is either a 1 or 2 byte signed integer.
      */
     OPCODE_COND_BRANCH_1,
     OPCODE_COND_BRANCH_2,
@@ -164,7 +167,7 @@ enum opcode_t
     OPCODE_GET_BOUND_LOCATION,
 
     /*
-     * OPCODE_arithmetic | [b] [a] -> [a OP b]
+     * OPCODE_binop | [b] [a] -> [a OP b]
      * Perform arithmetic on the values on the top of the stack. The type of 
      * the expression [a OP b] is the less precise of the types of a and b.
      * For example, adding the fixnum 3 and flonum 1.0 gives the flonum 4.0.
@@ -174,6 +177,11 @@ enum opcode_t
     OPCODE_SUB,
     OPCODE_MUL,
     OPCODE_DIV,
+
+    OPCODE_AND,
+    OPCODE_OR,
+    OPCODE_XOR,
+    OPCODE_NOT,
 
     /*
      * OPCODE_DUP_X | [a] ... (x - 1) ... -> [a] ... (x - 1) ... [a]

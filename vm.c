@@ -123,6 +123,19 @@ union eight_byte_union_t
         sp = vm_push_bool(sp + 2, result);                                                  \
     }
 
+#define FIXNUM_BINOP(OP) {\
+        struct object_t *a = sp + 1;                                                        \
+        struct object_t *b = sp + 2;                                                        \
+        unsigned char a_tag = a->tag_count.tag;                                             \
+        unsigned char b_tag = b->tag_count.tag;                                             \
+                                                                                            \
+        ENSURE_NUMERIC(a);                                                                  \
+        ENSURE_NUMERIC(b);                                                                  \
+        VM_ASSERT(a_tag == b_tag);                                                          \
+        b->value.fixnum_value = a->value.fixnum_value OP b->value.fixnum_value;             \
+        --sp;                                                                               \
+    }
+
 static int
 vm_push_args_to_stack(struct environment_t *environment, struct object_t *args)
 {
@@ -502,6 +515,7 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
                     sp += 2;
                 }
                 break;
+
             case OPCODE_SET_CAR:
             case OPCODE_SET_CDR:
             case OPCODE_NEW:
@@ -534,17 +548,79 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
                 CMPN_IMPL(>=)
                 break;
             case OPCODE_BRANCH_1:
+                {
+                    int offset = (int)((char)*pc);
+                    pc += offset + 1;
+                }
+                break;
             case OPCODE_BRANCH_2:
+                {
+                    int offset = (int)(*(short *)pc);
+                    pc += offset + 2;
+                }
+                break;
             case OPCODE_COND_BRANCH_1:
+                {
+                    struct object_t *condition;
+                    int offset;
+
+                    condition = sp + 1;
+                    VM_ASSERT(condition->tag_count.tag == TAG_BOOLEAN);
+                    offset = (int)((char)*pc);
+                    ++pc;
+
+                    if (condition->value.fixnum_value)
+                    {
+                        pc += offset;
+                    }
+
+                    ++sp;
+                }
+                break;
             case OPCODE_COND_BRANCH_2:
+                {
+                    struct object_t *condition;
+                    int offset;
+
+                    condition = sp + 1;
+                    VM_ASSERT(condition->tag_count.tag == TAG_BOOLEAN);
+                    offset = (int)(*(short *)pc);
+                    pc += 2;
+
+                    if (condition->value.fixnum_value)
+                    {
+                        pc += offset;
+                    }
+
+                    ++sp;
+                }
+                break;
             case OPCODE_CALL:
             case OPCODE_TAILCALL:
             case OPCODE_RETURN:
             case OPCODE_GET_BOUND_LOCATION:
             case OPCODE_ADD:
+                FIXNUM_BINOP(+)
+                break;
             case OPCODE_SUB:
+                FIXNUM_BINOP(-)
+                break;
             case OPCODE_MUL:
+                FIXNUM_BINOP(*)
+                break;
             case OPCODE_DIV:
+                FIXNUM_BINOP(/)
+                break;
+            case OPCODE_AND:
+                FIXNUM_BINOP(&)
+                break;
+            case OPCODE_OR:
+                FIXNUM_BINOP(|)
+                break;
+            case OPCODE_XOR:
+                FIXNUM_BINOP(^)
+                break;
+            case OPCODE_NOT:
             case OPCODE_DUP_X:
             case OPCODE_POP_X:
             case OPCODE_SWAP_X:
