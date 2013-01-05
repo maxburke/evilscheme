@@ -9,12 +9,21 @@
 #include "runtime.h"
 #include "vm.h"
 
+DISABLE_WARNING(4127)
+DISABLE_WARNING(4996)
+
 /*
  * Stack etiquette:
  * The stack pointer points to the first available slot in the stack (ie: use first, then decrement).
  */
 
-#define ENABLE_VM_ASSERTS 1
+#ifndef ENABLE_VM_ASSERTS
+    #ifdef NDEBUG
+        #define ENABLE_VM_ASSERTS 1
+    #else
+        #define ENABLE_VM_ASSERTS 0
+    #endif
+#endif
 
 #if ENABLE_VM_ASSERTS
     #define VM_ASSERT(x) if (!(x)) { fprintf(stderr, "%s:%d: Assertion failed: %s", __FILE__, __LINE__, #x); BREAK(); } else (void)0
@@ -90,8 +99,8 @@ union eight_byte_union_t
 #define LDIMM_8_FLONUM() LDIMM_8_IMPL(TAG_FLONUM, flonum_value)
 #define LDIMM_8_SYMBOL() LDIMM_8_IMPL(TAG_SYMBOL, symbol_hash)
 
-#ifdef ENABLE_VM_ASSERTS
-    #define ENSURE_NUMERIC(X) VM_ASSERT(X ## _tag == TAG_FIXNUM || X ## _tag == TAG_FLONUM) 
+#if ENABLE_VM_ASSERTS
+    #define ENSURE_NUMERIC(X) VM_ASSERT(X == TAG_FIXNUM || X == TAG_FLONUM) 
 #else
     #define ENSURE_NUMERIC(X)
 #endif
@@ -114,8 +123,8 @@ union eight_byte_union_t
         unsigned char b_tag = b->tag_count.tag;                                             \
         int result;                                                                         \
                                                                                             \
-        ENSURE_NUMERIC(a);                                                                  \
-        ENSURE_NUMERIC(b);                                                                  \
+        ENSURE_NUMERIC(a_tag);                                                              \
+        ENSURE_NUMERIC(b_tag);                                                              \
         CONDITIONAL_DEMOTE(a, b);                                                           \
         result = (a_tag == TAG_FIXNUM)                                                      \
             ? (a->value.fixnum_value OP b->value.fixnum_value)                              \
@@ -126,11 +135,9 @@ union eight_byte_union_t
 #define FIXNUM_BINOP(OP) {\
         struct object_t *a = sp + 1;                                                        \
         struct object_t *b = sp + 2;                                                        \
-        unsigned char a_tag = a->tag_count.tag;                                             \
-        unsigned char b_tag = b->tag_count.tag;                                             \
                                                                                             \
-        ENSURE_NUMERIC(a);                                                                  \
-        ENSURE_NUMERIC(b);                                                                  \
+        ENSURE_NUMERIC(a->tag_count.tag);                                                   \
+        ENSURE_NUMERIC(b->tag_count.tag);                                                   \
         VM_ASSERT(a_tag == b_tag);                                                          \
         b->value.fixnum_value = a->value.fixnum_value OP b->value.fixnum_value;             \
         --sp;                                                                               \
@@ -191,7 +198,7 @@ vm_push_ref(struct object_t *sp, struct object_t *object)
     return_address.tag_count.count = 1;
     return_address.value.ref.object = object;
 
-#ifdef ENABLE_VM_ASSERTS
+#if ENABLE_VM_ASSERTS
     return_address.value.ref.index = 0;
 #endif
 
@@ -234,7 +241,7 @@ vm_reference_type(struct object_t *ref)
 {
     const struct object_t *referenced_object = ref->value.ref.object;
 
-#ifdef ENABLE_VM_ASSERTS
+#if ENABLE_VM_ASSERTS
     const unsigned char ref_type = ref->tag_count.tag;
     VM_ASSERT(ref_type == TAG_REFERENCE || ref_type == TAG_INNER_REFERENCE);
 #endif
@@ -334,7 +341,6 @@ vm_compare_equal_reference_type(const struct object_t *a, const struct object_t 
 
                 return 1;
             }
-            return 0;
         case TAG_STRING:
             return memcmp(a->value.string_value, b->value.string_value, a->tag_count.count) == 0;
         default:
@@ -533,7 +539,7 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
                 }
                 break;
             case OPCODE_CMPN_EQ:
-                CMPN_IMPL(=)
+                CMPN_IMPL(==)
                 break;
             case OPCODE_CMPN_LT:
                 CMPN_IMPL(<)
@@ -595,12 +601,15 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
                     ++sp;
                 }
                 break;
+            case OPCODE_GET_BOUND_LOCATION:
             case OPCODE_CALL:
             case OPCODE_TAILCALL:
-            case OPCODE_RETURN:
-            case OPCODE_GET_BOUND_LOCATION:
                 BREAK();
                 break;
+
+            case OPCODE_RETURN:
+                BREAK();
+                goto vm_execution_done;
 
             case OPCODE_ADD:
                 FIXNUM_BINOP(+)
@@ -633,6 +642,7 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
         }
     }
 
+vm_execution_done:
     environment->stack_ptr = old_stack;
 
     /*
