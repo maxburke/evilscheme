@@ -187,52 +187,55 @@ print(struct environment_t *environment, struct object_t *args)
 
     if (args == empty_pair)
     {
-        printf("'()");
+        skim_print("'()");
         return NULL;
     }
 
     switch (args->tag_count.tag)
     {
         case TAG_BOOLEAN:
-            printf("%s", args->value.fixnum_value ? "#t" : "#f");
-            return args + 1;
+            skim_print("%s", args->value.fixnum_value ? "#t" : "#f");
+            break;
         case TAG_CHAR:
-            printf("%c", (char)args->value.fixnum_value);
-            return args + 1;
+            skim_print("%c", (char)args->value.fixnum_value);
+            break; 
         case TAG_VECTOR:
             {
                 int i;
                 struct object_t *object = args + 1;
 
-                printf("#(");
+                skim_print("#(");
                 for (i = 0; i < args->tag_count.count; ++i)
                     object = print(environment, object);
-                printf(")");
-                return object;
+                skim_print(")");
+                break;
             }
         case TAG_FIXNUM:
-            printf("%" PRId64, args->value.fixnum_value);
-            return args + 1;
+            skim_print("%" PRId64, args->value.fixnum_value);
+            break;
         case TAG_FLONUM:
-            printf("%f", args->value.flonum_value);
-            return args + 1;
+            skim_print("%f", args->value.flonum_value);
+            break;
         case TAG_PROCEDURE:
-            printf("<procedure>");
-            return args + 1;
+            skim_print("<procedure>");
+            break;
         case TAG_STRING:
-            printf("\"%s\"", args->value.string_value);
-            return (struct object_t *)((char *)(args + 1) + strlen(args->value.string_value));
+            skim_print("\"%s\"", args->value.string_value);
+            break;
         case TAG_SYMBOL:
-            printf("%s", args->value.string_value);
-            return (struct object_t *)((char *)(args + 1) + strlen(args->value.string_value));
+            {
+                const char *str = find_symbol_name(environment, args->value.symbol_hash);
+                skim_print("%s", str);
+                break;
+            }
         case TAG_PAIR:
             print(environment, CAR(args));
-            printf(" ");
+            skim_print(" ");
             print(environment, CDR(args));
-            return args + 1;
+            break;
         case TAG_SPECIAL_FUNCTION:
-            printf("<special function>");
-            return args + 1;
+            skim_print("<special function>");
+            break;
         default:
             assert(0);
             break;

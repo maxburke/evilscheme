@@ -84,12 +84,6 @@ struct object_t
 
 extern struct object_t *empty_pair;
 
-uint64_t
-hash_string(const char *string);
-
-uint64_t
-hash_bytes(const void *bytes, size_t num_bytes);
-
 #define CAR(x) ((x)->value.pair[0])
 #define CDR(x) ((x)->value.pair[1])
 
