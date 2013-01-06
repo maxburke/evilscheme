@@ -213,7 +213,6 @@ recursive_create_object_from_token_stream(struct environment_t *environment, con
         *input = (const struct token_t *)(*input)->link.next;
 
         CAR(pair) = recursive_create_object_from_token_stream(environment, input);
-
         if (*input)
         {
             CDR(pair) = recursive_create_object_from_token_stream(environment, input);
@@ -221,6 +220,7 @@ recursive_create_object_from_token_stream(struct environment_t *environment, con
         }
         else
         {
+            CDR(pair) = empty_pair;
             return pair;
         }
     }
