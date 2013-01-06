@@ -192,7 +192,10 @@ object_from_symbol(struct environment_t *environment, const struct token_t *inpu
     {
         assert(input->type == TOKEN_SYMBOL);
         object = gc_alloc(environment->heap, TAG_SYMBOL, 0);
-        object->value.symbol_hash = hash_bytes(input->text, string_length);
+        object->value.symbol_hash = register_symbol_from_bytes(
+                environment, 
+                input->text, 
+                string_length);
     }
 
     return object;

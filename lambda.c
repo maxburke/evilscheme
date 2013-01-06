@@ -1,3 +1,5 @@
+#include <stdio.h>
+
 #include "base.h"
 #include "builtins.h"
 #include "object.h"
@@ -6,10 +8,14 @@
 struct object_t *
 lambda(struct environment_t *environment, struct object_t *args)
 {
-    UNUSED(environment);
-    UNUSED(args);
+    struct object_t *i;
 
-    print(environment, args);
+    UNUSED(environment);
+
+    for (i = args; CAR(i) != empty_pair; i = CDR(i))
+    {
+        print(environment, i);
+    }
 
     BREAK(); 
     return NULL;
