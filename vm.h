@@ -59,6 +59,17 @@ enum opcode_t
     OPCODE_LDSTR,
 
     /*
+     * OPCODE_LDEMPTY
+     */
+    OPCODE_LDEMPTY,
+
+    /*
+     * OPCODE_LDCxR
+     */
+    OPCODE_LDCAR,
+    OPCODE_LDCDR,
+
+    /*
      * OPCODE_MAKE_REF | [reference] [index] -> [slot reference]
      */
     OPCODE_MAKE_REF,
@@ -200,17 +211,6 @@ enum opcode_t
      * Swaps the top of the stack with the value X items deep.
      */
     OPCODE_SWAP_X
-};
-
-enum condition_t
-{
-    CONDITION_EQ,
-    CONDITION_LT,
-    CONDITION_GT,
-    CONDITION_NEQ,
-    CONDITION_LE,
-    CONDITION_GE,
-    CONDITION_REFEQ
 };
 
 struct procedure_t
