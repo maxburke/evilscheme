@@ -55,6 +55,10 @@ main(void)
 {
     const char *inputs[] = {
         "4",
+        "(define list-length (lambda (L) (if (null? L) 0 (+ 1 (list-length (rest L))))))",
+        "(define list-length-tailrec (lambda (L x) (if (null? L) x (list-length-tailrec (rest L) (+ 1 x)))))",
+        "(define fact (lambda (n) (if (<= n 1) 1 (* n (fact (- n 1))))))",
+        "(define fact-tailrec (lambda (acc i limit) (if (> i limit) acc (fact-tailrec (* i acc) (+ i 1) limit))))",
         "(define count (lambda (item L) (if L (+ (equal? item (first L)) (count item (rest L))) 0)))",
         "(define fact (lambda (n) (if (<= n 1) 1 (* n (fact (- n 1))))))",
         "(define hello-world (lambda () (display \"hello world!\") (newline)))",

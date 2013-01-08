@@ -145,6 +145,7 @@ eval(struct environment_t *environment, struct object_t *args)
 {
     struct object_t *first_arg;
     struct object_t **bound_location;
+
     assert(args->tag_count.tag == TAG_PAIR);
 
     first_arg = CAR(args);
@@ -202,7 +203,9 @@ print(struct environment_t *environment, struct object_t *args)
         case TAG_VECTOR:
             {
                 int i;
-                struct object_t *object = args + 1;
+                struct object_t *object;
+                
+                object = args + 1;
 
                 skim_print("#(");
                 for (i = 0; i < args->tag_count.count; ++i)

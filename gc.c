@@ -12,8 +12,11 @@
 static void *
 gc_perform_alloc(struct heap_t *heap, size_t size)
 {
-    void *mem = heap->ptr;
-    size_t aligned_size = (size + DEFAULT_ALIGN_MASK) & ~(DEFAULT_ALIGN_MASK);
+    void *mem;
+    size_t aligned_size;
+
+    mem = heap->ptr;
+    aligned_size = (size + DEFAULT_ALIGN_MASK) & ~(DEFAULT_ALIGN_MASK);
 
     if ((char *)heap->ptr + size >= (char *)heap->top)
         gc_collect(heap);
@@ -28,7 +31,9 @@ gc_perform_alloc(struct heap_t *heap, size_t size)
 struct heap_t *
 gc_create(void *heap_mem, size_t heap_size)
 {
-    struct heap_t *heap = heap_mem;
+    struct heap_t *heap;
+    
+    heap = heap_mem;
     memset(heap, 0, sizeof(struct heap_t));
 
     heap->tag_count.tag = TAG_HEAP;
@@ -44,8 +49,11 @@ gc_create(void *heap_mem, size_t heap_size)
 struct object_t *
 gc_alloc(struct heap_t *heap, enum tag_t type, size_t extra_bytes)
 {
-    size_t size = (type != TAG_ENVIRONMENT) ? sizeof(struct object_t) + extra_bytes : sizeof(struct environment_t);
-    struct object_t *object = gc_perform_alloc(heap, size);
+    size_t size;
+    struct object_t *object;
+
+    size = (type != TAG_ENVIRONMENT) ? sizeof(struct object_t) + extra_bytes : sizeof(struct environment_t);
+    object = gc_perform_alloc(heap, size);
 
     if (type == TAG_STRING)
     {
@@ -69,8 +77,11 @@ gc_alloc_vector(struct heap_t *heap, size_t count)
      * has the tag_count header but following that the vector contains an array of simple
      * objects or references to complex objects (strings/symbols/functions/etc.)
      */
-    size_t total_alloc_size = (count * sizeof(struct object_t)) + sizeof(struct tag_count_t);
-    struct object_t *object = gc_perform_alloc(heap, total_alloc_size);
+    size_t total_alloc_size; 
+    struct object_t *object;
+
+    total_alloc_size = (count * sizeof(struct object_t)) + sizeof(struct tag_count_t);
+    object = gc_perform_alloc(heap, total_alloc_size);
 
     object->tag_count.tag = TAG_VECTOR;
     object->tag_count.count = (unsigned short)count;

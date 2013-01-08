@@ -571,11 +571,15 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
                     int offset;
 
                     condition = sp + 1;
-                    VM_ASSERT(condition->tag_count.tag == TAG_BOOLEAN);
                     offset = (int)((char)*pc);
                     ++pc;
 
-                    if (condition->value.fixnum_value)
+                    /*
+                     * Non-boolean types automatically count as "true". Only
+                     * #f on the evaluation stack will cause the branch to
+                     * not be followed.
+                     */
+                    if (condition->tag_count.tag != TAG_BOOLEAN || condition->value.fixnum_value != 0)
                     {
                         pc += offset;
                     }
@@ -593,7 +597,7 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
                     offset = (int)(*(short *)pc);
                     pc += 2;
 
-                    if (condition->value.fixnum_value)
+                    if (condition->tag_count.tag != TAG_BOOLEAN || condition->value.fixnum_value != 0)
                     {
                         pc += offset;
                     }
@@ -649,6 +653,6 @@ vm_execution_done:
      * This should probably cons the last return value on the stack and
      * return that instead.
      */
-    return NULL;
+    return empty_pair;
 }
 

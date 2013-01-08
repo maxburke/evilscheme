@@ -33,7 +33,9 @@ slist_link(struct slist_t *from, struct slist_t *to)
 static struct slist_t *
 slist_reverse(struct slist_t *head)
 {
-    struct slist_t *last = NULL;
+    struct slist_t *last;
+    
+    last = NULL;
 
     while (head != NULL) 
     {
@@ -81,7 +83,9 @@ consume_whitespace(const char *input)
 static const char *
 find_current_token_end(const char **input_ptr, enum token_type_t *token_type)
 {
-    const char *input = *input_ptr;
+    const char *input;
+    
+    input = *input_ptr;
 
     if (*input == '(' || *input == '[' || *input == '{')
     {
@@ -243,7 +247,9 @@ recursive_create_object_from_token_stream(struct environment_t *environment, con
 static struct object_t *
 create_object_from_token_stream(struct environment_t *environment, const struct token_t *input)
 {
-    struct object_t *object = recursive_create_object_from_token_stream(environment, &input);
+    struct object_t *object;
+    
+    object = recursive_create_object_from_token_stream(environment, &input);
     return object;
 }
 
@@ -257,8 +263,11 @@ expand_to(struct token_t *input, const char *expansion)
     struct token_t *expansion_token;
     struct token_t *matching_rparen;
     struct token_t *current;
-    size_t expansion_string_length = strlen(expansion);
-    size_t paren_level = 0;
+    size_t expansion_string_length;
+    size_t paren_level;
+    
+    expansion_string_length = strlen(expansion);
+    paren_level = 0;
 
     /*
      * Allocate expansion token
@@ -320,7 +329,9 @@ static void
 split_symbol_token(struct token_t *input, int text_index)
 {
     struct token_t *new_token;
-    size_t token_text_length = strlen(input->text);
+    size_t token_text_length;
+    
+    token_text_length = strlen(input->text);
 
     if (input->text[text_index] == '\0')
         return;
@@ -343,7 +354,9 @@ split_symbol_token(struct token_t *input, int text_index)
 static struct token_t *
 apply_expansions(struct token_t *input)
 {
-    struct token_t *iter = input;
+    struct token_t *iter;
+    
+    iter = input;
 
     while (iter)
     {
@@ -409,8 +422,11 @@ apply_expansions(struct token_t *input)
 static struct token_t *
 validate(struct token_t *head)
 {
-    int paren_level = 0;
-    const struct token_t *ptr = head;
+    int paren_level;
+    const struct token_t *ptr;
+
+    paren_level = 0;
+    ptr = head;
 
     while (ptr != NULL)
     {
@@ -425,7 +441,9 @@ validate(struct token_t *head)
 static struct token_t *
 tokenize(const char *input)
 {
-    struct token_t *head = NULL;
+    struct token_t *head;
+    
+    head = NULL;
 
     while (*input) 
     {
