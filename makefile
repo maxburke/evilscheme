@@ -12,10 +12,10 @@ else
 endif
 
 %.o : %.c $(HEADERS)
-	$(CC) $(CFLAGS) -c -o $@ $< $(CFLAGS)
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 r4rs : $(OBJS)
-	$(LD) $(LDFLAGS) -o $@ $^ $(CFLAGS)
+	$(LD) $(LDFLAGS) -o $@ $^
 
 clean :
 	rm *.o
