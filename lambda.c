@@ -1,5 +1,7 @@
 #include <assert.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "base.h"
 #include "builtins.h"
@@ -39,7 +41,7 @@ pool_alloc(struct memory_pool_t *pool, size_t size)
 
     for (i = pool->head; i != NULL; i = i->next)
     {
-        ssize_t pool_room = i->end - i->top;
+        size_t pool_room = i->end - i->top;
 
         if (pool_room >= size)
         {
@@ -96,17 +98,43 @@ get_arg_index(struct object_t *args, uint64_t hash)
     return UNKNOWN_ARG;
 }
 
+struct compiler_context_t
+{
+    struct memory_pool_t pool;
+    struct object_t *args;
+};
+
+static void
+initialize_compiler_context(struct compiler_context_t *context, struct object_t *args)
+{
+    memset(context, 0, sizeof(struct compiler_context_t));
+    context->args = args;
+}
+
+static void
+destroy_compiler_context(struct compiler_context_t *context)
+{
+    discard_pool(&context.pool);
+}
+
+static void
+compile_form(struct compiler_context_t *context, struct object_t *form)
+{
+}
+
 struct object_t *
 lambda(struct environment_t *environment, struct object_t *lambda_body)
 {
     struct object_t *args;
     struct object_t *body;
 
-    struct memory_pool_t pool;
+    struct compiler_context_t compiler_context;
+
+    UNUSED(environment);
     
     args = CAR(lambda_body);
     body = CAR(CDR(lambda_body));
-    memset(&pool, 0, sizeof(struct memory_pool_t));
+    initialize_compiler_context(&context, args);
 
 /*
     for (i = args; CAR(i) != empty_pair; i = CDR(i))
@@ -115,6 +143,8 @@ lambda(struct environment_t *environment, struct object_t *lambda_body)
     }
     BREAK(); 
 */
+
+    destroy_compiler_context(&context);
     return NULL;
 }
 
