@@ -85,7 +85,7 @@ environment_initialize(struct environment_t *environment)
 struct environment_t *
 environment_create(void *stack, size_t stack_size, void *heap_mem, size_t heap_size)
 {
-    struct heap_t *heap = gc_create(heap_mem, heap_size);
+    struct heap_t *heap;
 
     /*
      * This bit of casting magic is to make the error "initialization from
@@ -95,8 +95,12 @@ environment_create(void *stack, size_t stack_size, void *heap_mem, size_t heap_s
      * return void* but this should help prevent unintended auto-casts of
      * newly allocated values.
      */
-    void *env_mem = gc_alloc(heap, TAG_ENVIRONMENT, 0);
-    struct environment_t *env = env_mem;
+    void *env_mem;
+    struct environment_t *env;
+
+    heap = gc_create(heap_mem, heap_size);
+    env_mem = gc_alloc(heap, TAG_ENVIRONMENT, 0);
+    env = env_mem;
 
     env->stack_bottom = stack;
     env->stack_top = (struct object_t *)((char *)stack + stack_size) - 1;
@@ -118,9 +122,12 @@ environment_create(void *stack, size_t stack_size, void *heap_mem, size_t heap_s
 static uint64_t
 symbol_hash_bytes(const void *bytes, size_t num_bytes)
 {
-    const char *ptr = bytes;
-    uint64_t hash = UINT64_C(14695981039346656037);
+    const char *ptr;
+    uint64_t hash;
     size_t i;
+
+    ptr = bytes;
+    hash = UINT64_C(14695981039346656037);
 
     for (i = 0; i < num_bytes; ++i)
     {
