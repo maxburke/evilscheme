@@ -478,7 +478,7 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
                 }
                 break;
             case OPCODE_LDEMPTY:
-                sp = vm_push_ref(vm, empty_pair);
+                sp = vm_push_ref(sp, empty_pair);
                 break;
             case OPCODE_LOAD:
                 BREAK();

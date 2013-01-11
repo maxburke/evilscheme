@@ -64,14 +64,12 @@ enum opcode_t
      */
     OPCODE_LDEMPTY,
 
-#if 0
-    TODO: if pairs were vectors of length 2, these won't be needed.
     /*
+     * TODO: if pairs were vectors of length 2, these won't be needed.
      * OPCODE_LDCxR
-     */
     OPCODE_LDCAR,
     OPCODE_LDCDR,
-#endif
+     */
 
     /*
      * OPCODE_LOAD | [slot reference] -> [reference|value]
