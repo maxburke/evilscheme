@@ -7,6 +7,7 @@
 #include "builtins.h"
 #include "object.h"
 #include "runtime.h"
+#include "slist.h"
 #include "vm.h"
 
 #define UNKNOWN_ARG -1
@@ -124,7 +125,7 @@ struct instruction_t
     struct slist_t link;
 
     unsigned char insn;
-    unsigned char size;
+    size_t size;
     struct instruction_t *reloc;
 
     union data
@@ -134,14 +135,16 @@ struct instruction_t
         unsigned short u2;
                  short s2;
         unsigned int u4;
+                 int s4;
         float f4;
         uint64_t u8;
+        int64_t s8;
         double f8;
         char string[1];
     } data;
 };
 
-static void
+static struct instruction_t *
 compile_if(struct compiler_context_t *context, struct object_t *body)
 {
     struct object_t *test;
@@ -155,10 +158,14 @@ compile_if(struct compiler_context_t *context, struct object_t *body)
     temp = CDR(temp);
     consequent = CAR(temp);
     alternate = CDR(temp);
-#error hello
+
+    UNUSED(context);
+    
     if (alternate != empty_pair)
     {
     }
+
+    return NULL;
 }
 
 static struct instruction_t *
@@ -172,7 +179,7 @@ compile_literal(struct compiler_context_t *context, struct object_t *literal)
     extra_size = literal->tag_count.count - 1;
     instruction = pool_alloc(&context->pool, sizeof(struct instruction_t) + extra_size);
 
-    switch (literal->tag_value.tag)
+    switch (literal->tag_count.tag)
     {
         case TAG_BOOLEAN:
             instruction->insn = OPCODE_LDIMM_1_BOOL;
@@ -199,7 +206,7 @@ compile_literal(struct compiler_context_t *context, struct object_t *literal)
                     instruction->size = 1;
                     instruction->data.s1 = (char)n;
                 }
-                else if (n >= -2147483648 && n <= 2147483647)
+                else if (n >= -2147483648LL && n <= 2147483647)
                 {
                     instruction->insn = OPCODE_LDIMM_4_FIXNUM;
                     instruction->size = 4;
@@ -262,7 +269,7 @@ compile_load_arg(struct compiler_context_t *context, int arg_index)
     instruction = pool_alloc(&context->pool, sizeof(struct instruction_t));
     instruction->insn = OPCODE_LDARG_X;
     instruction->size = 1;
-    instruction->data.u1 = arg_index;
+    instruction->data.u1 = (unsigned char)arg_index;
 
     return instruction;
 }
@@ -273,7 +280,7 @@ compile_symbol_load(struct compiler_context_t *context, struct object_t *symbol)
     struct instruction_t *ldimm_symbol;
     struct instruction_t *get_bound_location;
 
-    assert(symbol->tag_value.tag == TAG_SYMBOL);
+    assert(symbol->tag_count.tag == TAG_SYMBOL);
 
     ldimm_symbol = pool_alloc(&context->pool, sizeof(struct instruction_t));
     ldimm_symbol->insn = OPCODE_LDIMM_8_SYMBOL;
@@ -283,7 +290,7 @@ compile_symbol_load(struct compiler_context_t *context, struct object_t *symbol)
     get_bound_location = pool_alloc(&context->pool, sizeof(struct instruction_t)); 
     get_bound_location->insn = OPCODE_GET_BOUND_LOCATION;
     get_bound_location->size = 0;
-    get_bound_location->next = ldimm_symbol;
+    get_bound_location->link.next = &ldimm_symbol->link;
 
     return get_bound_location;
 }
@@ -294,7 +301,6 @@ static struct instruction_t *
 compile_form(struct compiler_context_t *context, struct object_t *body)
 {
     struct object_t *symbol_object;
-    struct instruction_t *instruction;
     uint64_t symbol_hash;
     int arg_index;
 
@@ -318,14 +324,14 @@ compile_form(struct compiler_context_t *context, struct object_t *body)
                     symbol_hash);
     }
 
-    arg_index = get_arg_index(context->args);
+    arg_index = get_arg_index(context->args, symbol_hash);
 
     if (arg_index != UNKNOWN_ARG)
     {
         return compile_load_arg(context, arg_index);
     }
 
-    return compile_symbol_load(context, symbol);
+    return compile_symbol_load(context, symbol_object);
 }
 
 struct object_t *
@@ -338,7 +344,7 @@ lambda(struct environment_t *environment, struct object_t *lambda_body)
     
     args = CAR(lambda_body);
     body = CAR(CDR(lambda_body));
-    root = NULL;
+    root.next = NULL;
 
     initialize_compiler_context(&context, environment, args);
 
@@ -351,7 +357,7 @@ lambda(struct environment_t *environment, struct object_t *lambda_body)
         slist_splice(&root, &instruction->link);
     }
 
-    assert(root != NULL);
+    assert(root.next != NULL);
 
     slist_reverse(&root);
     assemble(root);
