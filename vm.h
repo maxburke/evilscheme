@@ -20,7 +20,8 @@ enum opcode_t
     /*
      * OPCODE_LDIMM_1_type [byte 0] | -> [value]
      * Create an object of the specified type on the top of the stack with its
-     * value initialized to the byte parameter.
+     * value initialized to the byte parameter. Fixnum types will be 
+     * sign-extended as necessary.
      */
     OPCODE_LDIMM_1_BOOL,
     OPCODE_LDIMM_1_CHAR,
@@ -63,11 +64,19 @@ enum opcode_t
      */
     OPCODE_LDEMPTY,
 
+#if 0
+    TODO: if pairs were vectors of length 2, these won't be needed.
     /*
      * OPCODE_LDCxR
      */
     OPCODE_LDCAR,
     OPCODE_LDCDR,
+#endif
+
+    /*
+     * OPCODE_LOAD | [slot reference] -> [reference|value]
+     */
+    OPCODE_LOAD,
 
     /*
      * OPCODE_MAKE_REF | [reference] [index] -> [slot reference]
