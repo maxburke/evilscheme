@@ -477,6 +477,12 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
                     pc += string_length + 1;
                 }
                 break;
+            case OPCODE_LDEMPTY:
+                sp = vm_push_ref(sp, empty_pair);
+                break;
+            case OPCODE_LOAD:
+                BREAK();
+                break;
             case OPCODE_MAKE_REF:
                 {
                     struct object_t * const ref = sp + 2;
