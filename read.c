@@ -8,45 +8,11 @@
 #include "object.h"
 #include "read.h"
 #include "runtime.h"
+#include "slist.h"
 
 /*
  * TODO: Remove use of calloc.
  */
-
-/*
- * Singly linked list used for storage of the intermediate tokens.
- */
-struct slist_t
-{
-    struct slist_t *next;
-};
-
-/*
- * Helper function to add a new link to the specified slist.
- */
-static void 
-slist_link(struct slist_t *from, struct slist_t *to)
-{
-    from->next = to;
-}
-
-static struct slist_t *
-slist_reverse(struct slist_t *head)
-{
-    struct slist_t *last;
-    
-    last = NULL;
-
-    while (head != NULL) 
-    {
-        struct slist_t *temp = head->next;
-        head->next = last;
-        last = head;
-        head = temp;
-    }
-
-    return last;
-}
 
 /*
  * The input stream is broken up into a number of coarse-grained tokens,
