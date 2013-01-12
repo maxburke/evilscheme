@@ -179,10 +179,8 @@ compile_if(struct compiler_context_t *context, struct instruction_t *next, struc
     struct instruction_t *nop;
     struct instruction_t *cond_br_target;
 
+    test_form = CAR(body);
     temp = CDR(body);
-    test_form = CAR(temp);
-
-    temp = CDR(temp);
     consequent_form = CAR(temp);
     alternate_form = CDR(temp);
 
@@ -250,7 +248,7 @@ compile_nullp(struct compiler_context_t *context, struct instruction_t *next, st
     struct instruction_t *cmp_eq;
 
     expression_form = CDR(body);
-
+BREAK();
     expression = compile_form(context, next, expression_form);
     ldempty = alloc_insn(context);
     ldempty->insn = OPCODE_LDEMPTY;
@@ -403,8 +401,49 @@ compile_form(struct compiler_context_t *context, struct instruction_t *next, str
     uint64_t symbol_hash;
     int arg_index;
 
-    UNUSED(context);
+    symbol_object = CAR(body);
 
+    if (symbol_object->tag_count.tag == TAG_PAIR)
+    {
+        struct object_t *function_symbol;
+        struct object_t *function_args;
+        uint64_t function_hash;
+
+        function_symbol = CAR(symbol_object);
+        function_args = CDR(symbol_object);
+
+        assert(function_symbol->tag_count.tag == TAG_SYMBOL);
+        function_hash = function_symbol->value.symbol_hash;
+
+        switch (function_hash)
+        {
+            case SYMBOL_IF:
+                return compile_if(context, next, function_args);
+            case SYMBOL_NULLP:
+                return compile_nullp(context, next, function_args);
+            default:
+                skim_print("** %s (0x%" PRIx64 ") **\n", 
+                        find_symbol_name(context->environment, function_hash),
+                        function_hash);
+        }
+
+        BREAK();
+    }
+
+    if (symbol_object->tag_count.tag != TAG_SYMBOL)
+        return compile_literal(context, next, symbol_object);
+
+    symbol_hash = symbol_object->value.symbol_hash;
+    arg_index = get_arg_index(context->args, symbol_hash);
+
+    if (arg_index != UNKNOWN_ARG)
+    {
+        return compile_load_arg(context, next, arg_index);
+    }
+
+    return compile_symbol_load(context, next, symbol_object);
+
+#if 0
     symbol_object = CAR(body);
     symbol_hash = symbol_object->value.symbol_hash;
 
@@ -436,6 +475,7 @@ compile_form(struct compiler_context_t *context, struct instruction_t *next, str
     }
 
     return compile_symbol_load(context, next, symbol_object);
+#endif
 }
 
 struct object_t *
@@ -466,7 +506,7 @@ lambda(struct environment_t *environment, struct object_t *lambda_body)
 
     for (body = CDR(lambda_body); body != empty_pair; body = CDR(body))
     {
-        root = compile_form(&context, root, CAR(body));
+        root = compile_form(&context, root, body);
     }
 
     procedure = assemble(environment, root);
