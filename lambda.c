@@ -14,6 +14,8 @@
 
 #define DEFAULT_POOL_CHUNK_SIZE 4096
 
+#define alloc_insn(context) pool_alloc(&context->pool, sizeof(struct instruction_t))
+
 struct memory_pool_chunk_t
 {
     struct memory_pool_chunk_t *next;
@@ -190,14 +192,14 @@ compile_if(struct compiler_context_t *context, struct instruction_t *next, struc
      * All conditional branches are encoded as a COND_BRANCH_1 and will be
      * expanded to a COND_BRANCH_2 only if the extra distance is needed.
      */
-    cond_br = pool_alloc(&context->pool, sizeof(struct instruction_t));
+    cond_br = alloc_insn(context);
     cond_br->insn = OPCODE_COND_BRANCH_1;
     cond_br->link.next = &test_code->link;
 
-    br = pool_alloc(&context->pool, sizeof(struct instruction_t));
+    br = alloc_insn(context);
     br->insn = OPCODE_BRANCH_1;
 
-    nop = pool_alloc(&context->pool, sizeof(struct instruction_t));
+    nop = alloc_insn(context);
     nop->insn = OPCODE_NOP;
 
     if (alternate_form == empty_pair)
@@ -236,6 +238,29 @@ compile_if(struct compiler_context_t *context, struct instruction_t *next, struc
     nop->link.next = &consequent_code->link;
 
     return nop;
+}
+
+static struct instruction_t *
+compile_nullp(struct compiler_context_t *context, struct instruction_t *next, struct object_t *body)
+{
+    struct object_t *expression_form;
+
+    struct instruction_t *expression;
+    struct instruction_t *ldempty;
+    struct instruction_t *cmp_eq;
+
+    expression_form = CDR(body);
+
+    expression = compile_form(context, next, expression_form);
+    ldempty = alloc_insn(context);
+    ldempty->insn = OPCODE_LDEMPTY;
+    ldempty->link.next = &expression->link;
+
+    cmp_eq = alloc_insn(context);
+    cmp_eq->insn = OPCODE_CMP_EQUAL;
+    cmp_eq->link.next = &ldempty->link;
+
+    return cmp_eq;
 }
 
 static struct instruction_t *
@@ -337,7 +362,7 @@ compile_load_arg(struct compiler_context_t *context, struct instruction_t *next,
      */
     assert(arg_index < 256 && arg_index >= 0);
     
-    instruction = pool_alloc(&context->pool, sizeof(struct instruction_t));
+    instruction = alloc_insn(context);
     instruction->insn = OPCODE_LDARG_X;
     instruction->size = 1;
     instruction->data.u1 = (unsigned char)arg_index;
@@ -354,13 +379,13 @@ compile_symbol_load(struct compiler_context_t *context, struct instruction_t *ne
 
     assert(symbol->tag_count.tag == TAG_SYMBOL);
 
-    ldimm_symbol = pool_alloc(&context->pool, sizeof(struct instruction_t));
+    ldimm_symbol = alloc_insn(context);
     ldimm_symbol->insn = OPCODE_LDIMM_8_SYMBOL;
     ldimm_symbol->size = 8;
     ldimm_symbol->data.u8 = symbol->value.symbol_hash;
     ldimm_symbol->link.next = &next->link;
 
-    get_bound_location = pool_alloc(&context->pool, sizeof(struct instruction_t)); 
+    get_bound_location = alloc_insn(context); 
     get_bound_location->insn = OPCODE_GET_BOUND_LOCATION;
     get_bound_location->size = 0;
     get_bound_location->link.next = &ldimm_symbol->link;
@@ -369,6 +394,7 @@ compile_symbol_load(struct compiler_context_t *context, struct instruction_t *ne
 }
 
 #define SYMBOL_IF 0x8325f07b4eb2a24
+#define SYMBOL_NULLP 0xb4d24b59678288cd
 
 static struct instruction_t *
 compile_form(struct compiler_context_t *context, struct instruction_t *next, struct object_t *body)
@@ -391,10 +417,15 @@ compile_form(struct compiler_context_t *context, struct instruction_t *next, str
     {
         case SYMBOL_IF:
             return compile_if(context, next, body);
+        case SYMBOL_NULLP:
+            return compile_nullp(context, next, body);
         default:
             skim_print("** %s (0x%" PRIx64 ") **\n", 
                     find_symbol_name(context->environment, symbol_hash),
                     symbol_hash);
+            /*
+             * TODO: Remove this break as it should fall through.
+             */
     }
 
     arg_index = get_arg_index(context->args, symbol_hash);
@@ -412,6 +443,8 @@ assemble(struct environment_t *environment, struct instruction_t *root)
 {
     UNUSED(environment);
     UNUSED(root);
+
+    BREAK();
 
     return NULL;
 }
