@@ -646,6 +646,10 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
             case OPCODE_DUP_X:
             case OPCODE_POP_X:
             case OPCODE_SWAP_X:
+                BREAK();
+                break;
+            case OPCODE_NOP:
+                break;
             default:
                 BREAK();
                 break;

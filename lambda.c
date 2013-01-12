@@ -145,31 +145,101 @@ struct instruction_t
 };
 
 static struct instruction_t *
-compile_if(struct compiler_context_t *context, struct object_t *body)
+compile_form(struct compiler_context_t *context, struct instruction_t *next, struct object_t *body);
+
+static struct instruction_t *
+find_before(struct instruction_t *start, struct instruction_t *target)
 {
-    struct object_t *test;
-    struct object_t *consequent;
-    struct object_t *alternate;
-    struct object_t *temp;
+    struct slist_t *end;
+    struct slist_t *i;
 
-    temp = CDR(body);
-    test = CAR(temp);
-
-    temp = CDR(temp);
-    consequent = CAR(temp);
-    alternate = CDR(temp);
-
-    UNUSED(context);
+    end = &target->link;
     
-    if (alternate != empty_pair)
-    {
-    }
+    for (i = &start->link; i->next != end; i = i->next)
+        ;
 
-    return NULL;
+    return (struct instruction_t *)i;
 }
 
 static struct instruction_t *
-compile_literal(struct compiler_context_t *context, struct object_t *literal)
+compile_if(struct compiler_context_t *context, struct instruction_t *next, struct object_t *body)
+{
+    struct object_t *test_form;
+    struct object_t *consequent_form;
+    struct object_t *alternate_form;
+    struct object_t *temp;
+
+    struct instruction_t *test_code;
+    struct instruction_t *consequent_code;
+    struct instruction_t *alternate_code;
+    struct instruction_t *cond_br;
+    struct instruction_t *br;
+    struct instruction_t *nop;
+    struct instruction_t *cond_br_target;
+
+    temp = CDR(body);
+    test_form = CAR(temp);
+
+    temp = CDR(temp);
+    consequent_form = CAR(temp);
+    alternate_form = CDR(temp);
+
+    test_code = compile_form(context, next, test_form);
+
+    /*
+     * All conditional branches are encoded as a COND_BRANCH_1 and will be
+     * expanded to a COND_BRANCH_2 only if the extra distance is needed.
+     */
+    cond_br = pool_alloc(&context->pool, sizeof(struct instruction_t));
+    cond_br->insn = OPCODE_COND_BRANCH_1;
+    cond_br->link.next = &test_code->link;
+
+    br = pool_alloc(&context->pool, sizeof(struct instruction_t));
+    br->insn = OPCODE_BRANCH_1;
+
+    nop = pool_alloc(&context->pool, sizeof(struct instruction_t));
+    nop->insn = OPCODE_NOP;
+
+    if (alternate_form == empty_pair)
+    {
+        consequent_code = compile_form(context, br, consequent_form);
+
+        /*
+         * The conditional branch jumps to the beginning of the consequent code
+         * block, but because everything's all craaaazy backwards here we need
+         * to first find the first instruction. This *might* be easier with
+         * a doubly linked list...
+         */
+        cond_br_target = find_before(consequent_code, br);
+        cond_br->reloc = cond_br_target;
+
+        /*
+         * Since there's no alternate, we emit a nop that is the branch target
+         * if the conditional is not taken. This can be eliminated by a pass
+         * through the bytecode at a later date if desired.
+         */
+        br->link.next = &cond_br->link;
+        br->reloc = nop;
+        nop->link.next = &consequent_code->link;
+
+        return nop;
+    }
+
+    alternate_code = compile_form(context, cond_br, alternate_form);
+    consequent_code = compile_form(context, alternate_code, consequent_form);
+    br->link.next = &alternate_code->link;
+    br->reloc = nop;
+
+    cond_br_target = find_before(consequent_code, alternate_code);
+    cond_br->reloc = cond_br_target;
+
+    nop->link.next = &consequent_code->link;
+
+    return nop;
+}
+
+static struct instruction_t *
+compile_literal(struct compiler_context_t *context, struct instruction_t *next, struct object_t *literal)
 {
     struct instruction_t *instruction;
     size_t extra_size;
@@ -178,6 +248,7 @@ compile_literal(struct compiler_context_t *context, struct object_t *literal)
 
     extra_size = literal->tag_count.count - 1;
     instruction = pool_alloc(&context->pool, sizeof(struct instruction_t) + extra_size);
+    instruction->link.next = &next->link;
 
     switch (literal->tag_count.tag)
     {
@@ -256,7 +327,7 @@ compile_literal(struct compiler_context_t *context, struct object_t *literal)
 }
 
 static struct instruction_t *
-compile_load_arg(struct compiler_context_t *context, int arg_index)
+compile_load_arg(struct compiler_context_t *context, struct instruction_t *next, int arg_index)
 {
     struct instruction_t *instruction;
 
@@ -270,12 +341,13 @@ compile_load_arg(struct compiler_context_t *context, int arg_index)
     instruction->insn = OPCODE_LDARG_X;
     instruction->size = 1;
     instruction->data.u1 = (unsigned char)arg_index;
+    instruction->link.next = &next->link;
 
     return instruction;
 }
 
 static struct instruction_t *
-compile_symbol_load(struct compiler_context_t *context, struct object_t *symbol)
+compile_symbol_load(struct compiler_context_t *context, struct instruction_t *next, struct object_t *symbol)
 {
     struct instruction_t *ldimm_symbol;
     struct instruction_t *get_bound_location;
@@ -286,6 +358,7 @@ compile_symbol_load(struct compiler_context_t *context, struct object_t *symbol)
     ldimm_symbol->insn = OPCODE_LDIMM_8_SYMBOL;
     ldimm_symbol->size = 8;
     ldimm_symbol->data.u8 = symbol->value.symbol_hash;
+    ldimm_symbol->link.next = &next->link;
 
     get_bound_location = pool_alloc(&context->pool, sizeof(struct instruction_t)); 
     get_bound_location->insn = OPCODE_GET_BOUND_LOCATION;
@@ -298,7 +371,7 @@ compile_symbol_load(struct compiler_context_t *context, struct object_t *symbol)
 #define SYMBOL_IF 0x8325f07b4eb2a24
 
 static struct instruction_t *
-compile_form(struct compiler_context_t *context, struct object_t *body)
+compile_form(struct compiler_context_t *context, struct instruction_t *next, struct object_t *body)
 {
     struct object_t *symbol_object;
     uint64_t symbol_hash;
@@ -310,14 +383,14 @@ compile_form(struct compiler_context_t *context, struct object_t *body)
     symbol_hash = symbol_object->value.symbol_hash;
 
     if (symbol_object->tag_count.tag != TAG_SYMBOL)
-        return compile_literal(context, symbol_object);
+        return compile_literal(context, next, symbol_object);
 
     assert(symbol_object->tag_count.tag == TAG_SYMBOL);
 
     switch (symbol_hash)
     {
         case SYMBOL_IF:
-            return compile_if(context, body);
+            return compile_if(context, next, body);
         default:
             skim_print("** %s (0x%" PRIx64 ") **\n", 
                     find_symbol_name(context->environment, symbol_hash),
@@ -328,10 +401,19 @@ compile_form(struct compiler_context_t *context, struct object_t *body)
 
     if (arg_index != UNKNOWN_ARG)
     {
-        return compile_load_arg(context, arg_index);
+        return compile_load_arg(context, next, arg_index);
     }
 
-    return compile_symbol_load(context, symbol_object);
+    return compile_symbol_load(context, next, symbol_object);
+}
+
+struct object_t *
+assemble(struct environment_t *environment, struct instruction_t *root)
+{
+    UNUSED(environment);
+    UNUSED(root);
+
+    return NULL;
 }
 
 struct object_t *
@@ -339,32 +421,26 @@ lambda(struct environment_t *environment, struct object_t *lambda_body)
 {
     struct object_t *args;
     struct object_t *body;
-    struct slist_t root;
+    struct object_t *procedure;
+    struct instruction_t *root;
     struct compiler_context_t context;
     
     args = CAR(lambda_body);
     body = CAR(CDR(lambda_body));
-    root.next = NULL;
+    root = NULL;
 
     initialize_compiler_context(&context, environment, args);
 
     for (body = CDR(lambda_body); body != empty_pair; body = CDR(body))
     {
-        struct instruction_t *instruction;
-        
-        instruction = compile_form(&context, CAR(body));
-        slist_splice(&instruction->link, &root);
-        slist_splice(&root, &instruction->link);
+        root = compile_form(&context, root, CAR(body));
     }
 
-    assert(root.next != NULL);
-
-    slist_reverse(&root);
-    assemble(root);
+    procedure = assemble(environment, root);
 
     destroy_compiler_context(&context);
 
-    return NULL;
+    return procedure;
 }
 
 

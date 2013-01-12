@@ -217,7 +217,13 @@ enum opcode_t
      * OPCODE_SWAP_X | [a] ... (x - 1) ... [b] -> [b] ... (x - 1) ... [a]
      * Swaps the top of the stack with the value X items deep.
      */
-    OPCODE_SWAP_X
+    OPCODE_SWAP_X,
+
+    /*
+     * This opcode makes it easier to implement conditional branching in the
+     * compiler. It probably can go away... eventually.
+     */
+    OPCODE_NOP
 };
 
 struct procedure_t
