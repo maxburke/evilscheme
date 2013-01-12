@@ -60,7 +60,8 @@ enum opcode_t
     OPCODE_LDSTR,
 
     /*
-     * OPCODE_LDEMPTY
+     * OPCODE_LDEMPTY | -> [reference]
+     * Push a reference to the empty pair to the stack.
      */
     OPCODE_LDEMPTY,
 
