@@ -179,7 +179,7 @@ compile_if(struct compiler_context_t *context, struct instruction_t *next, struc
     struct instruction_t *nop;
     struct instruction_t *cond_br_target;
 
-    test_form = CAR(body);
+    test_form = body;
     temp = CDR(body);
     consequent_form = CAR(temp);
     alternate_form = CDR(temp);
@@ -239,16 +239,41 @@ compile_if(struct compiler_context_t *context, struct instruction_t *next, struc
 }
 
 static struct instruction_t *
-compile_nullp(struct compiler_context_t *context, struct instruction_t *next, struct object_t *body)
+compile_plus(struct compiler_context_t *context, struct instruction_t *next, struct object_t *args)
 {
-    struct object_t *expression_form;
+    struct instruction_t *insn;
+    struct object_t *arg;
+    int i;
 
+    insn = next;
+    arg = args;
+    i = 0;
+
+    for (arg = args; arg != empty_pair; arg = CDR(arg), ++i)
+    {
+        insn = compile_form(context, insn, arg);
+
+        if (i >= 1)
+        {
+            struct instruction_t *plus;
+
+            plus = alloc_insn(context);
+            plus->insn = OPCODE_ADD;
+            plus->link.next = &insn->link;
+            insn = plus;
+        }
+    }
+
+    return insn;
+}
+
+static struct instruction_t *
+compile_nullp(struct compiler_context_t *context, struct instruction_t *next, struct object_t *expression_form)
+{
     struct instruction_t *expression;
     struct instruction_t *ldempty;
     struct instruction_t *cmp_eq;
 
-    expression_form = CDR(body);
-BREAK();
     expression = compile_form(context, next, expression_form);
     ldempty = alloc_insn(context);
     ldempty->insn = OPCODE_LDEMPTY;
@@ -393,6 +418,7 @@ compile_symbol_load(struct compiler_context_t *context, struct instruction_t *ne
 
 #define SYMBOL_IF 0x8325f07b4eb2a24
 #define SYMBOL_NULLP 0xb4d24b59678288cd
+#define SYMBOL_PLUS 0xaf63bd4c8601b7f4
 
 static struct instruction_t *
 compile_form(struct compiler_context_t *context, struct instruction_t *next, struct object_t *body)
@@ -421,13 +447,16 @@ compile_form(struct compiler_context_t *context, struct instruction_t *next, str
                 return compile_if(context, next, function_args);
             case SYMBOL_NULLP:
                 return compile_nullp(context, next, function_args);
+            case SYMBOL_PLUS:
+                return compile_plus(context, next, function_args);
             default:
+                /*
+                 * Look symbol up in environment (ldimm8_symbol, get_bound_location, call)
+                 */
                 skim_print("** %s (0x%" PRIx64 ") **\n", 
                         find_symbol_name(context->environment, function_hash),
                         function_hash);
         }
-
-        BREAK();
     }
 
     if (symbol_object->tag_count.tag != TAG_SYMBOL)
