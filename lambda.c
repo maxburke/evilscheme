@@ -182,10 +182,10 @@ compile_if(struct compiler_context_t *context, struct instruction_t *next, struc
     struct instruction_t *nop;
     struct instruction_t *cond_br_target;
 
-    test_form = body;
+    test_form = CAR(body);
     temp = CDR(body);
     consequent_form = CAR(temp);
-    alternate_form = CDR(temp);
+    alternate_form = CAR(CDR(temp));
 
     test_code = compile_form(context, next, test_form);
 
@@ -254,7 +254,7 @@ compile_plus(struct compiler_context_t *context, struct instruction_t *next, str
 
     for (arg = args; arg != empty_pair; arg = CDR(arg), ++i)
     {
-        insn = compile_form(context, insn, arg);
+        insn = compile_form(context, insn, CAR(arg));
 
         if (i >= 1)
         {
@@ -317,12 +317,14 @@ compile_call(struct compiler_context_t *context, struct instruction_t *next, str
 }
 
 static struct instruction_t *
-compile_nullp(struct compiler_context_t *context, struct instruction_t *next, struct object_t *expression_form)
+compile_nullp(struct compiler_context_t *context, struct instruction_t *next, struct object_t *args)
 {
+    struct object_t *expression_form;
     struct instruction_t *expression;
     struct instruction_t *ldempty;
     struct instruction_t *cmp_eq;
 
+    expression_form = CAR(args);
     expression = compile_form(context, next, expression_form);
     ldempty = alloc_insn(context);
     ldempty->insn = OPCODE_LDEMPTY;
@@ -476,9 +478,7 @@ compile_form(struct compiler_context_t *context, struct instruction_t *next, str
     uint64_t symbol_hash;
     int arg_index;
 
-    assert(body->tag_count.tag == TAG_PAIR);
-
-    symbol_object = CAR(body);
+    symbol_object = body;
 
     if (symbol_object->tag_count.tag == TAG_PAIR)
     {
@@ -512,7 +512,7 @@ skim_print("** %s (0x%" PRIx64 ") **\n",
                 return compile_call(context, next, function_symbol, function_args);
         }
     }
-BREAK();
+
     if (symbol_object->tag_count.tag != TAG_SYMBOL)
         return compile_literal(context, next, symbol_object);
 
@@ -525,40 +525,6 @@ BREAK();
     }
 
     return compile_symbol_load(context, next, symbol_object);
-
-#if 0
-    symbol_object = CAR(body);
-    symbol_hash = symbol_object->value.symbol_hash;
-
-    if (symbol_object->tag_count.tag != TAG_SYMBOL)
-        return compile_literal(context, next, symbol_object);
-
-    assert(symbol_object->tag_count.tag == TAG_SYMBOL);
-
-    switch (symbol_hash)
-    {
-        case SYMBOL_IF:
-            return compile_if(context, next, body);
-        case SYMBOL_NULLP:
-            return compile_nullp(context, next, body);
-        default:
-            skim_print("** %s (0x%" PRIx64 ") **\n", 
-                    find_symbol_name(context->environment, symbol_hash),
-                    symbol_hash);
-            /*
-             * TODO: Remove this break as it should fall through.
-             */
-    }
-
-    arg_index = get_arg_index(context->args, symbol_hash);
-
-    if (arg_index != UNKNOWN_ARG)
-    {
-        return compile_load_arg(context, next, arg_index);
-    }
-
-    return compile_symbol_load(context, next, symbol_object);
-#endif
 }
 
 static struct object_t *
@@ -575,10 +541,11 @@ assemble(struct environment_t *environment, struct instruction_t *root)
 static void
 add_return_insn(struct compiler_context_t *context, struct instruction_t *root)
 {
-    UNUSED(context);
-    UNUSED(root);
+    struct instruction_t *ret;
 
-    BREAK();
+    ret = alloc_insn(context);
+    ret->insn = OPCODE_RETURN;
+    ret->link.next = &root->link;
 }
 
 static void
@@ -616,7 +583,7 @@ lambda(struct environment_t *environment, struct object_t *lambda_body)
 
     for (body = CDR(lambda_body); body != empty_pair; body = CDR(body))
     {
-        root = compile_form(&context, root, body);
+        root = compile_form(&context, root, CAR(body));
     }
 
     add_return_insn(&context, root);
