@@ -150,6 +150,9 @@ static struct instruction_t *
 compile_form(struct compiler_context_t *context, struct instruction_t *next, struct object_t *body);
 
 static struct instruction_t *
+compile_symbol_load(struct compiler_context_t *context, struct instruction_t *next, struct object_t *symbol);
+
+static struct instruction_t *
 find_before(struct instruction_t *start, struct instruction_t *target)
 {
     struct slist_t *end;
@@ -265,6 +268,52 @@ compile_plus(struct compiler_context_t *context, struct instruction_t *next, str
     }
 
     return insn;
+}
+
+static struct instruction_t *
+compile_arg_eval(struct compiler_context_t *context, struct instruction_t *next, struct object_t *args)
+{
+    struct instruction_t *evaluated_args;
+
+    if (args == empty_pair)
+        return next;
+
+    evaluated_args = compile_arg_eval(context, next, CDR(args));
+
+    return compile_form(context, evaluated_args, CAR(args));
+}
+
+static struct instruction_t *
+compile_call(struct compiler_context_t *context, struct instruction_t *next, struct object_t *function, struct object_t *args)
+{
+    struct instruction_t *evaluated_args;
+    struct instruction_t *function_symbol;
+    struct instruction_t *call;
+
+    /*
+     * Optimization opportunity -- tail calls to self can be replaced with 
+     * branch to beginning of function. The difficulty will be detecting if
+     * we are branching to ourself. This will not be possible if we're compiling
+     * the form (define foo (lambda (x) ...))) because the slot foo can later be
+     * rebound, but if we're compiling (define (foo x) ...) I think it would be
+     * acceptable behavior to perform this optimization.
+     *
+     * TODO: Once the parser recognizes (define (foo x) ...), add this in.
+     */
+
+    evaluated_args = compile_arg_eval(context, next, args);
+    function_symbol = compile_symbol_load(context, evaluated_args, function);
+
+    /*
+     * All function calls are emitted as normal calls here. Later we run a pass
+     * over the bytecode that converts calls to tailcalls if possible.
+     */
+
+    call = alloc_insn(context);
+    call->link.next = &function_symbol->link;
+    call->insn = OPCODE_CALL;
+
+    return call;
 }
 
 static struct instruction_t *
@@ -427,6 +476,8 @@ compile_form(struct compiler_context_t *context, struct instruction_t *next, str
     uint64_t symbol_hash;
     int arg_index;
 
+    assert(body->tag_count.tag == TAG_PAIR);
+
     symbol_object = CAR(body);
 
     if (symbol_object->tag_count.tag == TAG_PAIR)
@@ -451,14 +502,17 @@ compile_form(struct compiler_context_t *context, struct instruction_t *next, str
                 return compile_plus(context, next, function_args);
             default:
                 /*
-                 * Look symbol up in environment (ldimm8_symbol, get_bound_location, call)
+                 * The function/procedure isn't one that is handled by the
+                 * compiler so we need to emit a call to it.
+                 * TODO: determine if this can be a tailcall.
                  */
-                skim_print("** %s (0x%" PRIx64 ") **\n", 
-                        find_symbol_name(context->environment, function_hash),
-                        function_hash);
+skim_print("** %s (0x%" PRIx64 ") **\n", 
+        find_symbol_name(context->environment, function_hash),
+        function_hash);
+                return compile_call(context, next, function_symbol, function_args);
         }
     }
-
+BREAK();
     if (symbol_object->tag_count.tag != TAG_SYMBOL)
         return compile_literal(context, next, symbol_object);
 
@@ -507,7 +561,7 @@ compile_form(struct compiler_context_t *context, struct instruction_t *next, str
 #endif
 }
 
-struct object_t *
+static struct object_t *
 assemble(struct environment_t *environment, struct instruction_t *root)
 {
     UNUSED(environment);
@@ -516,6 +570,33 @@ assemble(struct environment_t *environment, struct instruction_t *root)
     BREAK();
 
     return NULL;
+}
+
+static void
+add_return_insn(struct compiler_context_t *context, struct instruction_t *root)
+{
+    UNUSED(context);
+    UNUSED(root);
+
+    BREAK();
+}
+
+static void
+collapse_nops(struct compiler_context_t *context, struct instruction_t *root)
+{
+    UNUSED(context);
+    UNUSED(root);
+
+    BREAK();
+}
+
+static void
+promote_tailcalls(struct compiler_context_t *context, struct instruction_t *root)
+{
+    UNUSED(context);
+    UNUSED(root);
+
+    BREAK();
 }
 
 struct object_t *
@@ -537,6 +618,10 @@ lambda(struct environment_t *environment, struct object_t *lambda_body)
     {
         root = compile_form(&context, root, body);
     }
+
+    add_return_insn(&context, root);
+    collapse_nops(&context, root);
+    promote_tailcalls(&context, root);
 
     procedure = assemble(environment, root);
 
