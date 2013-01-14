@@ -56,7 +56,8 @@ bind(struct environment_t *environment, struct object_t *args)
 
     assert(symbol->tag_count.tag == TAG_SYMBOL);
     location = get_bound_location(environment, symbol, 0);
-    assert(location == NULL);
+    if (location != NULL)
+        return location;
 
     current_fragment = environment->symbol_table_fragment;
     symbol = CAR(args);

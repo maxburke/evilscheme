@@ -5,6 +5,7 @@
 
 #include "base.h"
 #include "builtins.h"
+#include "gc.h"
 #include "object.h"
 #include "runtime.h"
 #include "slist.h"
@@ -127,6 +128,7 @@ struct instruction_t
     struct slist_t link;
 
     unsigned char opcode;
+    int offset;
     size_t size;
     struct instruction_t *reloc;
 
@@ -189,16 +191,12 @@ compile_if(struct compiler_context_t *context, struct instruction_t *next, struc
 
     test_code = compile_form(context, next, test_form);
 
-    /*
-     * All conditional branches are encoded as a COND_BRANCH_1 and will be
-     * expanded to a COND_BRANCH_2 only if the extra distance is needed.
-     */
     cond_br = allocate_instruction(context);
-    cond_br->opcode = OPCODE_COND_BRANCH_1;
+    cond_br->opcode = OPCODE_COND_BRANCH;
     cond_br->link.next = &test_code->link;
 
     br = allocate_instruction(context);
-    br->opcode = OPCODE_BRANCH_1;
+    br->opcode = OPCODE_BRANCH;
 
     nop = allocate_instruction(context);
     nop->opcode = OPCODE_NOP;
@@ -353,6 +351,7 @@ compile_literal(struct compiler_context_t *context, struct instruction_t *next, 
     {
         case TAG_BOOLEAN:
             instruction->opcode = OPCODE_LDIMM_1_BOOL;
+            instruction->data.s1 = (char)literal->value.fixnum_value;
             break;
         case TAG_SYMBOL:
             instruction->opcode = OPCODE_LDIMM_8_SYMBOL;
@@ -527,18 +526,170 @@ skim_print("** %s (0x%" PRIx64 ") **\n",
     return compile_symbol_load(context, next, symbol_object);
 }
 
+static size_t
+calculate_bytecode_size_and_offsets(struct slist_t *root)
+{
+    struct slist_t *i;
+    size_t size;
+
+    size = 0;
+
+    for (i = root; i != NULL; i = i->next)
+    {
+        struct instruction_t *insn;
+
+        insn = (struct instruction_t *)i;
+        insn->offset = size;
+        size += 1 + insn->size;
+    }
+
+    assert(size < 65536);
+    return size;
+}
+
+union convert_two_t
+{
+    unsigned char bytes[2];
+    unsigned short u2;
+    short s2;
+};
+
+union convert_four_t
+{
+    unsigned char bytes[4];
+    float f4;
+    unsigned int u4;
+    int s4;
+};
+
+union convert_eight_t
+{
+    unsigned char bytes[8];
+    double f8;
+    uint64_t u8;
+    int64_t s8;
+};
+
 static struct object_t *
 assemble(struct environment_t *environment, struct instruction_t *root)
 {
+    struct slist_t *insns;
+    struct slist_t *i;
+    struct procedure_t *procedure;
+    void *mem;
+    unsigned char *bytes;
+    size_t num_bytes;
+    size_t idx;
     UNUSED(environment);
-    UNUSED(root);
 
-    BREAK();
+    /*
+     * This must be the last function called as it destructively alters the
+     * instruction chain.
+     */
 
-    return NULL;
+    insns = slist_reverse(&root->link);
+    idx = 0;
+    num_bytes = calculate_bytecode_size_and_offsets(insns);
+    mem = gc_alloc(environment->heap, TAG_PROCEDURE, num_bytes);
+    procedure = mem;
+    bytes = procedure->byte_code;
+
+    for (i = insns; i != NULL; i = i->next)
+    {
+        struct instruction_t *insn;
+        unsigned char opcode;
+        size_t size;
+
+        insn = (struct instruction_t *)i;
+        opcode = insn->opcode;
+        size = insn->size;
+        bytes[idx++] = opcode;
+
+        switch (opcode)
+        {
+            case OPCODE_BRANCH:
+            case OPCODE_COND_BRANCH:
+                {
+                    int offset;
+                    int target_offset;
+                    int diff;
+                    union convert_two_t c2;
+
+                    /*
+                     * We add 1 to the offset of the current instruction 
+                     * because this one accounts for the PC's offset after
+                     * it has decoded the opcode.
+                     */
+                    offset = insn->offset + 1;
+                    target_offset = insn->reloc->offset;
+                    diff = target_offset - offset;
+
+                    assert(diff >= -32768 && diff < 32767);
+
+                    c2.s2 = (short)diff;
+                    memcpy(&bytes[idx], c2.bytes, 2);
+                    idx += 2;
+                }
+                break;
+            case OPCODE_LDIMM_1_BOOL:
+            case OPCODE_LDIMM_1_CHAR:
+            case OPCODE_LDIMM_1_FIXNUM:
+                bytes[idx++] = (unsigned char)insn->data.s1;
+                break;
+            case OPCODE_LDARG_X:
+                bytes[idx++] = insn->data.u1;
+                break;
+            case OPCODE_LDIMM_4_FIXNUM:
+                {
+                    union convert_four_t c4;
+                    c4.s4 = insn->data.s4;
+                    memcpy(&bytes[idx], c4.bytes, 4);
+                    idx += 4;
+                }
+                break;
+            case OPCODE_LDIMM_4_FLONUM:
+                {
+                    union convert_four_t c4;
+                    c4.f4 = insn->data.f4;
+                    memcpy(&bytes[idx], c4.bytes, 4);
+                    idx += 4;
+                }
+                break;
+            case OPCODE_LDIMM_8_FIXNUM:
+                {
+                    union convert_eight_t c8;
+                    c8.s8 = insn->data.s8;
+                    memcpy(&bytes[idx], c8.bytes, 8);
+                    idx += 8;
+                }
+                break;
+            case OPCODE_LDIMM_8_FLONUM:
+                {
+                    union convert_eight_t c8;
+                    c8.f8 = insn->data.f8;
+                    memcpy(&bytes[idx], c8.bytes, 8);
+                    idx += 8;
+                }
+                break;
+            case OPCODE_LDIMM_8_SYMBOL:
+                {
+                    union convert_eight_t c8;
+                    c8.u8 = insn->data.s8;
+                    memcpy(&bytes[idx], c8.bytes, 8);
+                    idx += 8;
+                }
+                break;
+            case OPCODE_LDSTR:
+                memcpy(&bytes[idx], insn->data.string, size);
+                idx += size;
+                break;
+        }
+    }
+
+    return (struct object_t *)mem;
 }
 
-static void
+static struct instruction_t *
 add_return_insn(struct compiler_context_t *context, struct instruction_t *root)
 {
     struct instruction_t *ret;
@@ -546,20 +697,65 @@ add_return_insn(struct compiler_context_t *context, struct instruction_t *root)
     ret = allocate_instruction(context);
     ret->opcode = OPCODE_RETURN;
     ret->link.next = &root->link;
+
+    return ret;
+}
+
+static inline int
+is_branch(struct instruction_t *insn)
+{
+    unsigned char opcode;
+
+    opcode = insn->opcode;
+
+    return opcode == OPCODE_BRANCH || opcode == OPCODE_COND_BRANCH;
 }
 
 static void
-collapse_nops(struct compiler_context_t *context, struct instruction_t *root)
+eradicate_nop(struct instruction_t *root, 
+        struct instruction_t *nop,
+        struct instruction_t *prev)
 {
     struct slist_t *i;
 
-    UNUSED(context);
+    for (i = &root->link; i != NULL; i = i->next)
+    {
+        struct instruction_t *insn;
+
+        insn = (struct instruction_t *)i;
+        if (!is_branch(insn))
+            continue;
+
+        if (insn->reloc != nop)
+            continue;
+
+        insn->reloc = prev;
+    }
+}
+
+static void
+collapse_nops(struct instruction_t *root)
+{
+    struct slist_t *i;
+    struct instruction_t *prev;
+
+    prev = NULL;
 
     for (i = &root->link; i != NULL; i = i->next)
     {
-    }
+        struct instruction_t *insn;
 
-    BREAK();
+        insn = (struct instruction_t *)i;
+
+        if (insn->opcode == OPCODE_NOP)
+        {
+            assert(prev != NULL);
+            eradicate_nop(root, insn, prev);
+            prev->link.next = insn->link.next;
+        }
+
+        prev = insn;
+    }
 }
 
 static void
@@ -568,7 +764,11 @@ promote_tailcalls(struct compiler_context_t *context, struct instruction_t *root
     UNUSED(context);
     UNUSED(root);
 
-    BREAK();
+    /*
+     * This gets a TODO. This function needs to determine if a particular call 
+     * is actually a tail call and, if it is, change its call opcode into the
+     * tailcall opcode.
+     */
 }
 
 struct object_t *
@@ -591,8 +791,8 @@ lambda(struct environment_t *environment, struct object_t *lambda_body)
         root = compile_form(&context, root, CAR(body));
     }
 
-    add_return_insn(&context, root);
-    collapse_nops(&context, root);
+    root = add_return_insn(&context, root);
+    collapse_nops(root);
     promote_tailcalls(&context, root);
 
     procedure = assemble(environment, root);
