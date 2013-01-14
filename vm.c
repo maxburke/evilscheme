@@ -559,41 +559,13 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
             case OPCODE_CMPN_GE:
                 CMPN_IMPL(>=)
                 break;
-            case OPCODE_BRANCH_1:
-                {
-                    int offset = (int)((char)*pc);
-                    pc += offset + 1;
-                }
-                break;
-            case OPCODE_BRANCH_2:
+            case OPCODE_BRANCH:
                 {
                     int offset = (int)(*(short *)pc);
                     pc += offset + 2;
                 }
                 break;
-            case OPCODE_COND_BRANCH_1:
-                {
-                    struct object_t *condition;
-                    int offset;
-
-                    condition = sp + 1;
-                    offset = (int)((char)*pc);
-                    ++pc;
-
-                    /*
-                     * Non-boolean types automatically count as "true". Only
-                     * #f on the evaluation stack will cause the branch to
-                     * not be followed.
-                     */
-                    if (condition->tag_count.tag != TAG_BOOLEAN || condition->value.fixnum_value != 0)
-                    {
-                        pc += offset;
-                    }
-
-                    ++sp;
-                }
-                break;
-            case OPCODE_COND_BRANCH_2:
+            case OPCODE_COND_BRANCH:
                 {
                     struct object_t *condition;
                     int offset;

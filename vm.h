@@ -128,20 +128,17 @@ enum opcode_t
     /*
      * OPCODE_BRANCH_N [offset bytes 0 .. (N - 1)]
      * Sets the PC to (pc + offsetValue). The base pc value is the one after
-     * the decoded instruction. The offset value is either a 1 or 2 byte
-     * signed integer.
+     * the decoded instruction. The offset value is a 2 byte signed integer.
      */
-    OPCODE_BRANCH_1,
-    OPCODE_BRANCH_2,
+    OPCODE_BRANCH,
 
     /*
      * OPCODE_COND_BRANCH_N [offset bytes 0 .. (N - 1)] | [bool] ->
      * Sets the PC to (pc + offsetValue) if the boolean value on the top of
      * the stack is true. As with the branch instruction, the offset value
-     * is either a 1 or 2 byte signed integer.
+     * is a 2 byte signed integer.
      */
-    OPCODE_COND_BRANCH_1,
-    OPCODE_COND_BRANCH_2,
+    OPCODE_COND_BRANCH,
 
     /*
      * OPCODE_CALL 
@@ -222,7 +219,8 @@ enum opcode_t
 
     /*
      * This opcode makes it easier to implement conditional branching in the
-     * compiler. It probably can go away... eventually.
+     * compiler. This is eliminated by an "optimization" pass at the end of
+     * compilation.
      */
     OPCODE_NOP
 };
