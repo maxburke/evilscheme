@@ -14,7 +14,7 @@
 
 #define DEFAULT_POOL_CHUNK_SIZE 4096
 
-#define alloc_insn(context) pool_alloc(&context->pool, sizeof(struct instruction_t))
+#define allocate_instruction(context) pool_alloc(&context->pool, sizeof(struct instruction_t))
 
 struct memory_pool_chunk_t
 {
@@ -126,7 +126,7 @@ struct instruction_t
 {
     struct slist_t link;
 
-    unsigned char insn;
+    unsigned char opcode;
     size_t size;
     struct instruction_t *reloc;
 
@@ -193,15 +193,15 @@ compile_if(struct compiler_context_t *context, struct instruction_t *next, struc
      * All conditional branches are encoded as a COND_BRANCH_1 and will be
      * expanded to a COND_BRANCH_2 only if the extra distance is needed.
      */
-    cond_br = alloc_insn(context);
-    cond_br->insn = OPCODE_COND_BRANCH_1;
+    cond_br = allocate_instruction(context);
+    cond_br->opcode = OPCODE_COND_BRANCH_1;
     cond_br->link.next = &test_code->link;
 
-    br = alloc_insn(context);
-    br->insn = OPCODE_BRANCH_1;
+    br = allocate_instruction(context);
+    br->opcode = OPCODE_BRANCH_1;
 
-    nop = alloc_insn(context);
-    nop->insn = OPCODE_NOP;
+    nop = allocate_instruction(context);
+    nop->opcode = OPCODE_NOP;
 
     if (alternate_form == empty_pair)
     {
@@ -260,8 +260,8 @@ compile_plus(struct compiler_context_t *context, struct instruction_t *next, str
         {
             struct instruction_t *plus;
 
-            plus = alloc_insn(context);
-            plus->insn = OPCODE_ADD;
+            plus = allocate_instruction(context);
+            plus->opcode = OPCODE_ADD;
             plus->link.next = &insn->link;
             insn = plus;
         }
@@ -309,9 +309,9 @@ compile_call(struct compiler_context_t *context, struct instruction_t *next, str
      * over the bytecode that converts calls to tailcalls if possible.
      */
 
-    call = alloc_insn(context);
+    call = allocate_instruction(context);
     call->link.next = &function_symbol->link;
-    call->insn = OPCODE_CALL;
+    call->opcode = OPCODE_CALL;
 
     return call;
 }
@@ -326,12 +326,12 @@ compile_nullp(struct compiler_context_t *context, struct instruction_t *next, st
 
     expression_form = CAR(args);
     expression = compile_form(context, next, expression_form);
-    ldempty = alloc_insn(context);
-    ldempty->insn = OPCODE_LDEMPTY;
+    ldempty = allocate_instruction(context);
+    ldempty->opcode = OPCODE_LDEMPTY;
     ldempty->link.next = &expression->link;
 
-    cmp_eq = alloc_insn(context);
-    cmp_eq->insn = OPCODE_CMP_EQUAL;
+    cmp_eq = allocate_instruction(context);
+    cmp_eq->opcode = OPCODE_CMP_EQUAL;
     cmp_eq->link.next = &ldempty->link;
 
     return cmp_eq;
@@ -352,15 +352,15 @@ compile_literal(struct compiler_context_t *context, struct instruction_t *next, 
     switch (literal->tag_count.tag)
     {
         case TAG_BOOLEAN:
-            instruction->insn = OPCODE_LDIMM_1_BOOL;
+            instruction->opcode = OPCODE_LDIMM_1_BOOL;
             break;
         case TAG_SYMBOL:
-            instruction->insn = OPCODE_LDIMM_8_SYMBOL;
+            instruction->opcode = OPCODE_LDIMM_8_SYMBOL;
             instruction->size = 8;
             instruction->data.u8 = (char)literal->value.symbol_hash;
             break;
         case TAG_CHAR:
-            instruction->insn = OPCODE_LDIMM_1_CHAR;
+            instruction->opcode = OPCODE_LDIMM_1_CHAR;
             instruction->size = 1;
             instruction->data.s1 = (char)literal->value.fixnum_value;
             break;
@@ -372,19 +372,19 @@ compile_literal(struct compiler_context_t *context, struct instruction_t *next, 
 
                 if (n >= -128 && n <= 127)
                 {
-                    instruction->insn = OPCODE_LDIMM_1_FIXNUM;
+                    instruction->opcode = OPCODE_LDIMM_1_FIXNUM;
                     instruction->size = 1;
                     instruction->data.s1 = (char)n;
                 }
                 else if (n >= -2147483648LL && n <= 2147483647)
                 {
-                    instruction->insn = OPCODE_LDIMM_4_FIXNUM;
+                    instruction->opcode = OPCODE_LDIMM_4_FIXNUM;
                     instruction->size = 4;
                     instruction->data.s4 = (int)n;
                 }
                 else
                 {
-                    instruction->insn = OPCODE_LDIMM_8_FIXNUM;
+                    instruction->opcode = OPCODE_LDIMM_8_FIXNUM;
                     instruction->size = 8;
                     instruction->data.s8 = n;
                 }
@@ -400,20 +400,20 @@ compile_literal(struct compiler_context_t *context, struct instruction_t *next, 
 
                 if (d == (double)f)
                 {
-                    instruction->insn = OPCODE_LDIMM_4_FLONUM;
+                    instruction->opcode = OPCODE_LDIMM_4_FLONUM;
                     instruction->size = 4;
                     instruction->data.f4 = f;
                 }
                 else
                 {
-                    instruction->insn = OPCODE_LDIMM_8_FLONUM;
+                    instruction->opcode = OPCODE_LDIMM_8_FLONUM;
                     instruction->size = 8;
                     instruction->data.f8 = d;
                 }
             }
             break;
         case TAG_STRING:
-            instruction->insn = OPCODE_LDSTR;
+            instruction->opcode = OPCODE_LDSTR;
             instruction->size = literal->tag_count.count + 1;
             memcpy(&instruction->data.string, literal->value.string_value, instruction->size);
             break;
@@ -436,8 +436,8 @@ compile_load_arg(struct compiler_context_t *context, struct instruction_t *next,
      */
     assert(arg_index < 256 && arg_index >= 0);
     
-    instruction = alloc_insn(context);
-    instruction->insn = OPCODE_LDARG_X;
+    instruction = allocate_instruction(context);
+    instruction->opcode = OPCODE_LDARG_X;
     instruction->size = 1;
     instruction->data.u1 = (unsigned char)arg_index;
     instruction->link.next = &next->link;
@@ -453,14 +453,14 @@ compile_symbol_load(struct compiler_context_t *context, struct instruction_t *ne
 
     assert(symbol->tag_count.tag == TAG_SYMBOL);
 
-    ldimm_symbol = alloc_insn(context);
-    ldimm_symbol->insn = OPCODE_LDIMM_8_SYMBOL;
+    ldimm_symbol = allocate_instruction(context);
+    ldimm_symbol->opcode = OPCODE_LDIMM_8_SYMBOL;
     ldimm_symbol->size = 8;
     ldimm_symbol->data.u8 = symbol->value.symbol_hash;
     ldimm_symbol->link.next = &next->link;
 
-    get_bound_location = alloc_insn(context); 
-    get_bound_location->insn = OPCODE_GET_BOUND_LOCATION;
+    get_bound_location = allocate_instruction(context); 
+    get_bound_location->opcode = OPCODE_GET_BOUND_LOCATION;
     get_bound_location->size = 0;
     get_bound_location->link.next = &ldimm_symbol->link;
 
@@ -543,16 +543,21 @@ add_return_insn(struct compiler_context_t *context, struct instruction_t *root)
 {
     struct instruction_t *ret;
 
-    ret = alloc_insn(context);
-    ret->insn = OPCODE_RETURN;
+    ret = allocate_instruction(context);
+    ret->opcode = OPCODE_RETURN;
     ret->link.next = &root->link;
 }
 
 static void
 collapse_nops(struct compiler_context_t *context, struct instruction_t *root)
 {
+    struct slist_t *i;
+
     UNUSED(context);
-    UNUSED(root);
+
+    for (i = &root->link; i != NULL; i = i->next)
+    {
+    }
 
     BREAK();
 }
