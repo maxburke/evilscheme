@@ -259,6 +259,7 @@ print(struct environment_t *environment, struct object_t *args)
                 for (i = 0; i < count; ++i)
                 {
                     print(environment, base + i);
+
                     if (i < (count - 1))
                     {
                         skim_print(" ");
