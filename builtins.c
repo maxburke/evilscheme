@@ -98,11 +98,53 @@ define(struct environment_t *environment, struct object_t *args)
 struct object_t *
 vector(struct environment_t *environment, struct object_t *args)
 {
-    UNUSED(environment);
-    UNUSED(args);
-    BREAK();
+    struct object_t *i;
+    struct object_t *vector;
+    struct object_t *base;
+    size_t idx;
 
-    return NULL;
+    idx = 0;
+
+    for (i = args; i != empty_pair; i = CDR(i), ++idx)
+        ;
+
+    vector = gc_alloc(environment->heap, TAG_VECTOR, sizeof(struct object_t) * idx);
+    base = (struct object_t *)&vector->value;
+    idx = 0;
+
+    for (i = args; i != empty_pair; i = CDR(i), ++idx)
+    {
+        struct object_t *value;
+        
+        value = eval(environment, i);
+
+        switch (value->tag_count.tag)
+        {
+            case TAG_BOOLEAN:
+            case TAG_SYMBOL:
+            case TAG_CHAR:
+            case TAG_FIXNUM:
+            case TAG_FLONUM:
+            case TAG_PAIR:
+            case TAG_REFERENCE:
+            case TAG_INNER_REFERENCE:
+                base[idx] = *value;
+                break;
+            case TAG_VECTOR:
+            case TAG_STRING:
+            case TAG_PROCEDURE:
+            case TAG_SPECIAL_FUNCTION:
+                base[idx].tag_count.tag = TAG_REFERENCE;
+                base[idx].value.ref.object = value;
+                break;
+            case TAG_ENVIRONMENT:
+            case TAG_HEAP:
+                BREAK();
+                break;
+        }
+    }
+
+    return vector;
 }
 
 struct object_t *
@@ -203,13 +245,13 @@ print(struct environment_t *environment, struct object_t *args)
         case TAG_VECTOR:
             {
                 int i;
-                struct object_t *object;
+                struct object_t *base;
                 
-                object = args + 1;
+                base = (struct object_t *)&args->value;
 
                 skim_print("#(");
                 for (i = 0; i < args->tag_count.count; ++i)
-                    object = print(environment, object);
+                    print(environment, base + i);
                 skim_print(")");
                 break;
             }
