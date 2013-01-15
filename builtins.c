@@ -108,7 +108,11 @@ vector(struct environment_t *environment, struct object_t *args)
     for (i = args; i != empty_pair; i = CDR(i), ++idx)
         ;
 
+    assert(idx < 65536);
+
     vector = gc_alloc(environment->heap, TAG_VECTOR, sizeof(struct object_t) * idx);
+    vector->tag_count.count = (unsigned short)idx;
+
     base = (struct object_t *)&vector->value;
     idx = 0;
 
@@ -245,13 +249,21 @@ print(struct environment_t *environment, struct object_t *args)
         case TAG_VECTOR:
             {
                 int i;
+                int count;
                 struct object_t *base;
                 
                 base = (struct object_t *)&args->value;
+                count = args->tag_count.count;
 
                 skim_print("#(");
-                for (i = 0; i < args->tag_count.count; ++i)
+                for (i = 0; i < count; ++i)
+                {
                     print(environment, base + i);
+                    if (i < (count - 1))
+                    {
+                        skim_print(" ");
+                    }
+                }
                 skim_print(")");
                 break;
             }
