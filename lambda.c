@@ -5,6 +5,7 @@
 
 #include "base.h"
 #include "builtins.h"
+#include "environment.h"
 #include "gc.h"
 #include "object.h"
 #include "runtime.h"
@@ -769,6 +770,50 @@ promote_tailcalls(struct compiler_context_t *context, struct instruction_t *root
      * is actually a tail call and, if it is, change its call opcode into the
      * tailcall opcode.
      */
+}
+
+struct object_t *
+disassemble_procedure(struct object_t *procedure, const char *name)
+{
+    UNUSED(procedure);
+
+    skim_print("hello!!!! %s\n", name);
+    return empty_pair;
+}
+
+struct object_t *
+disassemble(struct environment_t *environment, struct object_t *args)
+{
+    struct object_t *symbol;
+    struct object_t **slot;
+    struct object_t *function;
+    const char *name;
+
+print(environment, args);
+    symbol = eval(environment, CAR(args));
+
+    assert(symbol->tag_count.tag == TAG_SYMBOL);
+    slot = get_bound_location(environment, symbol, 1);
+    assert(slot != NULL);
+
+    function = *slot;
+    assert(function != NULL);
+
+    name = find_symbol_name(environment, symbol->value.symbol_hash);
+
+    switch (function->tag_count.tag)
+    {
+        case TAG_SPECIAL_FUNCTION:
+            skim_print("%s: <special function>\n", name);
+            return function;
+        case TAG_PROCEDURE:
+            return disassemble_procedure(function, name);
+        default:
+            BREAK();
+            break;
+    }
+
+    return empty_pair;
 }
 
 struct object_t *

@@ -61,6 +61,7 @@ environment_initialize(struct environment_t *environment)
         { "define", define },
         { "lambda", lambda },
         { "vector", vector },
+        { "disassemble", disassemble },
     };
     #define NUM_INITIALIZERS (sizeof initializers / sizeof initializers[0])
     size_t i;
