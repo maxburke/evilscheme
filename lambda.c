@@ -777,16 +777,72 @@ collapse_nops(struct instruction_t *root)
 }
 
 static void
-promote_tailcalls(struct compiler_context_t *context, struct instruction_t *root)
+eliminate_branch_to_return(struct instruction_t *root)
 {
-    UNUSED(context);
-    UNUSED(root);
+    struct slist_t *i;
+
+    for (i = &root->link; i != NULL; i = i->next)
+    {
+        struct instruction_t *insn;
+
+        insn = (struct instruction_t *)i;
+
+        if (is_branch(insn))
+        {
+            if (insn->reloc->opcode == OPCODE_RETURN)
+            {
+                insn->opcode = OPCODE_RETURN;
+                insn->size = 0;
+                insn->reloc = NULL;
+            }
+        }
+    }
+}
+
+static struct instruction_t *
+promote_tailcalls(struct instruction_t *root)
+{
+    struct slist_t *i;
+    struct instruction_t *prev;
+
+    prev = NULL;
 
     /*
      * This gets a TODO. This function needs to determine if a particular call 
      * is actually a tail call and, if it is, change its call opcode into the
      * tailcall opcode.
      */
+
+    for (i = &root->link; i != NULL; i = i->next)
+    {
+        struct instruction_t *insn;
+
+        insn = (struct instruction_t *)i;
+        if (insn->opcode == OPCODE_RETURN)
+        {
+            struct instruction_t *next;
+
+            next = (struct instruction_t *)i->next;
+
+            if (next->opcode == OPCODE_CALL)
+            {
+                next->opcode = OPCODE_TAILCALL;
+
+                if (prev != NULL)
+                {
+                    prev->link.next = &next->link;
+                }
+                else
+                {
+                    root = next;
+                }
+            }
+        }
+
+        prev = insn;
+    }
+
+    return root;
 }
 
 static inline void
@@ -1204,7 +1260,8 @@ lambda(struct environment_t *environment, struct object_t *lambda_body)
 
     root = add_return_insn(&context, root);
     collapse_nops(root);
-    promote_tailcalls(&context, root);
+    eliminate_branch_to_return(root);
+    promote_tailcalls(root);
 
     procedure = assemble(environment, root);
 
