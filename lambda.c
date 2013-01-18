@@ -194,10 +194,12 @@ compile_if(struct compiler_context_t *context, struct instruction_t *next, struc
 
     cond_br = allocate_instruction(context);
     cond_br->opcode = OPCODE_COND_BRANCH;
+    cond_br->size = 2;
     cond_br->link.next = &test_code->link;
 
     br = allocate_instruction(context);
     br->opcode = OPCODE_BRANCH;
+    br->size = 2;
 
     nop = allocate_instruction(context);
     nop->opcode = OPCODE_NOP;
@@ -228,11 +230,11 @@ compile_if(struct compiler_context_t *context, struct instruction_t *next, struc
     }
 
     alternate_code = compile_form(context, cond_br, alternate_form);
-    consequent_code = compile_form(context, alternate_code, consequent_form);
     br->link.next = &alternate_code->link;
     br->reloc = nop;
+    consequent_code = compile_form(context, br, consequent_form);
 
-    cond_br_target = find_before(consequent_code, alternate_code);
+    cond_br_target = find_before(consequent_code, br);
     cond_br->reloc = cond_br_target;
 
     nop->link.next = &consequent_code->link;
@@ -696,6 +698,12 @@ assemble(struct environment_t *environment, struct instruction_t *root)
         }
     }
 
+    /*
+     * If this assert fires then chances are we've forgotten to set the size
+     * field of an instruction instance.
+     */
+    assert(idx == num_bytes);
+
     return (struct object_t *)mem;
 }
 
@@ -769,16 +777,72 @@ collapse_nops(struct instruction_t *root)
 }
 
 static void
-promote_tailcalls(struct compiler_context_t *context, struct instruction_t *root)
+eliminate_branch_to_return(struct instruction_t *root)
 {
-    UNUSED(context);
-    UNUSED(root);
+    struct slist_t *i;
+
+    for (i = &root->link; i != NULL; i = i->next)
+    {
+        struct instruction_t *insn;
+
+        insn = (struct instruction_t *)i;
+
+        if (is_branch(insn))
+        {
+            if (insn->reloc->opcode == OPCODE_RETURN)
+            {
+                insn->opcode = OPCODE_RETURN;
+                insn->size = 0;
+                insn->reloc = NULL;
+            }
+        }
+    }
+}
+
+static struct instruction_t *
+promote_tailcalls(struct instruction_t *root)
+{
+    struct slist_t *i;
+    struct instruction_t *prev;
+
+    prev = NULL;
 
     /*
      * This gets a TODO. This function needs to determine if a particular call 
      * is actually a tail call and, if it is, change its call opcode into the
      * tailcall opcode.
      */
+
+    for (i = &root->link; i != NULL; i = i->next)
+    {
+        struct instruction_t *insn;
+
+        insn = (struct instruction_t *)i;
+        if (insn->opcode == OPCODE_RETURN)
+        {
+            struct instruction_t *next;
+
+            next = (struct instruction_t *)i->next;
+
+            if (next->opcode == OPCODE_CALL)
+            {
+                next->opcode = OPCODE_TAILCALL;
+
+                if (prev != NULL)
+                {
+                    prev->link.next = &next->link;
+                }
+                else
+                {
+                    root = next;
+                }
+            }
+        }
+
+        prev = insn;
+    }
+
+    return root;
 }
 
 static inline void
@@ -791,7 +855,7 @@ print_hex_bytes(const unsigned char *c, size_t size)
         skim_print("%02X ", c[i]);
     }
 
-    for (; i < 12; ++i)
+    for (; i < 10; ++i)
     {
         skim_print("   ");
     }
@@ -816,7 +880,6 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
      * being omitted.
      * TODO: FIX!
      */
-BREAK();
 
     skim_print("%s:\n", name);
 
@@ -1050,7 +1113,7 @@ BREAK();
                     memcpy(c2.bytes, ptr + i + 1, 2);
                     print_hex_bytes(ptr + i, 3);
 
-                    skim_print("BRANCH %d\n", c2.s2);
+                    skim_print("BRANCH %d\n", c2.s2 + i + 1);
                 }
 
                 i += 3;
@@ -1062,7 +1125,7 @@ BREAK();
                     memcpy(c2.bytes, ptr + i + 1, 2);
                     print_hex_bytes(ptr + i, 3);
 
-                    skim_print("COND_BRANCH %d\n", c2.s2);
+                    skim_print("COND_BRANCH %d\n", c2.s2 + i + 1);
                 }
 
                 i += 3;
@@ -1197,7 +1260,8 @@ lambda(struct environment_t *environment, struct object_t *lambda_body)
 
     root = add_return_insn(&context, root);
     collapse_nops(root);
-    promote_tailcalls(&context, root);
+    eliminate_branch_to_return(root);
+    root = promote_tailcalls(root);
 
     procedure = assemble(environment, root);
 
