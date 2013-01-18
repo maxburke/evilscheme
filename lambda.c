@@ -404,6 +404,12 @@ compile_literal(struct compiler_context_t *context, struct instruction_t *next, 
                     instruction->size = 4;
                     instruction->data.f4 = f;
                 }
+                else if (d == 0.0 || d == -0.0)
+                {
+                    instruction->opcode = OPCODE_LDIMM_1_FLONUM;
+                    instruction->size = 1;
+                    instruction->data.u1 = 0;
+                }
                 else
                 {
                     instruction->opcode = OPCODE_LDIMM_8_FLONUM;
@@ -637,6 +643,9 @@ assemble(struct environment_t *environment, struct instruction_t *root)
             case OPCODE_LDIMM_1_FIXNUM:
                 bytes[idx++] = (unsigned char)insn->data.s1;
                 break;
+            case OPCODE_LDIMM_1_FLONUM:
+                bytes[idx++] = (unsigned char)insn->data.u1;
+                break;
             case OPCODE_LDARG_X:
                 bytes[idx++] = insn->data.u1;
                 break;
@@ -772,12 +781,363 @@ promote_tailcalls(struct compiler_context_t *context, struct instruction_t *root
      */
 }
 
-struct object_t *
-disassemble_procedure(struct object_t *procedure, const char *name)
+static inline void
+print_hex_bytes(const unsigned char *c, size_t size)
 {
-    UNUSED(procedure);
+    size_t i;
 
-    skim_print("hello!!!! %s\n", name);
+    for (i = 0; i < size; ++i)
+    {
+        skim_print("%02X ", c[i]);
+    }
+
+    for (; i < 12; ++i)
+    {
+        skim_print("   ");
+    }
+}
+
+static struct object_t *
+disassemble_procedure(struct environment_t *environment, struct object_t *args, const char *name)
+{
+    void *mem;
+    struct procedure_t *procedure;
+    const unsigned char *ptr;
+    size_t i;
+    size_t num_bytes;
+
+    mem = args;
+    procedure = mem;
+    assert(procedure->tag_count.tag == TAG_PROCEDURE);
+    ptr = procedure->byte_code;
+
+    /* 
+     * It looks like this isn't quite working properly. Some instructions (return?) are
+     * being omitted.
+     * TODO: FIX!
+     */
+BREAK();
+
+    skim_print("%s:\n", name);
+
+    for (i = 0, num_bytes = procedure->tag_count.count; i < num_bytes;)
+    {
+        unsigned char c = ptr[i];
+
+        skim_print("    %5d: ", i);
+
+        switch (c)
+        {
+            case OPCODE_INVALID:
+                print_hex_bytes(ptr + i, 1);
+                skim_print("INVALID\n");
+                ++i;
+                break;
+            case OPCODE_LDARG_X:
+                {
+                    unsigned char index;
+
+                    index = ptr[i + 1];
+                    print_hex_bytes(ptr + i, 2);
+                    skim_print("LDARG %u\n", index);
+                }
+
+                i += 2;
+                break;
+            case OPCODE_LDIMM_1_BOOL:
+                {
+                    unsigned char value;
+                    
+                    value = ptr[i + 1];
+                    print_hex_bytes(ptr + i, 2);
+
+                    skim_print("LDIMM_1_BOOL %s\n", value ? "#t" : "#f");
+                }
+
+                i += 2;
+                break;
+            case OPCODE_LDIMM_1_CHAR:
+                {
+                    unsigned char value;
+                    
+                    value = ptr[i + 1];
+                    print_hex_bytes(ptr + i, 2);
+
+                    skim_print("LDIMM_1_CHAR #\\%c\n", (char)value);
+                }
+
+                i += 2;
+                break;
+            case OPCODE_LDIMM_1_FIXNUM:
+                {
+                    unsigned char value;
+                    
+                    value = ptr[i + 1];
+                    print_hex_bytes(ptr + i, 2);
+
+                    skim_print("LDIMM_1_FIXNUM %d\n", (int)value);
+                }
+
+                i += 2;
+                break;
+            case OPCODE_LDIMM_1_FLONUM:
+                {
+                    unsigned char value;
+                    
+                    value = ptr[i + 1];
+                    print_hex_bytes(ptr + i, 2);
+
+                    skim_print("LDIMM_1_FLONUM %f\n", (double)value);
+                }
+
+                i += 2;
+                break;
+            case OPCODE_LDIMM_4_FIXNUM:
+                {
+                    union convert_four_t c4;
+
+                    memcpy(c4.bytes, ptr + i + 1, 4);
+                    print_hex_bytes(ptr + i, 5);
+
+                    skim_print("LDIMM_4_FIXNUM %d\n", c4.s4);
+                }
+
+                i += 5;
+                break;
+            case OPCODE_LDIMM_4_FLONUM:
+                {
+                    union convert_four_t c4;
+
+                    memcpy(c4.bytes, ptr + i + 1, 4);
+                    print_hex_bytes(ptr + i, 5);
+
+                    skim_print("LDIMM_4_FLONUM %f\n", c4.f4);
+                }
+
+                i += 5;
+                break;
+            case OPCODE_LDIMM_8_FIXNUM:
+                {
+                    union convert_eight_t c8;
+
+                    memcpy(c8.bytes, ptr + i + 1, 8);
+                    print_hex_bytes(ptr + i, 9);
+
+                    skim_print("LDIMM_8_FIXNUM %" PRId64 "\n", c8.s8);
+                }
+
+                i += 9;
+                break;
+            case OPCODE_LDIMM_8_FLONUM:
+                {
+                    union convert_eight_t c8;
+
+                    memcpy(c8.bytes, ptr + i + 1, 8);
+                    print_hex_bytes(ptr + i, 9);
+
+                    skim_print("LDIMM_8_FLONUM %lf\n", c8.f8);
+                }
+
+                i += 9;
+                break;
+            case OPCODE_LDIMM_8_SYMBOL:
+                {
+                    union convert_eight_t c8;
+
+                    memcpy(c8.bytes, ptr + i + 1, 8);
+                    print_hex_bytes(ptr + i, 9);
+
+                    skim_print("LDIMM_8_SYMBOL %s\n", find_symbol_name(environment, c8.u8));
+                }
+
+                i += 9;
+                break;
+            case OPCODE_LDSTR:
+                {
+                    const char *str;
+                    size_t length;
+
+                    str = (const char *)ptr + 1;
+                    length = strlen(str);
+                    print_hex_bytes(ptr + i, length + 1);
+
+                    skim_print("LDSTR %s\n", str);
+                    i += length + 2;
+                }
+
+                break;
+            case OPCODE_LDEMPTY:
+                print_hex_bytes(ptr + i, 1);
+                skim_print("LDEMPTY\n");
+                ++i;
+                break;
+            case OPCODE_LOAD:
+                print_hex_bytes(ptr + i, 1);
+                skim_print("LOAD\n");
+                ++i;
+                break;
+            case OPCODE_MAKE_REF:
+                print_hex_bytes(ptr + i, 1);
+                skim_print("MAKE_REF\n");
+                ++i;
+                break;
+            case OPCODE_SET:
+                print_hex_bytes(ptr + i, 1);
+                skim_print("SET\n");
+                ++i;
+                break;
+            case OPCODE_SET_CAR:
+                print_hex_bytes(ptr + i, 1);
+                skim_print("SET_CAR\n");
+                ++i;
+                break;
+            case OPCODE_SET_CDR:
+                print_hex_bytes(ptr + i, 1);
+                skim_print("SET_CDR\n");
+                ++i;
+                break;
+            case OPCODE_NEW:
+                {
+                    enum tag_t tag;
+
+                    tag = (enum tag_t)ptr[i + 1];
+                    print_hex_bytes(ptr + i, 2);
+
+                    skim_print("NEW %s\n", type_name(tag));
+                }
+
+                i += 2;
+                break;
+            case OPCODE_NEW_VECTOR:
+                print_hex_bytes(ptr + i, 1);
+                skim_print("NEW_VECTOR\n");
+                ++i;
+                break;
+            case OPCODE_CMP_EQUAL:
+                print_hex_bytes(ptr + i, 1);
+                skim_print("CMP_EQUAL\n");
+                ++i;
+                break;
+            case OPCODE_CMPN_EQ:
+                print_hex_bytes(ptr + i, 1);
+                skim_print("CMPN_EQ\n");
+                ++i;
+                break;
+            case OPCODE_CMPN_LT:
+                print_hex_bytes(ptr + i, 1);
+                skim_print("CMPN_LT\n");
+                ++i;
+                break;
+            case OPCODE_CMPN_GT:
+                print_hex_bytes(ptr + i, 1);
+                skim_print("CMPN_GT\n");
+                ++i;
+                break;
+            case OPCODE_CMPN_LE:
+                print_hex_bytes(ptr + i, 1);
+                skim_print("CMPN_LE\n");
+                ++i;
+                break;
+            case OPCODE_CMPN_GE:
+                print_hex_bytes(ptr + i, 1);
+                skim_print("CMPN_GE\n");
+                ++i;
+                break;
+            case OPCODE_BRANCH:
+                {
+                    union convert_two_t c2;
+
+                    memcpy(c2.bytes, ptr + i + 1, 2);
+                    print_hex_bytes(ptr + i, 3);
+
+                    skim_print("BRANCH %d\n", c2.s2);
+                }
+
+                i += 3;
+                break;
+            case OPCODE_COND_BRANCH:
+                {
+                    union convert_two_t c2;
+
+                    memcpy(c2.bytes, ptr + i + 1, 2);
+                    print_hex_bytes(ptr + i, 3);
+
+                    skim_print("COND_BRANCH %d\n", c2.s2);
+                }
+
+                i += 3;
+                break;
+            case OPCODE_CALL:
+                print_hex_bytes(ptr + i, 1);
+                skim_print("CALL\n");
+                ++i;
+                break;
+            case OPCODE_TAILCALL:
+                print_hex_bytes(ptr + i, 1);
+                skim_print("TAILCALL\n");
+                ++i;
+                break;
+            case OPCODE_RETURN:
+                print_hex_bytes(ptr + i, 1);
+                skim_print("RETURN\n");
+                ++i;
+                break;
+            case OPCODE_GET_BOUND_LOCATION:
+                print_hex_bytes(ptr + i, 1);
+                skim_print("GET_BOUND_LOCATION\n");
+                ++i;
+                break;
+            case OPCODE_ADD:
+                print_hex_bytes(ptr + i, 1);
+                skim_print("ADD\n");
+                ++i;
+                break;
+            case OPCODE_SUB:
+                print_hex_bytes(ptr + i, 1);
+                skim_print("SUB\n");
+                ++i;
+                break;
+            case OPCODE_MUL:
+                print_hex_bytes(ptr + i, 1);
+                skim_print("MUL\n");
+                ++i;
+                break;
+            case OPCODE_DIV:
+                print_hex_bytes(ptr + i, 1);
+                skim_print("DIV\n");
+                ++i;
+                break;
+            case OPCODE_AND:
+                print_hex_bytes(ptr + i, 1);
+                skim_print("AND\n");
+                ++i;
+                break;
+            case OPCODE_OR:
+                print_hex_bytes(ptr + i, 1);
+                skim_print("OR\n");
+                ++i;
+                break;
+            case OPCODE_XOR:
+                print_hex_bytes(ptr + i, 1);
+                skim_print("XOR\n");
+                ++i;
+                break;
+            case OPCODE_NOT:
+                print_hex_bytes(ptr + i, 1);
+                skim_print("NOT\n");
+                ++i;
+                break;
+            case OPCODE_NOP:
+                print_hex_bytes(ptr + i, 1);
+                skim_print("NOP\n");
+                ++i;
+                break;
+            default:
+                BREAK();
+                break;
+        }
+    }
+
     return empty_pair;
 }
 
@@ -789,8 +1149,7 @@ disassemble(struct environment_t *environment, struct object_t *args)
     struct object_t *function;
     const char *name;
 
-print(environment, args);
-    symbol = eval(environment, CAR(args));
+    symbol = eval(environment, args);
 
     assert(symbol->tag_count.tag == TAG_SYMBOL);
     slot = get_bound_location(environment, symbol, 1);
@@ -807,7 +1166,7 @@ print(environment, args);
             skim_print("%s: <special function>\n", name);
             return function;
         case TAG_PROCEDURE:
-            return disassemble_procedure(function, name);
+            return disassemble_procedure(environment, function, name);
         default:
             BREAK();
             break;
