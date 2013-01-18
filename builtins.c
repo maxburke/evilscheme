@@ -15,7 +15,6 @@ quote(struct environment_t *environment, struct object_t *args)
 {
     UNUSED(environment);
     assert(args->tag_count.tag == TAG_PAIR);
-BREAK();
     return CAR(args);
 }
 
