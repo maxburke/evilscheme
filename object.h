@@ -84,6 +84,9 @@ struct object_t
 
 extern struct object_t *empty_pair;
 
+const char *
+type_name(enum tag_t tag);
+
 #define CAR(x) ((x)->value.pair[0])
 #define CDR(x) ((x)->value.pair[1])
 

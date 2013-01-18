@@ -5,6 +5,7 @@
 #include "base.h"
 #include "runtime.h"
 #include "gc.h"
+#include "vm.h"
 
 #define DEFAULT_ALIGN sizeof(void *)
 #define DEFAULT_ALIGN_MASK (DEFAULT_ALIGN - 1)
@@ -52,10 +53,22 @@ gc_alloc(struct heap_t *heap, enum tag_t type, size_t extra_bytes)
     size_t size;
     struct object_t *object;
 
-    size = (type != TAG_ENVIRONMENT) ? sizeof(struct object_t) + extra_bytes : sizeof(struct environment_t);
+    if (type == TAG_ENVIRONMENT)
+    {
+        size = sizeof(struct environment_t);
+    }
+    else if (type == TAG_PROCEDURE)
+    {
+        size = sizeof(struct procedure_t) + extra_bytes;
+    }
+    else
+    {
+        size = sizeof(struct object_t) + extra_bytes;
+    }
+
     object = gc_perform_alloc(heap, size);
 
-    if (type == TAG_STRING)
+    if (type == TAG_STRING || type == TAG_PROCEDURE)
     {
         assert(extra_bytes < 65536);
         object->tag_count.count = (unsigned short)extra_bytes;
