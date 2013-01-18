@@ -194,10 +194,12 @@ compile_if(struct compiler_context_t *context, struct instruction_t *next, struc
 
     cond_br = allocate_instruction(context);
     cond_br->opcode = OPCODE_COND_BRANCH;
+    cond_br->size = 2;
     cond_br->link.next = &test_code->link;
 
     br = allocate_instruction(context);
     br->opcode = OPCODE_BRANCH;
+    br->size = 2;
 
     nop = allocate_instruction(context);
     nop->opcode = OPCODE_NOP;
@@ -228,11 +230,11 @@ compile_if(struct compiler_context_t *context, struct instruction_t *next, struc
     }
 
     alternate_code = compile_form(context, cond_br, alternate_form);
-    consequent_code = compile_form(context, alternate_code, consequent_form);
     br->link.next = &alternate_code->link;
     br->reloc = nop;
+    consequent_code = compile_form(context, br, consequent_form);
 
-    cond_br_target = find_before(consequent_code, alternate_code);
+    cond_br_target = find_before(consequent_code, br);
     cond_br->reloc = cond_br_target;
 
     nop->link.next = &consequent_code->link;
@@ -696,6 +698,12 @@ assemble(struct environment_t *environment, struct instruction_t *root)
         }
     }
 
+    /*
+     * If this assert fires then chances are we've forgotten to set the size
+     * field of an instruction instance.
+     */
+    assert(idx == num_bytes);
+
     return (struct object_t *)mem;
 }
 
@@ -816,7 +824,6 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
      * being omitted.
      * TODO: FIX!
      */
-BREAK();
 
     skim_print("%s:\n", name);
 
@@ -1050,7 +1057,7 @@ BREAK();
                     memcpy(c2.bytes, ptr + i + 1, 2);
                     print_hex_bytes(ptr + i, 3);
 
-                    skim_print("BRANCH %d\n", c2.s2);
+                    skim_print("BRANCH %d\n", c2.s2 + i + 1);
                 }
 
                 i += 3;
@@ -1062,7 +1069,7 @@ BREAK();
                     memcpy(c2.bytes, ptr + i + 1, 2);
                     print_hex_bytes(ptr + i, 3);
 
-                    skim_print("COND_BRANCH %d\n", c2.s2);
+                    skim_print("COND_BRANCH %d\n", c2.s2 + i + 1);
                 }
 
                 i += 3;
