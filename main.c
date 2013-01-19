@@ -56,15 +56,19 @@ main(void)
     const char *inputs[] = {
         "4",
         "(define list-length (lambda (L) (if (null? L) 0 (+ 1 (list-length (rest L))))))",
-        "(define list-length-tailrec (lambda (L x) (if (null? L) x (list-length-tailrec (rest L) (+ 1 x)))))",
         "(disassemble 'list-length)",
+        "(define list-length-tailrec (lambda (L x) (if (null? L) x (list-length-tailrec (rest L) (+ 1 x)))))",
         "(disassemble 'list-length-tailrec)",
         "(define fact (lambda (n) (if (<= n 1) 1 (* n (fact (- n 1))))))",
+        "(disassemble 'fact)",
         "(define fact-tailrec (lambda (acc i limit) (if (> i limit) acc (fact-tailrec (* i acc) (+ i 1) limit))))",
+        "(disassemble 'fact-tailrec)",
         "(define count (lambda (item L) (if L (+ (equal? item (first L)) (count item (rest L))) 0)))",
-        "(define fact (lambda (n) (if (<= n 1) 1 (* n (fact (- n 1))))))",
+        "(disassemble 'count)",
         "(define hello-world (lambda () (display \"hello world!\") (newline)))",
+        "(disassemble 'hello-world)",
         "(define hello-world-2 (lambda (x) `(foo ,bar ,@(list 1 2 3))))",
+        "(disassemble 'hello-world-2)",
         "(define vector-test #(1 2 3))"
     };
     size_t i;
