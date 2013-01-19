@@ -855,7 +855,7 @@ print_hex_bytes(const unsigned char *c, size_t size)
         skim_print("%02X ", c[i]);
     }
 
-    for (; i < 12; ++i)
+    for (; i < 10; ++i)
     {
         skim_print("   ");
     }
@@ -1261,7 +1261,7 @@ lambda(struct environment_t *environment, struct object_t *lambda_body)
     root = add_return_insn(&context, root);
     collapse_nops(root);
     eliminate_branch_to_return(root);
-    promote_tailcalls(root);
+    root = promote_tailcalls(root);
 
     procedure = assemble(environment, root);
 
