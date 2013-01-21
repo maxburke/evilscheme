@@ -243,7 +243,7 @@ compile_if(struct compiler_context_t *context, struct instruction_t *next, struc
 }
 
 static struct instruction_t *
-compile_plus(struct compiler_context_t *context, struct instruction_t *next, struct object_t *args)
+compile_add(struct compiler_context_t *context, struct instruction_t *next, struct object_t *args)
 {
     struct instruction_t *insn;
     struct object_t *arg;
@@ -270,6 +270,217 @@ compile_plus(struct compiler_context_t *context, struct instruction_t *next, str
 
     return insn;
 }
+
+static inline int
+count_parameters(struct object_t *args)
+{
+    struct object_t *arg;
+    int i;
+
+    i = 0;
+    for (arg = args; arg != empty_pair; arg = CDR(arg), ++i)
+        ;
+
+    return i;
+}
+
+static struct instruction_t *
+compile_sub(struct compiler_context_t *context, struct instruction_t *next, struct object_t *args)
+{
+    struct instruction_t *insn;
+    struct object_t *arg;
+    int i;
+    int num_parameters;
+
+    insn = next;
+    arg = args;
+    i = 0;
+
+    num_parameters = count_parameters(args);
+    assert(num_parameters >= 1);
+
+    if (num_parameters == 1)
+    {
+        /*
+         * (- x) should return x negated. This pushes a zero onto the 
+         * operation stack and calls sub as normal, effectively translating 
+         * this operation to (- 0 x).
+         */
+        struct instruction_t *zero;
+
+        zero = allocate_instruction(context);
+        zero->opcode = OPCODE_LDIMM_1_FIXNUM;
+        zero->size = 1;
+        zero->link.next = &insn->link;
+
+        insn = zero;
+
+        /*
+         * i is incremented here so that we ensure that the SUB opcode is
+         * emitted below even if we have only one argument.
+         */
+        ++i;
+    }
+
+    for (arg = args; arg != empty_pair; arg = CDR(arg), ++i)
+    {
+        insn = compile_form(context, insn, CAR(arg));
+
+        if (i >= 1)
+        {
+            struct instruction_t *plus;
+
+            plus = allocate_instruction(context);
+            plus->opcode = OPCODE_SUB;
+            plus->link.next = &insn->link;
+            insn = plus;
+        }
+    }
+
+    return insn;
+}
+
+static struct instruction_t *
+compile_mul(struct compiler_context_t *context, struct instruction_t *next, struct object_t *args)
+{
+    struct instruction_t *insn;
+    struct object_t *arg;
+    int i;
+    int num_parameters;
+
+    insn = next;
+    arg = args;
+    i = 0;
+
+    num_parameters = count_parameters(args);
+    assert(num_parameters >= 1);
+
+    if (num_parameters == 0)
+    {
+        /*
+         * (*) evaluates to 1.
+         */
+        struct instruction_t *one;
+
+        one = allocate_instruction(context);
+        one->opcode = OPCODE_LDIMM_1_FIXNUM;
+        one->data.s1 = 1;
+        one->size = 1;
+        one->link.next = &insn->link;
+
+        return one;
+    }
+    else if (num_parameters == 1)
+    {
+        /*
+         * (* x) evalutates to x.
+         */
+        return compile_form(context, insn, CAR(arg));
+    }
+
+    for (arg = args; arg != empty_pair; arg = CDR(arg), ++i)
+    {
+        insn = compile_form(context, insn, CAR(arg));
+
+        if (i >= 1)
+        {
+            struct instruction_t *plus;
+
+            plus = allocate_instruction(context);
+            plus->opcode = OPCODE_MUL;
+            plus->link.next = &insn->link;
+            insn = plus;
+        }
+    }
+
+    return insn;
+}
+
+static struct instruction_t *
+compile_div(struct compiler_context_t *context, struct instruction_t *next, struct object_t *args)
+{
+    struct instruction_t *insn;
+    struct object_t *arg;
+    int i;
+    int num_parameters;
+
+    insn = next;
+    arg = args;
+    i = 0;
+
+    num_parameters = count_parameters(args);
+    assert(num_parameters >= 1);
+
+    if (num_parameters == 1)
+    {
+        /*
+         * (/ x) evaluates to the reciprocal of x by pushing a 1 onto the
+         * stack and calling DIV, in otherwords (/ x) <=> (/ 1 x)
+         */
+        struct instruction_t *one;
+
+        one = allocate_instruction(context);
+        one->opcode = OPCODE_LDIMM_1_FIXNUM;
+        one->size = 1;
+        one->data.s1 = 1;
+        one->link.next = &insn->link;
+
+        insn = one;
+
+        /*
+         * i is incremented here so that we ensure that the DIV opcode is
+         * emitted below even if we only have one argument.
+         */
+        ++i;
+    }
+
+    for (arg = args; arg != empty_pair; arg = CDR(arg), ++i)
+    {
+        insn = compile_form(context, insn, CAR(arg));
+
+        if (i >= 1)
+        {
+            struct instruction_t *plus;
+
+            plus = allocate_instruction(context);
+            plus->opcode = OPCODE_DIV;
+            plus->link.next = &insn->link;
+            insn = plus;
+        }
+    }
+
+    return insn;
+}
+
+#define COMPILE_COMPARE(COMPARE, OPCODE) \
+    static struct instruction_t *                                                                               \
+    compile_ ## COMPARE(struct compiler_context_t *context, struct instruction_t *next, struct object_t *args)  \
+    {                                                                                                           \
+        struct instruction_t *insn;                                                                             \
+        struct instruction_t *lhs;                                                                              \
+        struct instruction_t *rhs;                                                                              \
+        struct object_t *lhs_form;                                                                              \
+        struct object_t *rhs_form;                                                                              \
+                                                                                                                \
+        lhs_form = args;                                                                                        \
+        rhs_form = CDR(args);                                                                                   \
+                                                                                                                \
+        rhs = compile_form(context, next, CAR(rhs_form));                                                       \
+        lhs = compile_form(context, rhs, CAR(lhs_form));                                                        \
+                                                                                                                \
+        insn = allocate_instruction(context);                                                                   \
+        insn->opcode = OPCODE;                                                                                  \
+        insn->link.next = &lhs->link;                                                                           \
+                                                                                                                \
+        return insn;                                                                                            \
+    }                                                                                                           \
+
+COMPILE_COMPARE(equalp, OPCODE_CMP_EQUAL)
+COMPILE_COMPARE(eq, OPCODE_CMPN_EQ)
+COMPILE_COMPARE(lt, OPCODE_CMPN_LT)
+COMPILE_COMPARE(gt, OPCODE_CMPN_GT)
+COMPILE_COMPARE(le, OPCODE_CMPN_LE)
+COMPILE_COMPARE(ge, OPCODE_CMPN_GE)
 
 static struct instruction_t *
 compile_arg_eval(struct compiler_context_t *context, struct instruction_t *next, struct object_t *args)
@@ -476,8 +687,19 @@ compile_symbol_load(struct compiler_context_t *context, struct instruction_t *ne
 }
 
 #define SYMBOL_IF 0x8325f07b4eb2a24
+#define SYMBOL_ADD 0xaf63bd4c8601b7f4
+#define SYMBOL_SUB 0xaf63bd4c8601b7f2
+#define SYMBOL_MUL 0xaf63bd4c8601b7f5
+#define SYMBOL_DIV 0xaf63bd4c8601b7f0
+#define SYMBOL_EQ 0xaf63bd4c8601b7e2
+#define SYMBOL_LT 0xaf63bd4c8601b7e3
+#define SYMBOL_GT 0xaf63bd4c8601b7e1
+#define SYMBOL_LE 0x8328c07b4eb7684
+#define SYMBOL_GE 0x8328a07b4eb736e
+#define SYMBOL_EQUALP 0xeacd8283b4334dba
 #define SYMBOL_NULLP 0xb4d24b59678288cd
-#define SYMBOL_PLUS 0xaf63bd4c8601b7f4
+#define SYMBOL_FIRST 0xc0de9a9b8ec0e479
+#define SYMBOL_REST 0x9ab4817ea75b3deb
 
 static struct instruction_t *
 compile_form(struct compiler_context_t *context, struct instruction_t *next, struct object_t *body)
@@ -504,10 +726,28 @@ compile_form(struct compiler_context_t *context, struct instruction_t *next, str
         {
             case SYMBOL_IF:
                 return compile_if(context, next, function_args);
+            case SYMBOL_ADD:
+                return compile_add(context, next, function_args);
+            case SYMBOL_SUB:
+                return compile_sub(context, next, function_args);
+            case SYMBOL_MUL:
+                return compile_mul(context, next, function_args);
+            case SYMBOL_DIV:
+                return compile_div(context, next, function_args);
+            case SYMBOL_EQ:
+                return compile_eq(context, next, function_args);
+            case SYMBOL_LT:
+                return compile_lt(context, next, function_args);
+            case SYMBOL_GT:
+                return compile_gt(context, next, function_args);
+            case SYMBOL_LE:
+                return compile_le(context, next, function_args);
+            case SYMBOL_GE:
+                return compile_ge(context, next, function_args);
+            case SYMBOL_EQUALP:
+                return compile_equalp(context, next, function_args);
             case SYMBOL_NULLP:
                 return compile_nullp(context, next, function_args);
-            case SYMBOL_PLUS:
-                return compile_plus(context, next, function_args);
             default:
                 /*
                  * The function/procedure isn't one that is handled by the
@@ -806,12 +1046,6 @@ promote_tailcalls(struct instruction_t *root)
     struct instruction_t *prev;
 
     prev = NULL;
-
-    /*
-     * This gets a TODO. This function needs to determine if a particular call 
-     * is actually a tail call and, if it is, change its call opcode into the
-     * tailcall opcode.
-     */
 
     for (i = &root->link; i != NULL; i = i->next)
     {

@@ -133,13 +133,14 @@ union eight_byte_union_t
     }
 
 #define FIXNUM_BINOP(OP) {\
-        struct object_t *a = sp + 1;                                                        \
-        struct object_t *b = sp + 2;                                                        \
+        struct object_t *a = sp + 2;                                                        \
+        struct object_t *b = sp + 1;                                                        \
                                                                                             \
         ENSURE_NUMERIC(a->tag_count.tag);                                                   \
         ENSURE_NUMERIC(b->tag_count.tag);                                                   \
         VM_ASSERT(a_tag == b_tag);                                                          \
-        b->value.fixnum_value = a->value.fixnum_value OP b->value.fixnum_value;             \
+        assert(0 && "This needs to work for flonums too.");                                 \
+        a->value.fixnum_value = a->value.fixnum_value OP b->value.fixnum_value;             \
         --sp;                                                                               \
     }
 

@@ -183,7 +183,7 @@ enum opcode_t
     OPCODE_GET_BOUND_LOCATION,
 
     /*
-     * OPCODE_binop | [b] [a] -> [a OP b]
+     * OPCODE_binop | [a] [b] -> [a OP b]
      * Perform arithmetic on the values on the top of the stack. The type of 
      * the expression [a OP b] is the less precise of the types of a and b.
      * For example, adding the fixnum 3 and flonum 1.0 gives the flonum 4.0.
