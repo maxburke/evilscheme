@@ -686,6 +686,24 @@ compile_symbol_load(struct compiler_context_t *context, struct instruction_t *ne
     return get_bound_location;
 }
 
+#define COMPILE_CONS_ACCESSOR(ACCESSOR, OPCODE)                                                                     \
+    static struct instruction_t *                                                                                   \
+    compile_ ## ACCESSOR(struct compiler_context_t *context, struct instruction_t *next, struct object_t *symbol)   \
+    {                                                                                                               \
+        struct instruction_t *insn;                                                                                 \
+                                                                                                                    \
+        UNUSED(symbol);                                                                                             \
+                                                                                                                    \
+        insn = allocate_instruction(context);                                                                       \
+        insn->link.next = &next->link;                                                                              \
+        insn->opcode = OPCODE;                                                                                      \
+                                                                                                                    \
+        return insn;                                                                                                \
+    }
+
+COMPILE_CONS_ACCESSOR(first, OPCODE_LDCAR)
+COMPILE_CONS_ACCESSOR(rest, OPCODE_LDCDR)
+
 #define SYMBOL_IF 0x8325f07b4eb2a24
 #define SYMBOL_ADD 0xaf63bd4c8601b7f4
 #define SYMBOL_SUB 0xaf63bd4c8601b7f2
@@ -748,6 +766,10 @@ compile_form(struct compiler_context_t *context, struct instruction_t *next, str
                 return compile_equalp(context, next, function_args);
             case SYMBOL_NULLP:
                 return compile_nullp(context, next, function_args);
+            case SYMBOL_FIRST:
+                return compile_first(context, next, function_args);
+            case SYMBOL_REST:
+                return compile_rest(context, next, function_args);
             default:
                 /*
                  * The function/procedure isn't one that is handled by the
@@ -1266,6 +1288,16 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
             case OPCODE_LDEMPTY:
                 print_hex_bytes(ptr + i, 1);
                 skim_print("LDEMPTY\n");
+                ++i;
+                break;
+            case OPCODE_LDCAR:
+                print_hex_bytes(ptr + i, 1);
+                skim_print("LDCAR\n");
+                ++i;
+                break;
+            case OPCODE_LDCDR:
+                print_hex_bytes(ptr + i, 1);
+                skim_print("LDCDR\n");
                 ++i;
                 break;
             case OPCODE_LOAD:

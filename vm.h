@@ -68,9 +68,9 @@ enum opcode_t
     /*
      * TODO: if pairs were vectors of length 2, these won't be needed.
      * OPCODE_LDCxR
+     */
     OPCODE_LDCAR,
     OPCODE_LDCDR,
-     */
 
     /*
      * OPCODE_LOAD | [slot reference] -> [reference|value]
