@@ -104,22 +104,26 @@ is_number(const struct token_t *input)
  * change strings like "#t" into their equivalent machine representation
  * of a Scheme true value.
  */
-static struct object_t *
+static struct object_t
 object_from_symbol(struct environment_t *environment, const struct token_t *input)
 {
-    struct object_t *object;
     size_t string_length;
 
     if (input->text[0] == '#') 
     {
+        struct object_t object;
+
         /* 
          * #t/#f -> boolean
          */
         char next_char = (char)tolower(input->text[1]);
         if (next_char == 't' || next_char == 'f')
         {
-            object = gc_alloc(environment->heap, TAG_BOOLEAN, 0);
-            object->value.fixnum_value = next_char == 't';
+            object.tag_count.tag = TAG_BOOLEAN;
+            object.tag_count.flag = 0;
+            object.tag_count.count = 1;
+            object.value.fixnum_value = next_char == 't';
+
             return object;
         }
 
@@ -127,21 +131,29 @@ object_from_symbol(struct environment_t *environment, const struct token_t *inpu
          * #\blat -> char
          */
         assert(next_char == '\\');
-        object = gc_alloc(environment->heap, TAG_CHAR, 0);
-        object->value.fixnum_value = strstr(input->text, "newline") != NULL ? '\n' : input->text[2];
+        object.tag_count.tag = TAG_CHAR;
+        object.tag_count.flag = 0;
+        object.tag_count.count = 1;
+        object.value.fixnum_value = strstr(input->text, "newline") != NULL ? '\n' : input->text[2];
         return object;
     }
     else if (is_number(input)) 
     {
+        struct object_t object;
+
         if (strstr(input->text, ".") == NULL)
         {
-            object = gc_alloc(environment->heap, TAG_FIXNUM, 0);
-            object->value.fixnum_value = strtol(input->text, NULL, 0);
+            object.tag_count.tag = TAG_FIXNUM;
+            object.tag_count.flag = 0;
+            object.tag_count.count = 1;
+            object.value.fixnum_value = strtol(input->text, NULL, 0);
         }
         else
         {
-            object = gc_alloc(environment->heap, TAG_FLONUM, 0);
-            object->value.flonum_value = strtod(input->text, NULL);
+            object.tag_count.tag = TAG_FLONUM;
+            object.tag_count.flag = 0;
+            object.tag_count.count = 1;
+            object.value.flonum_value = strtod(input->text, NULL);
         }
         return object;
     }
@@ -155,68 +167,74 @@ object_from_symbol(struct environment_t *environment, const struct token_t *inpu
 
     if (input->type == TOKEN_STRING)
     {
+        struct object_t *object;
+
         object = gc_alloc(environment->heap, TAG_STRING, string_length);
         memmove(object->value.string_value, input->text, string_length);
+
+        return make_ref(object);
     }
     else
     {
+        struct object_t object;
+
         assert(input->type == TOKEN_SYMBOL);
-        object = gc_alloc(environment->heap, TAG_SYMBOL, 0);
-        object->value.symbol_hash = register_symbol_from_bytes(
+        object.tag_count.tag = TAG_SYMBOL;
+        object.tag_count.flag = 0;
+        object.tag_count.count = 1;
+        object.value.symbol_hash = register_symbol_from_bytes(
                 environment, 
                 input->text, 
                 string_length);
-    }
 
-    return object;
+        return object;
+    }
 }
 
-static struct object_t * 
+static struct object_t
 recursive_create_object_from_token_stream(struct environment_t *environment, const struct token_t **input)
 {
     if (*input == NULL)
-        return empty_pair;
+        return make_empty_ref();
 
     if ((*input)->type == TOKEN_LPAREN)
     {
         struct object_t *pair = gc_alloc(environment->heap, TAG_PAIR, 0);
         *input = (const struct token_t *)(*input)->link.next;
 
-        CAR(pair) = recursive_create_object_from_token_stream(environment, input);
+        *CAR(pair) = recursive_create_object_from_token_stream(environment, input);
+
         if (*input)
         {
-            CDR(pair) = recursive_create_object_from_token_stream(environment, input);
-            return pair;
+            *CDR(pair) = recursive_create_object_from_token_stream(environment, input);
         }
         else
         {
-            CDR(pair) = empty_pair;
-            return pair;
+            *CDR(pair) = make_empty_ref();
         }
+
+        return make_ref(pair);
     }
     else if ((*input)->type == TOKEN_RPAREN)
     {
         *input = (const struct token_t *)(*input)->link.next;
-        return empty_pair;
+        return make_empty_ref();
     }
     else
     {
         struct object_t *pair = gc_alloc(environment->heap, TAG_PAIR, 0);
-        CAR(pair) = object_from_symbol(environment, *input);
+        *CAR(pair) = object_from_symbol(environment, *input);
 
         *input = (const struct token_t *)(*input)->link.next;
-        CDR(pair) = recursive_create_object_from_token_stream(environment, input);
-        return pair;
+        *CDR(pair) = recursive_create_object_from_token_stream(environment, input);
+        return make_ref(pair);
     }
 }
 
-static struct object_t *
+static struct object_t
 create_object_from_token_stream(struct environment_t *environment, const struct token_t *input)
 {
-    struct object_t *object;
-    
-    object = recursive_create_object_from_token_stream(environment, &input);
-    return object;
+    return recursive_create_object_from_token_stream(environment, &input);
 }
 
 /*
@@ -430,15 +448,18 @@ tokenize(const char *input)
     return apply_expansions(validate((struct token_t *)slist_reverse(&head->link)));
 }
 
-struct object_t *
+struct object_t
 read(struct environment_t *environment, struct object_t *args)
 {
+    struct object_t *object;
     struct token_t *head;
 
-    UNUSED(environment);
-    assert(args->tag_count.tag == TAG_PAIR);
+    object = deref(args);
 
-    head = tokenize(CAR(args)->value.string_value);
+    UNUSED(environment);
+    assert(object->tag_count.tag == TAG_PAIR);
+
+    head = tokenize(CAR(object)->value.string_value);
     return create_object_from_token_stream(environment, head);
 }
 

@@ -68,17 +68,28 @@ environment_initialize(struct environment_t *environment)
 
     for (i = 0; i < NUM_INITIALIZERS; ++i)
     {
-        size_t name_length = strlen(initializers[i].name);
-        struct object_t *p0 = gc_alloc(environment->heap, TAG_PAIR, 0);
-        struct object_t *symbol = gc_alloc(environment->heap, TAG_SYMBOL, name_length);
-        struct object_t *function = gc_alloc(environment->heap, TAG_SPECIAL_FUNCTION, 0);
-        struct object_t **place;
+        struct object_t *p0;
+        struct object_t *place;
+        struct object_t symbol;
+        struct object_t function;
+        struct object_t arg_ref;
 
-        symbol->value.symbol_hash = register_symbol_from_string(environment, initializers[i].name);
+        symbol.tag_count.tag = TAG_SYMBOL;
+        symbol.tag_count.flag = 0;
+        symbol.tag_count.count = 1;
+        symbol.value.symbol_hash = register_symbol_from_string(environment, initializers[i].name);
 
-        CAR(p0) = symbol;
-        function->value.special_function_value = initializers[i].function;
-        place = bind(environment, p0);
+        function.tag_count.tag = TAG_SPECIAL_FUNCTION;
+        function.tag_count.flag = 0;
+        function.tag_count.count = 1;
+        function.value.special_function_value = initializers[i].function;
+
+        p0 = gc_alloc(environment->heap, TAG_PAIR, 0);
+        *CAR(p0) = symbol;
+        *CDR(p0) = make_empty_ref();
+        arg_ref = make_ref(p0);
+
+        place = bind(environment, &arg_ref);
         *place = function;
     }
 }

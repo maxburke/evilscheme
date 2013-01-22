@@ -233,7 +233,7 @@ struct procedure_t
     unsigned char byte_code[1];
 };
 
-struct object_t *
+struct object_t
 vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *args);
 
 #endif

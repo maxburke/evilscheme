@@ -61,6 +61,10 @@ gc_alloc(struct heap_t *heap, enum tag_t type, size_t extra_bytes)
     {
         size = sizeof(struct procedure_t) + extra_bytes;
     }
+    else if (type == TAG_PAIR)
+    {
+        size = sizeof(struct tag_count_t) + 2 * sizeof(struct object_t);
+    }
     else
     {
         size = sizeof(struct object_t) + extra_bytes;

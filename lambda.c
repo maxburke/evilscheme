@@ -1117,7 +1117,7 @@ print_hex_bytes(const unsigned char *c, size_t size)
     }
 }
 
-static struct object_t *
+static void
 disassemble_procedure(struct environment_t *environment, struct object_t *args, const char *name)
 {
     void *mem;
@@ -1466,45 +1466,44 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
                 break;
         }
     }
-
-    return empty_pair;
 }
 
-struct object_t *
+struct object_t
 disassemble(struct environment_t *environment, struct object_t *args)
 {
-    struct object_t *symbol;
-    struct object_t **slot;
+    struct object_t symbol;
+    struct object_t *slot;
     struct object_t *function;
     const char *name;
 
     symbol = eval(environment, args);
 
-    assert(symbol->tag_count.tag == TAG_SYMBOL);
-    slot = get_bound_location(environment, symbol, 1);
+    assert(symbol.tag_count.tag == TAG_SYMBOL);
+    slot = get_bound_location(environment, &symbol, 1);
     assert(slot != NULL);
 
-    function = *slot;
+    function = deref(slot);
     assert(function != NULL);
 
-    name = find_symbol_name(environment, symbol->value.symbol_hash);
+    name = find_symbol_name(environment, symbol.value.symbol_hash);
 
     switch (function->tag_count.tag)
     {
         case TAG_SPECIAL_FUNCTION:
             skim_print("%s: <special function>\n", name);
-            return function;
+            break;
         case TAG_PROCEDURE:
-            return disassemble_procedure(environment, function, name);
+            disassemble_procedure(environment, function, name);
+            break;
         default:
             BREAK();
             break;
     }
 
-    return empty_pair;
+    return make_empty_ref();
 }
 
-struct object_t *
+struct object_t
 lambda(struct environment_t *environment, struct object_t *lambda_body)
 {
     struct object_t *args;
@@ -1533,7 +1532,7 @@ lambda(struct environment_t *environment, struct object_t *lambda_body)
 
     destroy_compiler_context(&context);
 
-    return procedure;
+    return make_ref(procedure);
 }
 
 

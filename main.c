@@ -86,21 +86,24 @@ main(void)
 
     for (i = 0; i < sizeof inputs / sizeof inputs[0]; ++i)
     {
-        struct object_t *object;
-        struct object_t *result;
         struct object_t *input_object;
         struct object_t *args;
+        struct object_t arg_ref;
+        struct object_t object;
+        struct object_t result;
         size_t input_length = strlen(inputs[i]);
     
         args = gc_alloc(environment->heap, TAG_PAIR, 0);
         input_object = gc_alloc(environment->heap, TAG_STRING, input_length);
         memmove(input_object->value.string_value, inputs[i], input_length);
-        CAR(args) = input_object;
 
-        object = read(environment, args);
-        result = eval(environment, object);
-        print(environment, result);
-        printf("\n");
+        *CAR(args) = make_ref(input_object);
+        arg_ref = make_ref(args);
+        object = read(environment, &arg_ref);
+        result = eval(environment, &object);
+        print(environment, &result);
+
+        skim_print("\n");
     }
 
     posix_memfree(heap);

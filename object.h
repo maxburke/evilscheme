@@ -57,13 +57,7 @@ struct tag_count_t
 
 struct object_t;
 struct environment_t;
-typedef struct object_t *(*special_function_t)(struct environment_t *, struct object_t *);
-
-struct inner_reference_t
-{
-    struct object_t *object;
-    int64_t index;
-};
+typedef struct object_t (*special_function_t)(struct environment_t *, struct object_t *);
 
 union object_value_t
 {
@@ -72,8 +66,7 @@ union object_value_t
     uint64_t symbol_hash;
     special_function_t special_function_value;
     char string_value[1];
-    struct object_t *pair[2];
-    struct inner_reference_t ref;
+    struct object_t *ref;
 };
 
 struct object_t
@@ -87,8 +80,48 @@ extern struct object_t *empty_pair;
 const char *
 type_name(enum tag_t tag);
 
-#define CAR(x) ((x)->value.pair[0])
-#define CDR(x) ((x)->value.pair[1])
+#define VECTOR_BASE(x) ((struct object_t *)(&(&x->tag_count)[1]))
+#define CAR(x) (VECTOR_BASE(x))
+#define CDR(x) (VECTOR_BASE(x) + 1)
+
+static inline struct object_t
+make_ref(struct object_t *ptr)
+{
+    struct object_t ref;
+    unsigned char tag;
+
+    tag = ptr->tag_count.tag;
+
+    if (tag == TAG_PAIR || tag == TAG_VECTOR || tag == TAG_PROCEDURE || tag == TAG_STRING)
+    {
+        ref.tag_count.tag = TAG_REFERENCE;
+        ref.tag_count.flag = 0;
+        ref.tag_count.count = 1;
+        ref.value.ref = ptr;
+
+        return ref;
+    }
+
+    return *ptr;
+}
+
+static inline struct object_t
+make_empty_ref(void)
+{
+    return make_ref(empty_pair);
+}
+
+static inline struct object_t *
+deref(struct object_t *ptr)
+{
+    return (ptr == NULL) ? NULL : ((ptr->tag_count.tag == TAG_REFERENCE) ? ptr->value.ref : ptr);
+}
+
+static inline const struct object_t *
+const_deref(const struct object_t *ptr)
+{
+    return (ptr == NULL) ? NULL : ((ptr->tag_count.tag == TAG_REFERENCE) ? ptr->value.ref : ptr);
+}
 
 #endif
 

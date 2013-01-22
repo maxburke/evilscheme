@@ -197,11 +197,7 @@ vm_push_ref(struct object_t *sp, struct object_t *object)
     return_address.tag_count.tag = TAG_REFERENCE;
     return_address.tag_count.flag = 0;
     return_address.tag_count.count = 1;
-    return_address.value.ref.object = object;
-
-#if ENABLE_VM_ASSERTS
-    return_address.value.ref.index = 0;
-#endif
+    return_address.value.ref = object;
 
     *(sp--) = return_address;
 
@@ -228,11 +224,12 @@ vm_create_inner_reference(struct object_t *object, int64_t index)
 {
     struct object_t inner_reference;
 
+    assert(index >= 0 && index < 65536);
+
     inner_reference.tag_count.tag = TAG_INNER_REFERENCE;
     inner_reference.tag_count.flag = 0;
-    inner_reference.tag_count.count = 1;
-    inner_reference.value.ref.object = object;
-    inner_reference.value.ref.index = index;
+    inner_reference.tag_count.count = (unsigned short)index;
+    inner_reference.value.ref = object;
 
     return inner_reference;
 }
@@ -240,7 +237,9 @@ vm_create_inner_reference(struct object_t *object, int64_t index)
 static inline unsigned char
 vm_reference_type(struct object_t *ref)
 {
-    const struct object_t *referenced_object = ref->value.ref.object;
+    const struct object_t *referenced_object;
+    
+    referenced_object = ref->value.ref;
 
 #if ENABLE_VM_ASSERTS
     const unsigned char ref_type = ref->tag_count.tag;
@@ -257,17 +256,6 @@ vm_demote_numeric(struct object_t *object)
 
     object->tag_count.tag = TAG_FLONUM;
     object->value.flonum_value = (double)(object->value.fixnum_value);
-}
-
-static inline const struct object_t *
-vm_flatten_reference(const struct object_t *object)
-{
-    VM_ASSERT(object->tag_count.tag != TAG_INNER_REFERENCE);
-
-    if (object->tag_count.tag != TAG_REFERENCE)
-        return object;
-
-    return object->value.ref.object;
 }
 
 static inline struct object_t *
@@ -326,8 +314,7 @@ vm_compare_equal_reference_type(const struct object_t *a, const struct object_t 
         case TAG_HEAP:
             return 0;
         case TAG_PAIR:
-            return a->value.pair[0] == b->value.pair[0] 
-                && a->value.pair[1] == b->value.pair[1];
+            return vm_compare_equal(CAR(a), CAR(b)) && vm_compare_equal(CDR(a), CDR(b));
         case TAG_VECTOR:
             {
                 unsigned short i, e;
@@ -372,14 +359,12 @@ vm_compare_equal(const struct object_t *a, const struct object_t *b)
         case TAG_SYMBOL:
             return a->value.symbol_hash == b->value.symbol_hash;
         case TAG_REFERENCE:
-            return vm_compare_equal_reference_type(
-                    vm_flatten_reference(a), 
-                    vm_flatten_reference(b));
+            return vm_compare_equal_reference_type(const_deref(a), const_deref(b));
         case TAG_INNER_REFERENCE:
             if (b_tag == TAG_INNER_REFERENCE)
             {
-                return a->value.ref.object == b->value.ref.object
-                    && a->value.ref.index == b->value.ref.index;
+                return a->value.ref == b->value.ref
+                    && a->tag_count.count == b->tag_count.count;
             }
             return 0;
         default:
@@ -389,7 +374,7 @@ vm_compare_equal(const struct object_t *a, const struct object_t *b)
     return 0;
 }
 
-struct object_t *
+struct object_t
 vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *args)
 {
     struct procedure_t *procedure;
@@ -491,7 +476,7 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
                     VM_ASSERT(ref->tag_count.tag == TAG_REFERENCE);
                     VM_ASSERT(index->tag_count.tag == TAG_FIXNUM);
 
-                    *ref = vm_create_inner_reference(ref->value.ref.object, index->value.fixnum_value);
+                    *ref = vm_create_inner_reference(ref->value.ref, index->value.fixnum_value);
                     ++sp;
                 }
                 break;
@@ -499,8 +484,8 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
                 {
                     struct object_t *source = sp + 2;
                     struct object_t *ref = sp + 1;
-                    struct object_t *ref_obj = ref->value.ref.object;
-                    int64_t ref_index = ref->value.ref.index;
+                    struct object_t *ref_obj = ref->value.ref;
+                    unsigned short ref_index = ref->tag_count.count;
 
                     const unsigned char target_type = ref_obj->tag_count.tag; 
 
@@ -636,6 +621,6 @@ vm_execution_done:
      * This should probably cons the last return value on the stack and
      * return that instead.
      */
-    return empty_pair;
+    return make_empty_ref();
 }
 

@@ -10,15 +10,15 @@
 #include "runtime.h"
 #include "vm.h"
 
-struct object_t *
+struct object_t
 quote(struct environment_t *environment, struct object_t *args)
 {
     UNUSED(environment);
     assert(args->tag_count.tag == TAG_PAIR);
-    return CAR(args);
+    return *CAR(args);
 }
 
-struct object_t *
+struct object_t
 cons(struct environment_t *environment, struct object_t *args)
 {
     struct object_t *object;
@@ -30,40 +30,55 @@ cons(struct environment_t *environment, struct object_t *args)
 
     object = gc_alloc(environment->heap, TAG_PAIR, 0);
 
-    CAR(object) = CAR(args);
-    CDR(object) = CAR(CDR(args));
+    *CAR(object) = *CAR(args);
+    *CDR(object) = *CAR(CDR(args));
 
-    return object;
+    return make_ref(object);
 }
 
-struct object_t *
+struct object_t
 car(struct environment_t *environment, struct object_t *args)
 {
+    struct object_t *object;
+
     UNUSED(environment);
-    assert(args->tag_count.tag == TAG_PAIR);
-    return CAR(args);
+
+    object = deref(args);
+    assert(object->tag_count.tag == TAG_PAIR);
+
+    return *CAR(object);
 }
 
-struct object_t *
+struct object_t
 cdr(struct environment_t *environment, struct object_t *args)
 {
+    struct object_t *object;
+
     UNUSED(environment);
-    assert(args->tag_count.tag == TAG_PAIR);
-    return CDR(args);
+
+    object = deref(args);
+    assert(object->tag_count.tag == TAG_PAIR);
+
+    return *CDR(object);
 }
 
 
-struct object_t *
+struct object_t
 set(struct environment_t *environment, struct object_t *args)
 {
+    struct object_t *object;
+
     UNUSED(environment);
-    assert(args->tag_count.tag == TAG_PAIR);
-    assert(CDR(args)->tag_count.tag == TAG_PAIR);
+
+    object = deref(args);
+    assert(object->tag_count.tag == TAG_PAIR);
+    assert(CDR(object)->tag_count.tag == TAG_PAIR);
     BREAK();
-    return NULL;
+
+    return make_empty_ref();
 }
 
-struct object_t *
+struct object_t
 define(struct environment_t *environment, struct object_t *args)
 {
     /* fetch symbol binding location */
@@ -71,18 +86,21 @@ define(struct environment_t *environment, struct object_t *args)
     /* call set! on it */
     /* TODO: I think this incorrect, I don't think we need to evaluate place, it will
        either be a variable or a list of (variable lambda-list*) */
+    struct object_t *object;
     struct object_t *place;
-    struct object_t *value;
+    struct object_t value;
 
-    assert(args->tag_count.tag == TAG_PAIR);
-    assert(CDR(args)->tag_count.tag == TAG_PAIR);
-    place = CAR(args);
-    value = eval(environment, CDR(args));
+    object = deref(args);
+
+    assert(object->tag_count.tag == TAG_PAIR);
+    assert(CDR(object)->tag_count.tag == TAG_PAIR);
+    place = CAR(object);
+    value = eval(environment, CDR(object));
     
     assert(place->tag_count.tag == TAG_SYMBOL || place->tag_count.tag == TAG_PAIR);
     if (place->tag_count.tag == TAG_SYMBOL)
     {
-        struct object_t **location = bind(environment, args);
+        struct object_t *location = bind(environment, object);
         *location = value;
     }
     else
@@ -94,17 +112,19 @@ define(struct environment_t *environment, struct object_t *args)
     return value;
 }
 
-struct object_t *
+struct object_t
 vector(struct environment_t *environment, struct object_t *args)
 {
+    struct object_t *object;
     struct object_t *i;
     struct object_t *vector;
     struct object_t *base;
     size_t idx;
 
+    object = deref(args);
     idx = 0;
 
-    for (i = args; i != empty_pair; i = CDR(i), ++idx)
+    for (i = object; i != empty_pair; i = CDR(i), ++idx)
         ;
 
     assert(idx < 65536);
@@ -115,13 +135,13 @@ vector(struct environment_t *environment, struct object_t *args)
     base = (struct object_t *)&vector->value;
     idx = 0;
 
-    for (i = args; i != empty_pair; i = CDR(i), ++idx)
+    for (i = object; i != empty_pair; i = deref(CDR(i)), ++idx)
     {
-        struct object_t *value;
-        
+        struct object_t value;
+
         value = eval(environment, i);
 
-        switch (value->tag_count.tag)
+        switch (value.tag_count.tag)
         {
             case TAG_BOOLEAN:
             case TAG_SYMBOL:
@@ -131,14 +151,17 @@ vector(struct environment_t *environment, struct object_t *args)
             case TAG_PAIR:
             case TAG_REFERENCE:
             case TAG_INNER_REFERENCE:
-                base[idx] = *value;
+                base[idx] = value;
                 break;
             case TAG_VECTOR:
             case TAG_STRING:
             case TAG_PROCEDURE:
             case TAG_SPECIAL_FUNCTION:
-                base[idx].tag_count.tag = TAG_REFERENCE;
-                base[idx].value.ref.object = value;
+                /*
+                 * Only references to these types should ever be returned here.
+                 * This is an error condition.
+                 */
+                BREAK();
                 break;
             case TAG_ENVIRONMENT:
             case TAG_HEAP:
@@ -147,24 +170,26 @@ vector(struct environment_t *environment, struct object_t *args)
         }
     }
 
-    return vector;
+    return make_ref(vector);
 }
 
-struct object_t *
+struct object_t
 apply(struct environment_t *environment, struct object_t *args)
 {
-    struct object_t **bound_location;
+    struct object_t *object;
+    struct object_t *bound_location;
     struct object_t *function_args;
     struct object_t *function;
 
-    function = CAR(args);
-    function_args = CDR(args);
+    object = deref(args);
+    function = CAR(object);
+    function_args = CDR(object);
 
     if (function->tag_count.tag == TAG_SYMBOL)
     {
         bound_location = get_bound_location(environment, function, 1);
         assert(bound_location != NULL);
-        function = *bound_location;
+        function = bound_location;
     }
 
     switch (function->tag_count.tag)
@@ -172,40 +197,44 @@ apply(struct environment_t *environment, struct object_t *args)
         case TAG_SPECIAL_FUNCTION:
             return function->value.special_function_value(environment, function_args);
         case TAG_PROCEDURE:
-            return vm_run(environment, function, args);
+            return vm_run(environment, function, object);
         default:
             BREAK();
             break;
     }
 
-    return NULL;
+    return make_empty_ref();
 }
 
 /*
  * eval
  */
 
-struct object_t *
+struct object_t
 eval(struct environment_t *environment, struct object_t *args)
 {
+    struct object_t *object;
     struct object_t *first_arg;
-    struct object_t **bound_location;
+    struct object_t *bound_location;
 
-    assert(args->tag_count.tag == TAG_PAIR);
+    object = deref(args);
 
-    first_arg = CAR(args);
+    assert(object->tag_count.tag == TAG_PAIR);
+
+    first_arg = CAR(object);
     switch (first_arg->tag_count.tag)
     {
         case TAG_SPECIAL_FUNCTION:
-            return first_arg->value.special_function_value(environment, CDR(args));
+            return first_arg->value.special_function_value(environment, CDR(object));
         case TAG_BOOLEAN:
         case TAG_CHAR:
-        case TAG_VECTOR:
         case TAG_FIXNUM:
         case TAG_FLONUM:
+            return *first_arg;
+        case TAG_VECTOR:
         case TAG_PROCEDURE:
         case TAG_STRING:
-            return first_arg;
+            return make_ref(first_arg);
         case TAG_SYMBOL:
             bound_location = get_bound_location(environment, first_arg, 1);
             assert(bound_location != NULL);
@@ -216,34 +245,34 @@ eval(struct environment_t *environment, struct object_t *args)
     }
 
     BREAK();
-    return NULL;
+    return make_empty_ref();
 }
 
 /*
  * print
  */
 
-struct object_t *
+struct object_t
 print(struct environment_t *environment, struct object_t *args)
 {
+    struct object_t *object;
+
     UNUSED(environment);
+    object = deref(args);
 
-    if (!args)
-        return NULL;
-
-    if (args == empty_pair)
+    if (object == empty_pair)
     {
         skim_print("'()");
-        return NULL;
+        return make_empty_ref();
     }
 
-    switch (args->tag_count.tag)
+    switch (object->tag_count.tag)
     {
         case TAG_BOOLEAN:
-            skim_print("%s", args->value.fixnum_value ? "#t" : "#f");
+            skim_print("%s", object->value.fixnum_value ? "#t" : "#f");
             break;
         case TAG_CHAR:
-            skim_print("%c", (char)args->value.fixnum_value);
+            skim_print("%c", (char)object->value.fixnum_value);
             break; 
         case TAG_VECTOR:
             {
@@ -251,8 +280,8 @@ print(struct environment_t *environment, struct object_t *args)
                 int count;
                 struct object_t *base;
                 
-                base = (struct object_t *)&args->value;
-                count = args->tag_count.count;
+                base = VECTOR_BASE(object);
+                count = object->tag_count.count;
 
                 skim_print("#(");
                 for (i = 0; i < count; ++i)
@@ -268,27 +297,27 @@ print(struct environment_t *environment, struct object_t *args)
                 break;
             }
         case TAG_FIXNUM:
-            skim_print("%" PRId64, args->value.fixnum_value);
+            skim_print("%" PRId64, object->value.fixnum_value);
             break;
         case TAG_FLONUM:
-            skim_print("%f", args->value.flonum_value);
+            skim_print("%f", object->value.flonum_value);
             break;
         case TAG_PROCEDURE:
             skim_print("<procedure>");
             break;
         case TAG_STRING:
-            skim_print("\"%s\"", args->value.string_value);
+            skim_print("\"%s\"", object->value.string_value);
             break;
         case TAG_SYMBOL:
             {
-                const char *str = find_symbol_name(environment, args->value.symbol_hash);
+                const char *str = find_symbol_name(environment, object->value.symbol_hash);
                 skim_print("%s", str);
                 break;
             }
         case TAG_PAIR:
-            print(environment, CAR(args));
+            print(environment, CAR(object));
             skim_print(" ");
-            print(environment, CDR(args));
+            print(environment, CDR(object));
             break;
         case TAG_SPECIAL_FUNCTION:
             skim_print("<special function>");
@@ -298,7 +327,7 @@ print(struct environment_t *environment, struct object_t *args)
             break;
     }
 
-    return NULL;
+    return make_empty_ref();
 }
 
 
