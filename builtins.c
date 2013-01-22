@@ -88,14 +88,16 @@ define(struct environment_t *environment, struct object_t *args)
        either be a variable or a list of (variable lambda-list*) */
     struct object_t *object;
     struct object_t *place;
+    struct object_t *rest;
     struct object_t value;
 
     object = deref(args);
-
     assert(object->tag_count.tag == TAG_PAIR);
-    assert(CDR(object)->tag_count.tag == TAG_PAIR);
+
+    rest = CDR(object);
+    assert(rest->tag_count.tag == TAG_PAIR);
     place = CAR(object);
-    value = eval(environment, CDR(object));
+    value = eval(environment, rest);
     
     assert(place->tag_count.tag == TAG_SYMBOL || place->tag_count.tag == TAG_PAIR);
     if (place->tag_count.tag == TAG_SYMBOL)
@@ -132,10 +134,10 @@ vector(struct environment_t *environment, struct object_t *args)
     vector = gc_alloc(environment->heap, TAG_VECTOR, sizeof(struct object_t) * idx);
     vector->tag_count.count = (unsigned short)idx;
 
-    base = (struct object_t *)&vector->value;
+    base = VECTOR_BASE(vector);
     idx = 0;
 
-    for (i = object; i != empty_pair; i = deref(CDR(i)), ++idx)
+    for (i = object; i != empty_pair; i = CDR(i), ++idx)
     {
         struct object_t value;
 

@@ -80,9 +80,9 @@ extern struct object_t *empty_pair;
 const char *
 type_name(enum tag_t tag);
 
-#define VECTOR_BASE(x) ((struct object_t *)(&(&x->tag_count)[1]))
-#define CAR(x) (VECTOR_BASE(x))
-#define CDR(x) (VECTOR_BASE(x) + 1)
+#define VECTOR_BASE(x) ((struct object_t *)(&(x)->value))
+#define CAR(x) deref((VECTOR_BASE(x)))
+#define CDR(x) deref((VECTOR_BASE(x) + 1))
 
 static inline struct object_t
 make_ref(struct object_t *ptr)

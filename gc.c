@@ -77,6 +77,10 @@ gc_alloc(struct heap_t *heap, enum tag_t type, size_t extra_bytes)
         assert(extra_bytes < 65536);
         object->tag_count.count = (unsigned short)extra_bytes;
     }
+    else if (type == TAG_PAIR)
+    {
+        object->tag_count.count = 2;
+    }
     else
     {
         object->tag_count.count = 1;

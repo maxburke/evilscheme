@@ -187,7 +187,6 @@ object_from_symbol(struct environment_t *environment, const struct token_t *inpu
                 environment, 
                 input->text, 
                 string_length);
-skim_print("CREATING SYMBOL: %s %lx\n", input->text, object.value.symbol_hash);
         return object;
     }
 }
@@ -461,7 +460,7 @@ read(struct environment_t *environment, struct object_t *args)
     UNUSED(environment);
     assert(object->tag_count.tag == TAG_PAIR);
 
-    arg = deref(CAR(object));
+    arg = CAR(object);
     assert(arg->tag_count.tag == TAG_STRING);
 
     head = tokenize(arg->value.string_value);

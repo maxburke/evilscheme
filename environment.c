@@ -36,7 +36,9 @@ get_bound_location(struct environment_t *environment, struct object_t *args, int
             for (i = 0; i < NUM_ENTRIES_PER_FRAGMENT; ++i)
             {
                 if (entries[i].symbol.value.symbol_hash == symbol_hash)
+                {
                     return &entries[i].object;
+                }
             }
         }
 
@@ -67,7 +69,7 @@ bind(struct environment_t *environment, struct object_t *args)
         return location;
 
     current_fragment = environment->symbol_table_fragment;
-    symbol = deref(CAR(object));
+    symbol = CAR(object);
 
     for (current_fragment = environment->symbol_table_fragment;
             current_fragment != NULL;
