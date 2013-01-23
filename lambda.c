@@ -104,6 +104,7 @@ struct compiler_context_t
 {
     struct memory_pool_t pool;
     struct object_t *args;
+    int num_args;
     struct environment_t *environment;
 };
 
@@ -113,9 +114,17 @@ initialize_compiler_context(
         struct environment_t *environment,
         struct object_t *args)
 {
+    struct object_t *i;
+    int num_args;
+
+    num_args = 0;
+    for (i = args; i != empty_pair; i = CDR(i), ++num_args)
+        ;
+
     memset(context, 0, sizeof(struct compiler_context_t));
     context->args = args;
     context->environment = environment;
+    context->num_args = num_args;
 }
 
 static void
@@ -842,7 +851,7 @@ union convert_eight_t
 };
 
 static struct object_t *
-assemble(struct environment_t *environment, struct instruction_t *root)
+assemble(struct environment_t *environment, struct compiler_context_t *context, struct instruction_t *root)
 {
     struct slist_t *insns;
     struct slist_t *i;
@@ -864,6 +873,7 @@ assemble(struct environment_t *environment, struct instruction_t *root)
     mem = gc_alloc(environment->heap, TAG_PROCEDURE, num_bytes);
     procedure = mem;
     bytes = procedure->byte_code;
+    procedure->num_args = context->num_args;
 
     for (i = insns; i != NULL; i = i->next)
     {
@@ -1528,7 +1538,7 @@ lambda(struct environment_t *environment, struct object_t *lambda_body)
     eliminate_branch_to_return(root);
     root = promote_tailcalls(root);
 
-    procedure = assemble(environment, root);
+    procedure = assemble(environment, &context, root);
 
     destroy_compiler_context(&context);
 
