@@ -18,7 +18,7 @@ DISABLE_WARNING(4996)
  */
 
 #ifndef ENABLE_VM_ASSERTS
-    #ifdef NDEBUG
+    #ifndef NDEBUG
         #define ENABLE_VM_ASSERTS 1
     #else
         #define ENABLE_VM_ASSERTS 0
@@ -117,8 +117,8 @@ union eight_byte_union_t
     } while (0)
 
 #define CMPN_IMPL(OP) {                                                                     \
-        struct object_t *a = sp + 1;                                                        \
-        struct object_t *b = sp + 2;                                                        \
+        struct object_t *a = deref(sp + 1);                                                 \
+        struct object_t *b = deref(sp + 2);                                                 \
         unsigned char a_tag = a->tag_count.tag;                                             \
         unsigned char b_tag = b->tag_count.tag;                                             \
         int result;                                                                         \
@@ -132,16 +132,40 @@ union eight_byte_union_t
         sp = vm_push_bool(sp + 2, result);                                                  \
     }
 
-#define FIXNUM_BINOP(OP) {\
+#define NUMERIC_BINOP(OP) {                                                                 \
+        struct object_t *a = deref(sp + 2);                                                 \
+        struct object_t *b = deref(sp + 1);                                                 \
+        unsigned char a_tag = a->tag_count.tag;                                             \
+        unsigned char b_tag = b->tag_count.tag;                                             \
+                                                                                            \
+        ENSURE_NUMERIC(a->tag_count.tag);                                                   \
+        ENSURE_NUMERIC(b->tag_count.tag);                                                   \
+        CONDITIONAL_DEMOTE(a, b);                                                           \
+        if (a_tag == TAG_FIXNUM)                                                            \
+        {                                                                                   \
+            a->value.fixnum_value = a->value.fixnum_value OP b->value.fixnum_value;         \
+        }                                                                                   \
+        else                                                                                \
+        {                                                                                   \
+            a->value.flonum_value = a->value.flonum_value OP b->value.flonum_value;         \
+        }                                                                                   \
+        ++sp;                                                                               \
+    }
+
+#define FIXNUM_BINOP(OP) {                                                                  \
         struct object_t *a = sp + 2;                                                        \
         struct object_t *b = sp + 1;                                                        \
+        unsigned char a_tag = a->tag_count.tag;                                             \
+        unsigned char b_tag = b->tag_count.tag;                                             \
+        UNUSED(a_tag);                                                                      \
+        UNUSED(b_tag);                                                                      \
                                                                                             \
         ENSURE_NUMERIC(a->tag_count.tag);                                                   \
         ENSURE_NUMERIC(b->tag_count.tag);                                                   \
         VM_ASSERT(a_tag == b_tag);                                                          \
         assert(0 && "This needs to work for flonums too.");                                 \
         a->value.fixnum_value = a->value.fixnum_value OP b->value.fixnum_value;             \
-        --sp;                                                                               \
+        ++sp;                                                                               \
     }
 
 static int
@@ -163,7 +187,7 @@ vm_push_args_to_stack(struct environment_t *environment, struct object_t *args)
     ptr = environment->stack_bottom;
     count = 0;
 
-    for (i = args; CAR(i) != empty_pair; i = CDR(i))
+    for (i = args; i != empty_pair; i = CDR(i))
     {
         struct object_t *object;
         
@@ -238,11 +262,13 @@ static inline unsigned char
 vm_reference_type(struct object_t *ref)
 {
     const struct object_t *referenced_object;
+#if ENABLE_VM_ASSERTS
+    const unsigned char ref_type = ref->tag_count.tag;
+#endif
     
     referenced_object = ref->value.ref;
 
 #if ENABLE_VM_ASSERTS
-    const unsigned char ref_type = ref->tag_count.tag;
     VM_ASSERT(ref_type == TAG_REFERENCE || ref_type == TAG_INNER_REFERENCE);
 #endif
 
@@ -387,7 +413,6 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
     procedure = (struct procedure_t *)fn;
     old_stack = environment->stack_ptr;
     sp = old_stack;
-    program_area = old_stack;
     pc = procedure->byte_code;
 
     /*
@@ -402,11 +427,17 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
 
     num_args = vm_push_args_to_stack(environment, args);
     assert(num_args == procedure->num_args);
+    sp = environment->stack_ptr;
+
+    /*
+     * The stack pointer points to the first free stack slot, so to point
+     * correctly at the program area the stack pointer must be incremented.
+     */
+    program_area = sp + 1;
+
     sp = vm_push_ref(sp, NULL);    /* return address */
     sp = vm_push_ref(sp, NULL);    /* program area chain */
     sp = vm_push_ref(sp, NULL);    /* stack chain */
-    sp = environment->stack_ptr;
-    fn = environment->stack_ptr;
     
     for (;;)
     {
@@ -580,16 +611,16 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
                 goto vm_execution_done;
 
             case OPCODE_ADD:
-                FIXNUM_BINOP(+)
+                NUMERIC_BINOP(+)
                 break;
             case OPCODE_SUB:
-                FIXNUM_BINOP(-)
+                NUMERIC_BINOP(-)
                 break;
             case OPCODE_MUL:
-                FIXNUM_BINOP(*)
+                NUMERIC_BINOP(*)
                 break;
             case OPCODE_DIV:
-                FIXNUM_BINOP(/)
+                NUMERIC_BINOP(/)
                 break;
             case OPCODE_AND:
                 FIXNUM_BINOP(&)
