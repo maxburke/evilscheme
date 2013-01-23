@@ -61,6 +61,7 @@ main(void)
         "(disassemble 'list-length-tailrec)",
         "(define fact (lambda (n) (if (<= n 1) 1 (* n (fact (- n 1))))))",
         "(disassemble 'fact)",
+        "(fact 5)",
         "(define fact-tailrec (lambda (acc i limit) (if (> i limit) acc (fact-tailrec (* i acc) (+ i 1) limit))))",
         "(disassemble 'fact-tailrec)",
         "(define count (lambda (item L) (if L (+ (equal? item (first L)) (count item (rest L))) 0)))",
