@@ -194,12 +194,13 @@ apply(struct environment_t *environment, struct object_t *args)
         function = bound_location;
     }
 
+    function = deref(function);
     switch (function->tag_count.tag)
     {
         case TAG_SPECIAL_FUNCTION:
             return function->value.special_function_value(environment, function_args);
         case TAG_PROCEDURE:
-            return vm_run(environment, function, object);
+            return vm_run(environment, function, function_args);
         default:
             BREAK();
             break;
