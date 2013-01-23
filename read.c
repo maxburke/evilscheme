@@ -202,15 +202,15 @@ recursive_create_object_from_token_stream(struct environment_t *environment, con
         struct object_t *pair = gc_alloc(environment->heap, TAG_PAIR, 0);
         *input = (const struct token_t *)(*input)->link.next;
 
-        *CAR(pair) = recursive_create_object_from_token_stream(environment, input);
+        *RAW_CAR(pair) = recursive_create_object_from_token_stream(environment, input);
 
         if (*input)
         {
-            *CDR(pair) = recursive_create_object_from_token_stream(environment, input);
+            *RAW_CDR(pair) = recursive_create_object_from_token_stream(environment, input);
         }
         else
         {
-            *CDR(pair) = make_empty_ref();
+            *RAW_CDR(pair) = make_empty_ref();
         }
 
         return make_ref(pair);
@@ -223,10 +223,10 @@ recursive_create_object_from_token_stream(struct environment_t *environment, con
     else
     {
         struct object_t *pair = gc_alloc(environment->heap, TAG_PAIR, 0);
-        *CAR(pair) = object_from_symbol(environment, *input);
+        *RAW_CAR(pair) = object_from_symbol(environment, *input);
 
         *input = (const struct token_t *)(*input)->link.next;
-        *CDR(pair) = recursive_create_object_from_token_stream(environment, input);
+        *RAW_CDR(pair) = recursive_create_object_from_token_stream(environment, input);
         return make_ref(pair);
     }
 }

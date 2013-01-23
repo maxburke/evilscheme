@@ -3,6 +3,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include "base.h"
 
 enum tag_t
 {
@@ -81,6 +82,8 @@ const char *
 type_name(enum tag_t tag);
 
 #define VECTOR_BASE(x) ((struct object_t *)(&(x)->value))
+#define RAW_CAR(x) (VECTOR_BASE(x))
+#define RAW_CDR(x) (VECTOR_BASE(x) + 1)
 #define CAR(x) deref((VECTOR_BASE(x)))
 #define CDR(x) deref((VECTOR_BASE(x) + 1))
 

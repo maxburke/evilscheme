@@ -1,4 +1,5 @@
 #include <assert.h>
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -63,7 +64,7 @@ gc_alloc(struct heap_t *heap, enum tag_t type, size_t extra_bytes)
     }
     else if (type == TAG_PAIR)
     {
-        size = sizeof(struct tag_count_t) + 2 * sizeof(struct object_t);
+        size = offsetof(struct object_t, value) + 2 * sizeof(struct object_t);
     }
     else
     {

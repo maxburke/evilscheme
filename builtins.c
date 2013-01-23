@@ -30,8 +30,8 @@ cons(struct environment_t *environment, struct object_t *args)
 
     object = gc_alloc(environment->heap, TAG_PAIR, 0);
 
-    *CAR(object) = *CAR(args);
-    *CDR(object) = *CAR(CDR(args));
+    *RAW_CAR(object) = make_ref(CAR(args));
+    *RAW_CDR(object) = make_ref(CAR(CDR(args)));
 
     return make_ref(object);
 }
