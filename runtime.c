@@ -117,6 +117,8 @@ environment_create(void *stack, size_t stack_size, void *heap_mem, size_t heap_s
     env->stack_bottom = stack;
     env->stack_top = (struct object_t *)((char *)stack + stack_size) - 1;
     env->stack_ptr = env->stack_top;
+    memset(stack, 0, stack_size);
+
     env->heap = heap;
     env->symbol_table_fragment = NULL;
 
