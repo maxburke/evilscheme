@@ -189,7 +189,7 @@ apply(struct environment_t *environment, struct object_t *args)
 
     if (function->tag_count.tag == TAG_SYMBOL)
     {
-        bound_location = get_bound_location(environment, function, 1);
+        bound_location = get_bound_location(environment, function->value.symbol_hash, 1);
         assert(bound_location != NULL);
         function = bound_location;
     }
@@ -239,7 +239,7 @@ eval(struct environment_t *environment, struct object_t *args)
         case TAG_STRING:
             return make_ref(first_arg);
         case TAG_SYMBOL:
-            bound_location = get_bound_location(environment, first_arg, 1);
+            bound_location = get_bound_location(environment, first_arg->value.symbol_hash, 1);
             assert(bound_location != NULL);
             return *bound_location;
         case TAG_PAIR:

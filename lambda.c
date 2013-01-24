@@ -1489,7 +1489,7 @@ disassemble(struct environment_t *environment, struct object_t *args)
     symbol = eval(environment, args);
 
     assert(symbol.tag_count.tag == TAG_SYMBOL);
-    slot = get_bound_location(environment, &symbol, 1);
+    slot = get_bound_location(environment, symbol.value.symbol_hash, 1);
     assert(slot != NULL);
 
     function = deref(slot);

@@ -600,7 +600,22 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
                 }
                 break;
             case OPCODE_GET_BOUND_LOCATION:
+                {
+                    struct object_t *symbol;
+                    struct object_t *object;
+                    uint64_t symbol_hash;
+
+                    symbol = sp + 1;
+                    VM_ASSERT(symbol->tag_count.tag == TAG_SYMBOL);
+                    symbol_hash = symbol->value.symbol_hash;
+
+                    object = get_bound_location(environment, symbol_hash, 1);
+                    *symbol = *object;
+                }
+                break;
             case OPCODE_CALL:
+                BREAK();
+                break;
             case OPCODE_TAILCALL:
                 BREAK();
                 break;

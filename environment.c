@@ -11,17 +11,11 @@
 #define INVALID_HASH 0
 
 struct object_t *
-get_bound_location(struct environment_t *environment, struct object_t *args, int recurse)
+get_bound_location(struct environment_t *environment, uint64_t symbol_hash, int recurse)
 {
-    struct object_t *symbol;
     struct environment_t *current_environment;
     struct symbol_table_fragment_t *fragment;
     int i;
-    uint64_t symbol_hash;
-
-    symbol = deref(args);
-    assert(symbol->tag_count.tag == TAG_SYMBOL);
-    symbol_hash = symbol->value.symbol_hash;
 
     for (current_environment = environment; 
             current_environment != NULL; 
@@ -64,7 +58,7 @@ bind(struct environment_t *environment, struct object_t *args)
     symbol = CAR(object);
 
     assert(symbol->tag_count.tag == TAG_SYMBOL);
-    location = get_bound_location(environment, symbol, 0);
+    location = get_bound_location(environment, symbol->value.symbol_hash, 0);
     if (location != NULL)
         return location;
 
