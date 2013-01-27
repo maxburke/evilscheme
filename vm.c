@@ -213,6 +213,21 @@ vm_push_args_to_stack(struct environment_t *environment, struct object_t *args)
 }
 
 static inline struct object_t *
+vm_push_return_address(struct object_t *sp, struct procedure_t *object, unsigned short offset)
+{
+    struct object_t return_address;
+
+    return_address.tag_count.tag = TAG_INNER_REFERENCE;
+    return_address.tag_count.flag = 0;
+    return_address.tag_count.count = offset;
+    return_address.value.ref = (struct object_t *)object;
+
+    *(sp--) = return_address;
+
+    return sp;
+}
+
+static inline struct object_t *
 vm_push_ref(struct object_t *sp, struct object_t *object)
 {
     struct object_t return_address;
@@ -407,19 +422,21 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
     struct object_t *sp;
     struct object_t *old_stack;
     int num_args;
+    unsigned char *pc_base;
     unsigned char *pc;
    
     procedure = (struct procedure_t *)fn;
     old_stack = environment->stack_ptr;
     sp = old_stack;
     pc = procedure->byte_code;
+    pc_base = procedure->byte_code;
 
     /*
      * Stack layout for VM:
-     * [high addresses]............................................................................[low addresses]
-     * [arg n - 1][...][arg 1][arg 0][return address][program area chain][stack chain][stack top]...[stack_bottom]
-     *                                      ^                                               ^
-     *                  program_area -------+                                     sp -------+
+     * [high addresses]...........................................[low addresses]
+     * [arg n - 1][...][arg 1][arg 0][return address][stack top]...[stack_bottom]
+     *                                      ^              ^
+     *                  program_area -------+        ------+
      *
      * arg0 is at program_area[1]
      */
@@ -435,8 +452,6 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
     program_area = sp + 1;
 
     sp = vm_push_ref(sp, NULL);    /* return address */
-    sp = vm_push_ref(sp, NULL);    /* program area chain */
-    sp = vm_push_ref(sp, NULL);    /* stack chain */
     
     for (;;)
     {
@@ -446,40 +461,40 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
         {
             case OPCODE_INVALID:
                 BREAK();
-                break;
+                continue;
             case OPCODE_LDARG_X:
                 {
                     unsigned char arg_index = *pc++;
                     STACK_PUSH(sp, program_area[arg_index]);
                 }
-                break;
+                continue;
             case OPCODE_LDIMM_1_BOOL:
                 LDIMM_1_BOOLEAN()
-                break;
+                continue;
             case OPCODE_LDIMM_1_CHAR:
                 LDIMM_1_CHAR()
-                break;
+                continue;
             case OPCODE_LDIMM_1_FIXNUM:
                 LDIMM_1_FIXNUM()
-                break;
+                continue;
             case OPCODE_LDIMM_1_FLONUM:
                 LDIMM_1_FLONUM()
-                break;
+                continue;
             case OPCODE_LDIMM_4_FIXNUM:
                 LDIMM_4_FIXNUM()
-                break;
+                continue;
             case OPCODE_LDIMM_4_FLONUM:
                 LDIMM_4_FLONUM()
-                break;
+                continue;
             case OPCODE_LDIMM_8_FIXNUM:
                 LDIMM_8_FIXNUM()
-                break;
+                continue;
             case OPCODE_LDIMM_8_FLONUM:
                 LDIMM_8_FLONUM()
-                break;
+                continue;
             case OPCODE_LDIMM_8_SYMBOL:
                 LDIMM_8_SYMBOL()
-                break;
+                continue;
             case OPCODE_LDSTR:
                 {
                     struct object_t *string_obj;
@@ -492,13 +507,13 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
 
                     pc += string_length + 1;
                 }
-                break;
+                continue;
             case OPCODE_LDEMPTY:
                 sp = vm_push_ref(sp, empty_pair);
-                break;
+                continue;
             case OPCODE_LOAD:
                 BREAK();
-                break;
+                continue;
             case OPCODE_MAKE_REF:
                 {
                     struct object_t * const ref = sp + 2;
@@ -509,7 +524,7 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
                     *ref = vm_create_inner_reference(ref->value.ref, index->value.fixnum_value);
                     ++sp;
                 }
-                break;
+                continue;
             case OPCODE_SET:
                 {
                     struct object_t *source = sp + 2;
@@ -542,14 +557,14 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
 
                     sp += 2;
                 }
-                break;
+                continue;
 
             case OPCODE_SET_CAR:
             case OPCODE_SET_CDR:
             case OPCODE_NEW:
             case OPCODE_NEW_VECTOR:
                 BREAK();
-                break;
+                continue;
             case OPCODE_CMP_EQUAL:
                 {
                     struct object_t *b = sp + 2;
@@ -559,28 +574,28 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
                     is_equal = vm_compare_equal(a, b);
                     sp = vm_push_bool(sp + 2, is_equal);
                 }
-                break;
+                continue;
             case OPCODE_CMPN_EQ:
                 CMPN_IMPL(==)
-                break;
+                continue;
             case OPCODE_CMPN_LT:
                 CMPN_IMPL(<)
-                break;
+                continue;
             case OPCODE_CMPN_GT:
                 CMPN_IMPL(>)
-                break;
+                continue;
             case OPCODE_CMPN_LE:
                 CMPN_IMPL(<=)
-                break;
+                continue;
             case OPCODE_CMPN_GE:
                 CMPN_IMPL(>=)
-                break;
+                continue;
             case OPCODE_BRANCH:
                 {
                     int offset = (int)(*(short *)pc);
                     pc += offset + 2;
                 }
-                break;
+                continue;
             case OPCODE_COND_BRANCH:
                 {
                     struct object_t *condition;
@@ -598,7 +613,7 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
 
                     ++sp;
                 }
-                break;
+                continue;
             case OPCODE_GET_BOUND_LOCATION:
                 {
                     struct object_t *symbol;
@@ -612,50 +627,93 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
                     object = get_bound_location(environment, symbol_hash, 1);
                     *symbol = *object;
                 }
-                break;
+                continue;
             case OPCODE_CALL:
-                BREAK();
-                break;
+                {
+                    struct procedure_t *fn;
+                    unsigned char tag;
+
+                    fn = (struct procedure_t *)deref(sp + 1);
+                    ++sp;
+                    tag = fn->tag_count.tag;
+
+                    VM_ASSERT(tag == TAG_PROCEDURE || tag == TAG_SPECIAL_FUNCTION);
+
+                    if (tag == TAG_PROCEDURE)
+                    {
+                        ptrdiff_t return_offset;
+
+                        return_offset = pc - pc_base;
+                        VM_ASSERT(return_offset >= 0 && return_offset < fn->tag_count.count);
+
+                        /*
+                         * Save the return address.
+                         */
+                        sp = vm_push_return_address(sp, fn, (unsigned short)return_offset);
+
+                        /*
+                         * call the function!
+                         */
+
+                        pc = fn->byte_code;
+                        pc_base = fn->byte_code;
+                        procedure = fn;
+                    }
+                    else
+                    {
+                        /*
+                         * TODO: This needs to take the arguments from the 
+                         * stack and combine them into a list. This is probably
+                         * going to be really ugly.
+                         */
+                        BREAK();
+                    }
+                }
+                continue;
             case OPCODE_TAILCALL:
                 BREAK();
-                break;
-
+                continue;
             case OPCODE_RETURN:
+                /*
+                 * assert that the current stack pointer is where the stack
+                 * pointer was at function entry, plus one for the return
+                 * value.
+                 */
                 BREAK();
                 goto vm_execution_done;
 
             case OPCODE_ADD:
                 NUMERIC_BINOP(+)
-                break;
+                continue;
             case OPCODE_SUB:
                 NUMERIC_BINOP(-)
-                break;
+                continue;
             case OPCODE_MUL:
                 NUMERIC_BINOP(*)
-                break;
+                continue;
             case OPCODE_DIV:
                 NUMERIC_BINOP(/)
-                break;
+                continue;
             case OPCODE_AND:
                 FIXNUM_BINOP(&)
-                break;
+                continue;
             case OPCODE_OR:
                 FIXNUM_BINOP(|)
-                break;
+                continue;
             case OPCODE_XOR:
                 FIXNUM_BINOP(^)
-                break;
+                continue;
             case OPCODE_NOT:
             case OPCODE_DUP_X:
             case OPCODE_POP_X:
             case OPCODE_SWAP_X:
                 BREAK();
-                break;
+                continue;
             case OPCODE_NOP:
-                break;
+                continue;
             default:
                 BREAK();
-                break;
+                continue;
         }
     }
 
