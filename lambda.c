@@ -901,7 +901,7 @@ assemble(struct environment_t *environment, struct compiler_context_t *context, 
                      * because this one accounts for the PC's offset after
                      * it has decoded the opcode.
                      */
-                    offset = insn->offset + 1;
+                    offset = insn->offset + 3;
                     target_offset = insn->reloc->offset;
                     diff = target_offset - offset;
 
@@ -1401,7 +1401,7 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
                     memcpy(c2.bytes, ptr + i + 1, 2);
                     print_hex_bytes(ptr + i, 3);
 
-                    skim_print("COND_BRANCH %d\n", c2.s2 + i + 1);
+                    skim_print("COND_BRANCH %d\n", c2.s2 + i + 3);
                 }
 
                 i += 3;
