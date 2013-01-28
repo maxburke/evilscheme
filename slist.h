@@ -1,3 +1,9 @@
+/***********************************************************************
+ * evilscheme, Copyright (c) 2012-2013, Maximilian Burke
+ * This file is distributed under the FreeBSD license. 
+ * See LICENSE.TXT for details.
+ ***********************************************************************/
+
 #ifndef SLIST_H
 #define SLIST_H
 

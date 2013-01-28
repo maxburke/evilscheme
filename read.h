@@ -1,3 +1,9 @@
+/***********************************************************************
+ * evilscheme, Copyright (c) 2012-2013, Maximilian Burke
+ * This file is distributed under the FreeBSD license. 
+ * See LICENSE.TXT for details.
+ ***********************************************************************/
+
 #ifndef READ_H
 #define READ_H
 
