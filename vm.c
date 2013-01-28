@@ -18,27 +18,29 @@ DISABLE_WARNING(4996)
  */
 
 #ifndef ENABLE_VM_ASSERTS
-    #ifndef NDEBUG
-        #define ENABLE_VM_ASSERTS 1
-    #else
-        #define ENABLE_VM_ASSERTS 0
-    #endif
+#   ifndef NDEBUG
+#       define ENABLE_VM_ASSERTS 1
+#   else
+#       define ENABLE_VM_ASSERTS 0
+#   endif
 #endif
 
 #if ENABLE_VM_ASSERTS
-    #define VM_ASSERT(x) if (!(x)) { fprintf(stderr, "%s:%d: Assertion failed: %s", __FILE__, __LINE__, #x); BREAK(); } else (void)0
+#   define VM_ASSERT(x) if (!(x)) { fprintf(stderr, "%s:%d: Assertion failed: %s", __FILE__, __LINE__, #x); BREAK(); } else (void)0
 #else
-    #define VM_ASSERT(x)
+#   define VM_ASSERT(x)
 #endif
 
 #define ENABLE_VM_TRACING 1
 
 #if ENABLE_VM_TRACING
-    #define VM_TRACE_OP(x) do { fprintf(stderr, "[vm] %s\n", #x); } while (0)
-    #define VM_TRACE(x) do { fprintf(stderr, "[vm] %s", x); } while (0)
+#   define VM_TRACE_OP(x) do { fprintf(stderr, "[vm] %32s program_area begin: %p sp begin: %p", #x, program_area, sp); } while (0)
+#   define VM_TRACE(x) do { fprintf(stderr, "[vm] %s", x); } while (0)
+#   define VM_CONTINUE(); fprintf(stderr, " sp end: %p\n", sp); continue
 #else
-    #define VM_TRACE_OP(x)
-    #define VM_TRACE(x)
+#   define VM_TRACE_OP(x)
+#   define VM_TRACE(x)
+#   define VM_CONTINUE();   continue
 #endif
 
 #define STACK_PUSH(stack, x) do { *(stack--) = x; } while (0)
@@ -443,10 +445,10 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
 
     /*
      * Stack layout for VM:
-     * [high addresses]...........................................[low addresses]
-     * [arg n - 1][...][arg 1][arg 0][return address][stack top]...[stack_bottom]
-     *                                      ^              ^
-     *                  program_area -------+        ------+
+     * [high addresses]...............................................................[low addresses]
+     * [arg n - 1][...][arg 1][arg 0][program area chain][return address][stack top]...[stack_bottom]
+     *                                      ^                                 ^
+     *                  program_area -------+                           ------+
      *
      * arg0 is at program_area[1]
      */
@@ -461,7 +463,8 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
      */
     program_area = sp + 1;
 
-    sp = vm_push_return_address(sp, NULL, 0);    /* return address */
+    sp = vm_push_ref(sp, NULL);                 /* program area chain */  
+    sp = vm_push_return_address(sp, NULL, 0);   /* return address */
     
     for (;;)
     {
@@ -472,50 +475,50 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
             case OPCODE_INVALID:
                 VM_TRACE_OP(OPCODE_INVALID);
                 BREAK();
-                continue;
+                VM_CONTINUE();
             case OPCODE_LDARG_X:
                 VM_TRACE_OP(OPCODE_LDARG_X);
                 {
                     unsigned char arg_index = *pc++;
                     STACK_PUSH(sp, program_area[arg_index]);
                 }
-                continue;
+                VM_CONTINUE();
             case OPCODE_LDIMM_1_BOOL:
                 VM_TRACE_OP(OPCODE_LDIMM_1_BOOL);
                 LDIMM_1_BOOLEAN()
-                continue;
+                VM_CONTINUE();
             case OPCODE_LDIMM_1_CHAR:
                 VM_TRACE_OP(OPCODE_LDIMM_1_CHAR);
                 LDIMM_1_CHAR()
-                continue;
+                VM_CONTINUE();
             case OPCODE_LDIMM_1_FIXNUM:
                 VM_TRACE_OP(OPCODE_LDIMM_1_FIXNUM);
                 LDIMM_1_FIXNUM()
-                continue;
+                VM_CONTINUE();
             case OPCODE_LDIMM_1_FLONUM:
                 VM_TRACE_OP(OPCODE_LDIMM_1_FLONUM);
                 LDIMM_1_FLONUM()
-                continue;
+                VM_CONTINUE();
             case OPCODE_LDIMM_4_FIXNUM:
                 VM_TRACE_OP(OPCODE_LDIMM_4_FIXNUM);
                 LDIMM_4_FIXNUM()
-                continue;
+                VM_CONTINUE();
             case OPCODE_LDIMM_4_FLONUM:
                 VM_TRACE_OP(OPCODE_LDIMM_4_FLONUM);
                 LDIMM_4_FLONUM()
-                continue;
+                VM_CONTINUE();
             case OPCODE_LDIMM_8_FIXNUM:
                 VM_TRACE_OP(OPCODE_LDIMM_8_FIXNUM);
                 LDIMM_8_FIXNUM()
-                continue;
+                VM_CONTINUE();
             case OPCODE_LDIMM_8_FLONUM:
                 VM_TRACE_OP(OPCODE_LDIMM_8_FLONUM);
                 LDIMM_8_FLONUM()
-                continue;
+                VM_CONTINUE();
             case OPCODE_LDIMM_8_SYMBOL:
                 VM_TRACE_OP(OPCODE_LDIMM_8_SYMBOL);
                 LDIMM_8_SYMBOL()
-                continue;
+                VM_CONTINUE();
             case OPCODE_LDSTR:
                 VM_TRACE_OP(OPCODE_LDSTR);
                 {
@@ -529,15 +532,15 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
 
                     pc += string_length + 1;
                 }
-                continue;
+                VM_CONTINUE();
             case OPCODE_LDEMPTY:
                 VM_TRACE_OP(OPCODE_LDEMPTY);
                 sp = vm_push_ref(sp, empty_pair);
-                continue;
+                VM_CONTINUE();
             case OPCODE_LOAD:
                 VM_TRACE_OP(OPCODE_LOAD);
                 BREAK();
-                continue;
+                VM_CONTINUE();
             case OPCODE_MAKE_REF:
                 VM_TRACE_OP(OPCODE_MAKE_REF);
                 {
@@ -549,7 +552,7 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
                     *ref = vm_create_inner_reference(ref->value.ref, index->value.fixnum_value);
                     ++sp;
                 }
-                continue;
+                VM_CONTINUE();
             case OPCODE_SET:
                 VM_TRACE_OP(OPCODE_SET);
                 {
@@ -583,23 +586,23 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
 
                     sp += 2;
                 }
-                continue;
+                VM_CONTINUE();
             case OPCODE_SET_CAR:
                 VM_TRACE_OP(OPCODE_SET_CAR);
                 BREAK();
-                continue;
+                VM_CONTINUE();
             case OPCODE_SET_CDR:
                 VM_TRACE_OP(OPCODE_SET_CDR);
                 BREAK();
-                continue;
+                VM_CONTINUE();
             case OPCODE_NEW:
                 VM_TRACE_OP(OPCODE_NEW);
                 BREAK();
-                continue;
+                VM_CONTINUE();
             case OPCODE_NEW_VECTOR:
                 VM_TRACE_OP(OPCODE_NEW_VECTOR);
                 BREAK();
-                continue;
+                VM_CONTINUE();
             case OPCODE_CMP_EQUAL:
                 VM_TRACE_OP(OPCODE_CMP_EQUAL);
                 {
@@ -610,34 +613,34 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
                     is_equal = vm_compare_equal(a, b);
                     sp = vm_push_bool(sp + 2, is_equal);
                 }
-                continue;
+                VM_CONTINUE();
             case OPCODE_CMPN_EQ:
                 VM_TRACE_OP(OPCODE_CMPN_EQ);
                 CMPN_IMPL(==)
-                continue;
+                VM_CONTINUE();
             case OPCODE_CMPN_LT:
                 VM_TRACE_OP(OPCODE_CMPN_LT);
                 CMPN_IMPL(<)
-                continue;
+                VM_CONTINUE();
             case OPCODE_CMPN_GT:
                 VM_TRACE_OP(OPCODE_CMPN_GT);
                 CMPN_IMPL(>)
-                continue;
+                VM_CONTINUE();
             case OPCODE_CMPN_LE:
                 VM_TRACE_OP(OPCODE_CMPN_LE);
                 CMPN_IMPL(<=)
-                continue;
+                VM_CONTINUE();
             case OPCODE_CMPN_GE:
                 VM_TRACE_OP(OPCODE_CMPN_GE);
                 CMPN_IMPL(>=)
-                continue;
+                VM_CONTINUE();
             case OPCODE_BRANCH:
                 VM_TRACE_OP(OPCODE_BRANCH);
                 {
                     int offset = (int)(*(short *)pc);
                     pc += offset + 2;
                 }
-                continue;
+                VM_CONTINUE();
             case OPCODE_COND_BRANCH:
                 VM_TRACE_OP(OPCODE_COND_BRANCH);
                 {
@@ -656,7 +659,7 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
 
                     ++sp;
                 }
-                continue;
+                VM_CONTINUE();
             case OPCODE_GET_BOUND_LOCATION:
                 VM_TRACE_OP(OPCODE_GET_BOUND_LOCATION);
                 {
@@ -671,10 +674,11 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
                     object = get_bound_location(environment, symbol_hash, 1);
                     *symbol = *object;
                 }
-                continue;
+                VM_CONTINUE();
             case OPCODE_CALL:
                 VM_TRACE_OP(OPCODE_CALL);
                 {
+                    struct object_t *old_program_area;
                     struct procedure_t *fn;
                     unsigned char tag;
 
@@ -690,20 +694,18 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
 
                         return_offset = pc - pc_base;
                         VM_ASSERT(return_offset >= 0 && return_offset < fn->tag_count.count);
+                        old_program_area = program_area;
                         program_area = sp + 1;
 
-/*
- * TODO: save program area
- */
                         /*
                          * Save the return address.
                          */
+                        sp = vm_push_ref(sp, old_program_area);
                         sp = vm_push_return_address(sp, fn, (unsigned short)return_offset);
 
                         /*
                          * call the function!
                          */
-
                         pc = fn->byte_code;
                         pc_base = pc;
                         procedure = fn;
@@ -718,91 +720,113 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
                         BREAK();
                     }
                 }
-                continue;
+                VM_CONTINUE();
             case OPCODE_TAILCALL:
                 VM_TRACE_OP(OPCODE_TAILCALL);
                 BREAK();
-                continue;
+                VM_CONTINUE();
             case OPCODE_RETURN:
                 VM_TRACE_OP(OPCODE_RETURN);
-                BREAK();
                 {
                     struct object_t *return_address;
+                    struct object_t *prev_program_area_ref;
                     struct procedure_t *parent;
 
-                    return_address = sp + 1;
+                    /*
+                     * We adjust the stack pointer to where we want to store
+                     * the returned value which is the same slot shared by
+                     * the rightmost function argument.
+                     */
+                    sp = program_area + procedure->num_args - 1;
+
+                    return_address = program_area - 2;
+                    prev_program_area_ref = program_area - 1;
                     VM_ASSERT(return_address->tag_count.tag == TAG_INNER_REFERENCE);
+                    VM_ASSERT(prev_program_area_ref->tag_count.tag == TAG_REFERENCE);
                     parent = (struct procedure_t *)return_address->value.ref;
 
-                    if (parent == NULL)
-                        goto vm_execution_done;
+                    if (parent != NULL)
+                    {
+                        pc = parent->byte_code + return_address->tag_count.count;
+                        pc_base = pc;
+                        procedure = parent;
 
-                    ++sp;
-                    pc = parent->byte_code + return_address->tag_count.count;
-                    pc_base = pc;
-                    procedure = parent;
-/*
- * TODO: restore program area, copy return value up stack.
- */
+                        /*
+                         * Restore the program area.
+                         */
+                        program_area = deref(prev_program_area_ref);
+
+                        /*
+                         * Copy up the return value.
+                         */
+                        *prev_program_area_ref = *sp;
+
+                        /*
+                         * Adjust the stack pointer back down to take into account
+                         * the new return value on the stack.
+                         */
+                        sp -= 1;
+                    }
+                    else
+                    {
+                        *prev_program_area_ref = *sp;
+                        sp -= 1;
+
+                        goto vm_execution_done;
+                    }
                 }
-                /*
-                 * assert that the current stack pointer is where the stack
-                 * pointer was at function entry, plus one for the return
-                 * value.
-                 */
-                BREAK();
-                goto vm_execution_done;
+                VM_CONTINUE();
 
             case OPCODE_ADD:
                 VM_TRACE_OP(OPCODE_ADD);
                 NUMERIC_BINOP(+)
-                continue;
+                VM_CONTINUE();
             case OPCODE_SUB:
                 VM_TRACE_OP(OPCODE_SUB);
                 NUMERIC_BINOP(-)
-                continue;
+                VM_CONTINUE();
             case OPCODE_MUL:
                 VM_TRACE_OP(OPCODE_MUL);
                 NUMERIC_BINOP(*)
-                continue;
+                VM_CONTINUE();
             case OPCODE_DIV:
                 VM_TRACE_OP(OPCODE_DIV);
                 NUMERIC_BINOP(/)
-                continue;
+                VM_CONTINUE();
             case OPCODE_AND:
                 VM_TRACE_OP(OPCODE_AND);
                 FIXNUM_BINOP(&)
-                continue;
+                VM_CONTINUE();
             case OPCODE_OR:
                 VM_TRACE_OP(OPCODE_OR);
                 FIXNUM_BINOP(|)
-                continue;
+                VM_CONTINUE();
             case OPCODE_XOR:
                 VM_TRACE_OP(OPCODE_XOR);
                 FIXNUM_BINOP(^)
-                continue;
+                VM_CONTINUE();
             case OPCODE_NOT:
                 VM_TRACE_OP(OPCODE_NOT);
                 BREAK();
-                continue;
+                VM_CONTINUE();
             case OPCODE_DUP_X:
                 VM_TRACE_OP(OPCODE_DUP_X);
                 BREAK();
-                continue;
+                VM_CONTINUE();
             case OPCODE_POP_X:
                 VM_TRACE_OP(OPCODE_POP_X);
                 BREAK();
-                continue;
+                VM_CONTINUE();
             case OPCODE_SWAP_X:
                 VM_TRACE_OP(OPCODE_SWAP_X);
                 BREAK();
-                continue;
+                VM_CONTINUE();
             case OPCODE_NOP:
                 VM_TRACE_OP(OPCODE_NOP);
-                continue;
+                VM_CONTINUE();
             default:
                 BREAK();
-                continue;
+                VM_CONTINUE();
         }
     }
 
@@ -814,6 +838,6 @@ vm_execution_done:
      * This should probably cons the last return value on the stack and
      * return that instead.
      */
-    return make_empty_ref();
+    return *(sp + 1);
 }
 
