@@ -31,7 +31,7 @@ DISABLE_WARNING(4996)
 #   define VM_ASSERT(x)
 #endif
 
-#define ENABLE_VM_TRACING 1
+#define ENABLE_VM_TRACING 0
 
 #if ENABLE_VM_TRACING
 #   define VM_TRACE_OP(x) do { fprintf(stderr, "[vm] %32s program_area begin: %p sp begin: %p", #x, program_area, sp); } while (0)
@@ -730,15 +730,10 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
                 {
                     struct object_t *return_address;
                     struct object_t *prev_program_area_ref;
+                    struct object_t *return_value;
                     struct procedure_t *parent;
 
-                    /*
-                     * We adjust the stack pointer to where we want to store
-                     * the returned value which is the same slot shared by
-                     * the rightmost function argument.
-                     */
-                    sp = program_area + procedure->num_args - 1;
-
+                    return_value = sp + 1;
                     return_address = program_area - 2;
                     prev_program_area_ref = program_area - 1;
                     VM_ASSERT(return_address->tag_count.tag == TAG_INNER_REFERENCE);
@@ -751,32 +746,20 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
                         pc_base = pc;
                         procedure = parent;
 
-                        /*
-                         * Restore the program area.
-                         */
+                        sp = program_area + procedure->num_args - 2;
+                        *(sp + 1) = *return_value;
+
                         program_area = deref(prev_program_area_ref);
-
-                        /*
-                         * Copy up the return value.
-                         */
-                        *prev_program_area_ref = *sp;
-
-                        /*
-                         * Adjust the stack pointer back down to take into account
-                         * the new return value on the stack.
-                         */
-                        sp -= 1;
                     }
                     else
                     {
-                        *prev_program_area_ref = *sp;
-                        sp -= 1;
+                        sp = program_area + procedure->num_args - 2;
+                        *(sp + 1) = *return_value;
 
                         goto vm_execution_done;
                     }
                 }
                 VM_CONTINUE();
-
             case OPCODE_ADD:
                 VM_TRACE_OP(OPCODE_ADD);
                 NUMERIC_BINOP(+)
@@ -832,7 +815,6 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
 
 vm_execution_done:
     environment->stack_ptr = old_stack;
-    BREAK();
 
     /*
      * This should probably cons the last return value on the stack and

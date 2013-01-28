@@ -183,6 +183,12 @@ apply(struct environment_t *environment, struct object_t *args)
     struct object_t *function_args;
     struct object_t *function;
 
+    /*
+     * TODO: This function should verify that the number of arguments passed
+     * in matches what the function can take, otherwise things will blow up.
+     * Alternative TODO: &rest-style handling of extra arguments.
+     */
+
     object = deref(args);
     function = CAR(object);
     function_args = CDR(object);
