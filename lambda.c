@@ -791,7 +791,7 @@ compile_form(struct compiler_context_t *context, struct instruction_t *next, str
                  * compiler so we need to emit a call to it.
                  * TODO: determine if this can be a tailcall.
                  */
-skim_print("** %s (0x%" PRIx64 ") **\n", 
+evil_print("** %s (0x%" PRIx64 ") **\n", 
         find_symbol_name(context->environment, function_hash),
         function_hash);
                 return compile_call(context, next, function_symbol, function_args);
@@ -1124,12 +1124,12 @@ print_hex_bytes(const unsigned char *c, size_t size)
 
     for (i = 0; i < size; ++i)
     {
-        skim_print("%02X ", c[i]);
+        evil_print("%02X ", c[i]);
     }
 
     for (; i < 10; ++i)
     {
-        skim_print("   ");
+        evil_print("   ");
     }
 }
 
@@ -1153,19 +1153,19 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
      * TODO: FIX!
      */
 
-    skim_print("%s:\n", name);
+    evil_print("%s:\n", name);
 
     for (i = 0, num_bytes = procedure->tag_count.count; i < num_bytes;)
     {
         unsigned char c = ptr[i];
 
-        skim_print("    %5d: ", i);
+        evil_print("    %5d: ", i);
 
         switch (c)
         {
             case OPCODE_INVALID:
                 print_hex_bytes(ptr + i, 1);
-                skim_print("INVALID\n");
+                evil_print("INVALID\n");
                 ++i;
                 break;
             case OPCODE_LDARG_X:
@@ -1174,7 +1174,7 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
 
                     index = ptr[i + 1];
                     print_hex_bytes(ptr + i, 2);
-                    skim_print("LDARG %u\n", index);
+                    evil_print("LDARG %u\n", index);
                 }
 
                 i += 2;
@@ -1186,7 +1186,7 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
                     value = ptr[i + 1];
                     print_hex_bytes(ptr + i, 2);
 
-                    skim_print("LDIMM_1_BOOL %s\n", value ? "#t" : "#f");
+                    evil_print("LDIMM_1_BOOL %s\n", value ? "#t" : "#f");
                 }
 
                 i += 2;
@@ -1198,7 +1198,7 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
                     value = ptr[i + 1];
                     print_hex_bytes(ptr + i, 2);
 
-                    skim_print("LDIMM_1_CHAR #\\%c\n", (char)value);
+                    evil_print("LDIMM_1_CHAR #\\%c\n", (char)value);
                 }
 
                 i += 2;
@@ -1210,7 +1210,7 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
                     value = ptr[i + 1];
                     print_hex_bytes(ptr + i, 2);
 
-                    skim_print("LDIMM_1_FIXNUM %d\n", (int)value);
+                    evil_print("LDIMM_1_FIXNUM %d\n", (int)value);
                 }
 
                 i += 2;
@@ -1222,7 +1222,7 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
                     value = ptr[i + 1];
                     print_hex_bytes(ptr + i, 2);
 
-                    skim_print("LDIMM_1_FLONUM %f\n", (double)value);
+                    evil_print("LDIMM_1_FLONUM %f\n", (double)value);
                 }
 
                 i += 2;
@@ -1234,7 +1234,7 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
                     memcpy(c4.bytes, ptr + i + 1, 4);
                     print_hex_bytes(ptr + i, 5);
 
-                    skim_print("LDIMM_4_FIXNUM %d\n", c4.s4);
+                    evil_print("LDIMM_4_FIXNUM %d\n", c4.s4);
                 }
 
                 i += 5;
@@ -1246,7 +1246,7 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
                     memcpy(c4.bytes, ptr + i + 1, 4);
                     print_hex_bytes(ptr + i, 5);
 
-                    skim_print("LDIMM_4_FLONUM %f\n", c4.f4);
+                    evil_print("LDIMM_4_FLONUM %f\n", c4.f4);
                 }
 
                 i += 5;
@@ -1258,7 +1258,7 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
                     memcpy(c8.bytes, ptr + i + 1, 8);
                     print_hex_bytes(ptr + i, 9);
 
-                    skim_print("LDIMM_8_FIXNUM %" PRId64 "\n", c8.s8);
+                    evil_print("LDIMM_8_FIXNUM %" PRId64 "\n", c8.s8);
                 }
 
                 i += 9;
@@ -1270,7 +1270,7 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
                     memcpy(c8.bytes, ptr + i + 1, 8);
                     print_hex_bytes(ptr + i, 9);
 
-                    skim_print("LDIMM_8_FLONUM %lf\n", c8.f8);
+                    evil_print("LDIMM_8_FLONUM %lf\n", c8.f8);
                 }
 
                 i += 9;
@@ -1282,7 +1282,7 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
                     memcpy(c8.bytes, ptr + i + 1, 8);
                     print_hex_bytes(ptr + i, 9);
 
-                    skim_print("LDIMM_8_SYMBOL %s\n", find_symbol_name(environment, c8.u8));
+                    evil_print("LDIMM_8_SYMBOL %s\n", find_symbol_name(environment, c8.u8));
                 }
 
                 i += 9;
@@ -1296,49 +1296,49 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
                     length = strlen(str);
                     print_hex_bytes(ptr + i, length + 1);
 
-                    skim_print("LDSTR %s\n", str);
+                    evil_print("LDSTR %s\n", str);
                     i += length + 2;
                 }
 
                 break;
             case OPCODE_LDEMPTY:
                 print_hex_bytes(ptr + i, 1);
-                skim_print("LDEMPTY\n");
+                evil_print("LDEMPTY\n");
                 ++i;
                 break;
             case OPCODE_LDCAR:
                 print_hex_bytes(ptr + i, 1);
-                skim_print("LDCAR\n");
+                evil_print("LDCAR\n");
                 ++i;
                 break;
             case OPCODE_LDCDR:
                 print_hex_bytes(ptr + i, 1);
-                skim_print("LDCDR\n");
+                evil_print("LDCDR\n");
                 ++i;
                 break;
             case OPCODE_LOAD:
                 print_hex_bytes(ptr + i, 1);
-                skim_print("LOAD\n");
+                evil_print("LOAD\n");
                 ++i;
                 break;
             case OPCODE_MAKE_REF:
                 print_hex_bytes(ptr + i, 1);
-                skim_print("MAKE_REF\n");
+                evil_print("MAKE_REF\n");
                 ++i;
                 break;
             case OPCODE_SET:
                 print_hex_bytes(ptr + i, 1);
-                skim_print("SET\n");
+                evil_print("SET\n");
                 ++i;
                 break;
             case OPCODE_SET_CAR:
                 print_hex_bytes(ptr + i, 1);
-                skim_print("SET_CAR\n");
+                evil_print("SET_CAR\n");
                 ++i;
                 break;
             case OPCODE_SET_CDR:
                 print_hex_bytes(ptr + i, 1);
-                skim_print("SET_CDR\n");
+                evil_print("SET_CDR\n");
                 ++i;
                 break;
             case OPCODE_NEW:
@@ -1348,44 +1348,44 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
                     tag = (enum tag_t)ptr[i + 1];
                     print_hex_bytes(ptr + i, 2);
 
-                    skim_print("NEW %s\n", type_name(tag));
+                    evil_print("NEW %s\n", type_name(tag));
                 }
 
                 i += 2;
                 break;
             case OPCODE_NEW_VECTOR:
                 print_hex_bytes(ptr + i, 1);
-                skim_print("NEW_VECTOR\n");
+                evil_print("NEW_VECTOR\n");
                 ++i;
                 break;
             case OPCODE_CMP_EQUAL:
                 print_hex_bytes(ptr + i, 1);
-                skim_print("CMP_EQUAL\n");
+                evil_print("CMP_EQUAL\n");
                 ++i;
                 break;
             case OPCODE_CMPN_EQ:
                 print_hex_bytes(ptr + i, 1);
-                skim_print("CMPN_EQ\n");
+                evil_print("CMPN_EQ\n");
                 ++i;
                 break;
             case OPCODE_CMPN_LT:
                 print_hex_bytes(ptr + i, 1);
-                skim_print("CMPN_LT\n");
+                evil_print("CMPN_LT\n");
                 ++i;
                 break;
             case OPCODE_CMPN_GT:
                 print_hex_bytes(ptr + i, 1);
-                skim_print("CMPN_GT\n");
+                evil_print("CMPN_GT\n");
                 ++i;
                 break;
             case OPCODE_CMPN_LE:
                 print_hex_bytes(ptr + i, 1);
-                skim_print("CMPN_LE\n");
+                evil_print("CMPN_LE\n");
                 ++i;
                 break;
             case OPCODE_CMPN_GE:
                 print_hex_bytes(ptr + i, 1);
-                skim_print("CMPN_GE\n");
+                evil_print("CMPN_GE\n");
                 ++i;
                 break;
             case OPCODE_BRANCH:
@@ -1395,7 +1395,7 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
                     memcpy(c2.bytes, ptr + i + 1, 2);
                     print_hex_bytes(ptr + i, 3);
 
-                    skim_print("BRANCH %d\n", c2.s2 + i + 1);
+                    evil_print("BRANCH %d\n", c2.s2 + i + 1);
                 }
 
                 i += 3;
@@ -1407,74 +1407,74 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
                     memcpy(c2.bytes, ptr + i + 1, 2);
                     print_hex_bytes(ptr + i, 3);
 
-                    skim_print("COND_BRANCH %d\n", c2.s2 + i + 3);
+                    evil_print("COND_BRANCH %d\n", c2.s2 + i + 3);
                 }
 
                 i += 3;
                 break;
             case OPCODE_CALL:
                 print_hex_bytes(ptr + i, 1);
-                skim_print("CALL\n");
+                evil_print("CALL\n");
                 ++i;
                 break;
             case OPCODE_TAILCALL:
                 print_hex_bytes(ptr + i, 1);
-                skim_print("TAILCALL\n");
+                evil_print("TAILCALL\n");
                 ++i;
                 break;
             case OPCODE_RETURN:
                 print_hex_bytes(ptr + i, 1);
-                skim_print("RETURN\n");
+                evil_print("RETURN\n");
                 ++i;
                 break;
             case OPCODE_GET_BOUND_LOCATION:
                 print_hex_bytes(ptr + i, 1);
-                skim_print("GET_BOUND_LOCATION\n");
+                evil_print("GET_BOUND_LOCATION\n");
                 ++i;
                 break;
             case OPCODE_ADD:
                 print_hex_bytes(ptr + i, 1);
-                skim_print("ADD\n");
+                evil_print("ADD\n");
                 ++i;
                 break;
             case OPCODE_SUB:
                 print_hex_bytes(ptr + i, 1);
-                skim_print("SUB\n");
+                evil_print("SUB\n");
                 ++i;
                 break;
             case OPCODE_MUL:
                 print_hex_bytes(ptr + i, 1);
-                skim_print("MUL\n");
+                evil_print("MUL\n");
                 ++i;
                 break;
             case OPCODE_DIV:
                 print_hex_bytes(ptr + i, 1);
-                skim_print("DIV\n");
+                evil_print("DIV\n");
                 ++i;
                 break;
             case OPCODE_AND:
                 print_hex_bytes(ptr + i, 1);
-                skim_print("AND\n");
+                evil_print("AND\n");
                 ++i;
                 break;
             case OPCODE_OR:
                 print_hex_bytes(ptr + i, 1);
-                skim_print("OR\n");
+                evil_print("OR\n");
                 ++i;
                 break;
             case OPCODE_XOR:
                 print_hex_bytes(ptr + i, 1);
-                skim_print("XOR\n");
+                evil_print("XOR\n");
                 ++i;
                 break;
             case OPCODE_NOT:
                 print_hex_bytes(ptr + i, 1);
-                skim_print("NOT\n");
+                evil_print("NOT\n");
                 ++i;
                 break;
             case OPCODE_NOP:
                 print_hex_bytes(ptr + i, 1);
-                skim_print("NOP\n");
+                evil_print("NOP\n");
                 ++i;
                 break;
             default:
@@ -1506,7 +1506,7 @@ disassemble(struct environment_t *environment, struct object_t *args)
     switch (function->tag_count.tag)
     {
         case TAG_SPECIAL_FUNCTION:
-            skim_print("%s: <special function>\n", name);
+            evil_print("%s: <special function>\n", name);
             break;
         case TAG_PROCEDURE:
             disassemble_procedure(environment, function, name);

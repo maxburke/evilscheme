@@ -45,7 +45,7 @@
 #endif
 
 void
-skim_print(const char *format, ...)
+evil_print(const char *format, ...)
 {
     va_list args;
     va_start(args, format);
@@ -110,7 +110,7 @@ main(void)
         result = eval(environment, &object);
         print(environment, &result);
 
-        skim_print("\n");
+        evil_print("\n");
     }
 
     posix_memfree(heap);

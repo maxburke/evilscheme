@@ -68,6 +68,6 @@
  */
 
 void
-skim_print(const char *format, ...);
+evil_print(const char *format, ...);
 
 #endif

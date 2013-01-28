@@ -277,17 +277,17 @@ print(struct environment_t *environment, struct object_t *args)
 
     if (object == empty_pair)
     {
-        skim_print("'()");
+        evil_print("'()");
         return make_empty_ref();
     }
 
     switch (object->tag_count.tag)
     {
         case TAG_BOOLEAN:
-            skim_print("%s", object->value.fixnum_value ? "#t" : "#f");
+            evil_print("%s", object->value.fixnum_value ? "#t" : "#f");
             break;
         case TAG_CHAR:
-            skim_print("%c", (char)object->value.fixnum_value);
+            evil_print("%c", (char)object->value.fixnum_value);
             break; 
         case TAG_VECTOR:
             {
@@ -298,44 +298,44 @@ print(struct environment_t *environment, struct object_t *args)
                 base = VECTOR_BASE(object);
                 count = object->tag_count.count;
 
-                skim_print("#(");
+                evil_print("#(");
                 for (i = 0; i < count; ++i)
                 {
                     print(environment, base + i);
 
                     if (i < (count - 1))
                     {
-                        skim_print(" ");
+                        evil_print(" ");
                     }
                 }
-                skim_print(")");
+                evil_print(")");
                 break;
             }
         case TAG_FIXNUM:
-            skim_print("%" PRId64, object->value.fixnum_value);
+            evil_print("%" PRId64, object->value.fixnum_value);
             break;
         case TAG_FLONUM:
-            skim_print("%f", object->value.flonum_value);
+            evil_print("%f", object->value.flonum_value);
             break;
         case TAG_PROCEDURE:
-            skim_print("<procedure>");
+            evil_print("<procedure>");
             break;
         case TAG_STRING:
-            skim_print("\"%s\"", object->value.string_value);
+            evil_print("\"%s\"", object->value.string_value);
             break;
         case TAG_SYMBOL:
             {
                 const char *str = find_symbol_name(environment, object->value.symbol_hash);
-                skim_print("%s", str);
+                evil_print("%s", str);
                 break;
             }
         case TAG_PAIR:
             print(environment, CAR(object));
-            skim_print(" ");
+            evil_print(" ");
             print(environment, CDR(object));
             break;
         case TAG_SPECIAL_FUNCTION:
-            skim_print("<special function>");
+            evil_print("<special function>");
             break;
         default:
             assert(0);
