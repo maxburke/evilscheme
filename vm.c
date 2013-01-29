@@ -720,10 +720,13 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
                 VM_CONTINUE();
             case OPCODE_TAILCALL:
                 VM_TRACE_OP(OPCODE_TAILCALL);
-                BREAK();
                 {
                     struct procedure_t *fn;
+                    struct object_t *arg_slot;
                     unsigned char tag;
+                    int current_fn_num_args;
+                    int num_args;
+                    int arg_diff;
 
                     fn = (struct procedure_t *)deref(sp + 1);
                     ++sp;
@@ -738,6 +741,30 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
 
                         BREAK();
                     }
+
+                    /*
+                     * This code erases the current frame replacing it with the new call.
+                     * At this point the stack, pre-call, where function b is performing
+                     * a tail call to function a, looks like this:
+                     * [arg a0][arg a1]...[arg an]...[stuff]...[return][PA chain][arg b0][arg b1]...[arg bk]
+                     * And we need to move the args a0-an on top of args b0-bk. The 
+                     * great thing is the return slot and the PA chain don't need to
+                     * change, they can just remain the same.
+                     */
+
+                    current_fn_num_args = procedure->num_args;
+                    num_args = fn->num_args;
+                    arg_diff = current_fn_num_args - num_args;
+
+                    arg_slot = program_area + arg_diff;
+                    memmove(arg_slot - 2, program_area - 2, 2 * sizeof(struct object_t));
+                    memmove(arg_slot, sp + 1, num_args * sizeof(struct object_t));
+
+                    pc = fn->byte_code;
+                    pc_base = pc;
+                    procedure = fn;
+                    sp = arg_slot - 3;
+                    program_area = arg_slot;
                 }
                 VM_CONTINUE();
             case OPCODE_RETURN:

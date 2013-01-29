@@ -70,6 +70,7 @@ main(void)
         "(fact 5)",
         "(define fact-tailrec (lambda (acc i limit) (if (> i limit) acc (fact-tailrec (* i acc) (+ i 1) limit))))",
         "(disassemble 'fact-tailrec)",
+        "(fact-tailrec 1 1 5)",
         "(define count (lambda (item L) (if L (+ (equal? item (first L)) (count item (rest L))) 0)))",
         "(disassemble 'count)",
         "(define hello-world (lambda () (display \"hello world!\") (newline)))",
