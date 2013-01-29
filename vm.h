@@ -242,5 +242,28 @@ struct procedure_t
 struct object_t
 vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *args);
 
+union convert_two_t
+{
+    unsigned char bytes[2];
+    unsigned short u2;
+    short s2;
+};
+
+union convert_four_t
+{
+    unsigned char bytes[4];
+    float f4;
+    unsigned int u4;
+    int s4;
+};
+
+union convert_eight_t
+{
+    unsigned char bytes[8];
+    double f8;
+    uint64_t u8;
+    int64_t s8;
+};
+
 #endif
 

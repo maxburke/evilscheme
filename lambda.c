@@ -833,29 +833,6 @@ calculate_bytecode_size_and_offsets(struct slist_t *root)
     return size;
 }
 
-union convert_two_t
-{
-    unsigned char bytes[2];
-    unsigned short u2;
-    short s2;
-};
-
-union convert_four_t
-{
-    unsigned char bytes[4];
-    float f4;
-    unsigned int u4;
-    int s4;
-};
-
-union convert_eight_t
-{
-    unsigned char bytes[8];
-    double f8;
-    uint64_t u8;
-    int64_t s8;
-};
-
 static struct object_t *
 assemble(struct environment_t *environment, struct compiler_context_t *context, struct instruction_t *root)
 {

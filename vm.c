@@ -74,48 +74,33 @@ vm_compare_equal(const struct object_t *a, const struct object_t *b);
 #define LDIMM_1_FIXNUM()    LDIMM_1_IMPL(fixnum_value, int64_t, TAG_FIXNUM)
 #define LDIMM_1_FLONUM()    LDIMM_1_IMPL(flonum_value, double, TAG_FLONUM)
 
-union four_byte_union_t
-{
-    unsigned char bytes[4];
-    int fixnum_value;
-    float flonum_value;
-};
-
-#define LDIMM_4_IMPL(TAG, FIELD) {                                                          \
-        union four_byte_union_t fb;                                                         \
+#define LDIMM_4_IMPL(TAG, FIELD, UNION_FIELD) {                                             \
+        union convert_four_t fb;                                                            \
         sp->tag_count.tag = TAG;                                                            \
         sp->tag_count.flag = 0;                                                             \
         sp->tag_count.count = 1;                                                            \
         fb.bytes[0] = *pc++; fb.bytes[1] = *pc++; fb.bytes[2] = *pc++; fb.bytes[3] = *pc++; \
-        sp->value.FIELD = fb.FIELD;                                                         \
+        sp->value.FIELD = fb.UNION_FIELD;                                                   \
         --sp;                                                                               \
     }
 
-#define LDIMM_4_FIXNUM() LDIMM_4_IMPL(TAG_FIXNUM, fixnum_value)
-#define LDIMM_4_FLONUM() LDIMM_4_IMPL(TAG_FLONUM, flonum_value)
+#define LDIMM_4_FIXNUM() LDIMM_4_IMPL(TAG_FIXNUM, fixnum_value, s4)
+#define LDIMM_4_FLONUM() LDIMM_4_IMPL(TAG_FLONUM, flonum_value, f4)
 
-union eight_byte_union_t
-{
-    unsigned char bytes[8];
-    int64_t fixnum_value;
-    double flonum_value;
-    uint64_t symbol_hash;
-};
-
-#define LDIMM_8_IMPL(TAG, FIELD) {                                                          \
-        union eight_byte_union_t fb;                                                        \
+#define LDIMM_8_IMPL(TAG, FIELD, UNION_FIELD) {                                             \
+        union convert_eight_t fb;                                                           \
         sp->tag_count.tag = TAG;                                                            \
         sp->tag_count.flag = 0;                                                             \
         sp->tag_count.count = 1;                                                            \
         fb.bytes[0] = *pc++; fb.bytes[1] = *pc++; fb.bytes[2] = *pc++; fb.bytes[3] = *pc++; \
         fb.bytes[4] = *pc++; fb.bytes[5] = *pc++; fb.bytes[6] = *pc++; fb.bytes[7] = *pc++; \
-        sp->value.FIELD = fb.FIELD;                                                         \
+        sp->value.FIELD = fb.UNION_FIELD;                                                   \
         --sp;                                                                               \
     }
 
-#define LDIMM_8_FIXNUM() LDIMM_8_IMPL(TAG_FIXNUM, fixnum_value)
-#define LDIMM_8_FLONUM() LDIMM_8_IMPL(TAG_FLONUM, flonum_value)
-#define LDIMM_8_SYMBOL() LDIMM_8_IMPL(TAG_SYMBOL, symbol_hash)
+#define LDIMM_8_FIXNUM() LDIMM_8_IMPL(TAG_FIXNUM, fixnum_value, s8)
+#define LDIMM_8_FLONUM() LDIMM_8_IMPL(TAG_FLONUM, flonum_value, f8)
+#define LDIMM_8_SYMBOL() LDIMM_8_IMPL(TAG_SYMBOL, symbol_hash, u8)
 
 #if ENABLE_VM_ASSERTS
     #define ENSURE_NUMERIC(X) VM_ASSERT(X == TAG_FIXNUM || X == TAG_FLONUM) 
@@ -643,20 +628,26 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
             case OPCODE_BRANCH:
                 VM_TRACE_OP(OPCODE_BRANCH);
                 {
-                    int offset = (int)(*(short *)pc);
-                    pc += offset + 2;
+                    union convert_two_t c2;
+
+                    c2.bytes[0] = *pc++;
+                    c2.bytes[1] = *pc++;
+
+                    pc += c2.s2;
                 }
                 VM_CONTINUE();
             case OPCODE_COND_BRANCH:
                 VM_TRACE_OP(OPCODE_COND_BRANCH);
                 {
+                    union convert_two_t c2;
                     struct object_t *condition;
                     int offset;
 
                     condition = sp + 1;
                     VM_ASSERT(condition->tag_count.tag == TAG_BOOLEAN);
-                    offset = (int)(*(short *)pc);
-                    pc += 2;
+                    c2.bytes[0] = *pc++;
+                    c2.bytes[1] = *pc++;
+                    offset = c2.s2;
 
                     if (condition->tag_count.tag != TAG_BOOLEAN || condition->value.fixnum_value != 0)
                     {
@@ -730,6 +721,24 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
             case OPCODE_TAILCALL:
                 VM_TRACE_OP(OPCODE_TAILCALL);
                 BREAK();
+                {
+                    struct procedure_t *fn;
+                    unsigned char tag;
+
+                    fn = (struct procedure_t *)deref(sp + 1);
+                    ++sp;
+                    tag = fn->tag_count.tag;
+
+                    if (tag == TAG_SPECIAL_FUNCTION)
+                    {
+                        /*
+                         * Tail calls to C functions are not currently 
+                         * supported.
+                         */
+
+                        BREAK();
+                    }
+                }
                 VM_CONTINUE();
             case OPCODE_RETURN:
                 VM_TRACE_OP(OPCODE_RETURN);
