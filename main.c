@@ -77,7 +77,14 @@ main(void)
         "(disassemble 'hello-world)",
         "(define hello-world-2 (lambda (x) `(foo ,bar ,@(list 1 2 3))))",
         "(disassemble 'hello-world-2)",
-        "(define vector-test #(1 2 3))"
+        "(define vector-test #(1 2 3))",
+        "vector-test",
+        "(define let-test (lambda (foo) (let ((x 1)) (+ x foo))))",
+        "(let-test 3)",
+        "(define closure-test (lambda (foo) (lambda () (set! foo (1+ foo)) foo)))",
+        "(define closure-test-fn (closure-test))",
+        "(closure-test-fn)",
+        "(closure-test-fn)",
     };
     size_t i;
 
