@@ -85,26 +85,12 @@ discard_pool(struct memory_pool_t *pool)
     discard_pool_chunk(pool->head);
 }
 
-static int
-get_arg_index(struct object_t *args, uint64_t hash)
+struct stack_slot_t
 {
-    struct object_t *i;
-    int idx;
-
-    idx = 0;
-
-    for (i = args; i != empty_pair; i = CDR(i), ++idx)
-    {
-        struct object_t *arg_symbol;
-        
-        arg_symbol = CAR(i);
-        assert(arg_symbol->tag_count.tag == TAG_SYMBOL);
-        if (arg_symbol->value.symbol_hash == hash)
-            return idx;
-    }
-
-    return UNKNOWN_ARG;
-}
+    struct slist_t link;
+    uint64_t symbol_hash;
+    int index;
+};
 
 struct compiler_context_t
 {
@@ -112,6 +98,7 @@ struct compiler_context_t
     struct object_t *args;
     int num_args;
     struct environment_t *environment;
+    struct stack_slot_t *stack_slots;
 };
 
 static void
@@ -139,6 +126,43 @@ destroy_compiler_context(struct compiler_context_t *context)
     discard_pool(&context->pool);
 }
 
+static int
+get_arg_index(struct object_t *args, uint64_t hash)
+{
+    struct object_t *i;
+    int idx;
+
+    idx = 0;
+
+    for (i = args; i != empty_pair; i = CDR(i), ++idx)
+    {
+        struct object_t *arg_symbol;
+
+        arg_symbol = CAR(i);
+        assert(arg_symbol->tag_count.tag == TAG_SYMBOL);
+        if (arg_symbol->value.symbol_hash == hash)
+            return idx;
+    }
+
+    return UNKNOWN_ARG;
+}
+
+static struct stack_slot_t *
+get_stack_slot(struct stack_slot_t *slots, uint64_t hash)
+{
+    while (slots != NULL)
+    {
+        if (slots->symbol_hash == hash)
+        {
+            return slots;
+        }
+
+        slots = (struct stack_slot_t *)slots->link.next;
+    }
+
+    return NULL;
+}
+
 struct instruction_t
 {
     struct slist_t link;
@@ -160,6 +184,7 @@ struct instruction_t
         uint64_t u8;
         int64_t s8;
         double f8;
+        struct stack_slot_t *slot;
         char string[1];
     } data;
 };
@@ -680,6 +705,20 @@ compile_load_arg(struct compiler_context_t *context, struct instruction_t *next,
 }
 
 static struct instruction_t *
+compile_load_slot(struct compiler_context_t *context, struct instruction_t *next, struct stack_slot_t *slot)
+{
+    struct instruction_t *instruction;
+
+    instruction = allocate_instruction(context);
+    instruction->opcode = OPCODE_LDSLOT_X;
+    instruction->size = 2;
+    instruction->data.slot = slot;
+    instruction->link.next = &next->link;
+
+    return instruction;
+}
+
+static struct instruction_t *
 compile_symbol_load(struct compiler_context_t *context, struct instruction_t *next, struct object_t *symbol)
 {
     struct instruction_t *ldimm_symbol;
@@ -701,6 +740,30 @@ compile_symbol_load(struct compiler_context_t *context, struct instruction_t *ne
     return get_bound_location;
 }
 
+static struct instruction_t *
+compile_lambda(struct compiler_context_t *context, struct instruction_t *next, struct object_t *args)
+{
+    UNUSED(context);
+    UNUSED(next);
+    UNUSED(args);
+
+    BREAK();
+
+    return NULL;
+}
+
+static struct instruction_t *
+compile_let(struct compiler_context_t *context, struct instruction_t *next, struct object_t *args)
+{
+    UNUSED(context);
+    UNUSED(next);
+    UNUSED(args);
+
+    BREAK();
+
+    return NULL;
+}
+
 #define COMPILE_CONS_ACCESSOR(ACCESSOR, OPCODE)                                                                     \
     static struct instruction_t *                                                                                   \
     compile_ ## ACCESSOR(struct compiler_context_t *context, struct instruction_t *next, struct object_t *symbol)   \
@@ -719,20 +782,25 @@ compile_symbol_load(struct compiler_context_t *context, struct instruction_t *ne
 COMPILE_CONS_ACCESSOR(first, OPCODE_LDCAR)
 COMPILE_CONS_ACCESSOR(rest, OPCODE_LDCDR)
 
-#define SYMBOL_IF 0x8325f07b4eb2a24
-#define SYMBOL_ADD 0xaf63bd4c8601b7f4
-#define SYMBOL_SUB 0xaf63bd4c8601b7f2
-#define SYMBOL_MUL 0xaf63bd4c8601b7f5
-#define SYMBOL_DIV 0xaf63bd4c8601b7f0
-#define SYMBOL_EQ 0xaf63bd4c8601b7e2
-#define SYMBOL_LT 0xaf63bd4c8601b7e3
-#define SYMBOL_GT 0xaf63bd4c8601b7e1
-#define SYMBOL_LE 0x8328c07b4eb7684
-#define SYMBOL_GE 0x8328a07b4eb736e
-#define SYMBOL_EQUALP 0xeacd8283b4334dba
-#define SYMBOL_NULLP 0xb4d24b59678288cd
-#define SYMBOL_FIRST 0xc0de9a9b8ec0e479
-#define SYMBOL_REST 0x9ab4817ea75b3deb
+#define SYMBOL_IF       0x8325f07b4eb2a24
+#define SYMBOL_ADD      0xaf63bd4c8601b7f4
+#define SYMBOL_SUB      0xaf63bd4c8601b7f2
+#define SYMBOL_MUL      0xaf63bd4c8601b7f5
+#define SYMBOL_DIV      0xaf63bd4c8601b7f0
+#define SYMBOL_EQ       0xaf63bd4c8601b7e2
+#define SYMBOL_LT       0xaf63bd4c8601b7e3
+#define SYMBOL_GT       0xaf63bd4c8601b7e1
+#define SYMBOL_LE       0x8328c07b4eb7684
+#define SYMBOL_GE       0x8328a07b4eb736e
+#define SYMBOL_EQUALP   0xeacd8283b4334dba
+#define SYMBOL_NULLP    0xb4d24b59678288cd
+#define SYMBOL_FIRST    0xc0de9a9b8ec0e479
+#define SYMBOL_REST     0x9ab4817ea75b3deb
+#define SYMBOL_LAMBDA   0xdb4485ae65d0c568
+#define SYMBOL_SET      0x92eb577ea331d824
+#define SYMBOL_LET      0xd8b7ad186b906050
+#define SYMBOL_LETSTAR  0xd07b707ec653a7da
+#define SYMBOL_LETREC   0x4c663d13ff171fa
 
 static struct instruction_t *
 compile_form(struct compiler_context_t *context, struct instruction_t *next, struct object_t *body)
@@ -740,6 +808,7 @@ compile_form(struct compiler_context_t *context, struct instruction_t *next, str
     struct object_t *symbol_object;
     uint64_t symbol_hash;
     int arg_index;
+    struct stack_slot_t *slot;
 
     symbol_object = body;
 
@@ -785,11 +854,17 @@ compile_form(struct compiler_context_t *context, struct instruction_t *next, str
                 return compile_first(context, next, function_args);
             case SYMBOL_REST:
                 return compile_rest(context, next, function_args);
+            case SYMBOL_LAMBDA:
+                return compile_lambda(context, next, function_args);
+            case SYMBOL_SET:
+                BREAK();
+            case SYMBOL_LET:
+            case SYMBOL_LETSTAR:
+                return compile_let(context, next, function_args);
             default:
                 /*
                  * The function/procedure isn't one that is handled by the
                  * compiler so we need to emit a call to it.
-                 * TODO: determine if this can be a tailcall.
                  */
 evil_print("** %s (0x%" PRIx64 ") **\n", 
         find_symbol_name(context->environment, function_hash),
@@ -802,6 +877,20 @@ evil_print("** %s (0x%" PRIx64 ") **\n",
         return compile_literal(context, next, symbol_object);
 
     symbol_hash = symbol_object->value.symbol_hash;
+
+    /*
+     * We need to check stack slots (ie:scopes created with (let) expressions)
+     * for symbols before we check arguments.
+     * TODO: Stack slots and arguments could probably follow the same code path
+     * without much extra work and it'd cut out a bunch of code. Refactor later!
+     */
+    slot = get_stack_slot(context->stack_slots, symbol_hash);
+
+    if (slot != NULL)
+    {
+        return compile_load_slot(context, next, slot);
+    }
+
     arg_index = get_arg_index(context->args, symbol_hash);
 
     if (arg_index != UNKNOWN_ARG)
@@ -1123,12 +1212,6 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
     procedure = mem;
     assert(procedure->tag_count.tag == TAG_PROCEDURE);
     ptr = procedure->byte_code;
-
-    /* 
-     * It looks like this isn't quite working properly. Some instructions (return?) are
-     * being omitted.
-     * TODO: FIX!
-     */
 
     evil_print("%s:\n", name);
 
@@ -1527,5 +1610,4 @@ lambda(struct environment_t *environment, struct object_t *lambda_body)
 
     return make_ref(procedure);
 }
-
 
