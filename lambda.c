@@ -21,8 +21,11 @@
 #define UNKNOWN_ARG -1
 
 #define DEFAULT_POOL_CHUNK_SIZE 4096
-
 #define allocate_instruction(context) pool_alloc(&context->pool, sizeof(struct instruction_t))
+
+#ifndef MAX
+#define MAX(a,b) ((a)>(b)?(a):(b))
+#endif
 
 struct memory_pool_chunk_t
 {
@@ -89,6 +92,7 @@ struct stack_slot_t
 {
     struct slist_t link;
     uint64_t symbol_hash;
+    struct instruction_t *initializer;
     int index;
 };
 
@@ -99,6 +103,7 @@ struct compiler_context_t
     int num_args;
     struct environment_t *environment;
     struct stack_slot_t *stack_slots;
+    int max_stack_slots;
 };
 
 static void
@@ -184,7 +189,6 @@ struct instruction_t
         uint64_t u8;
         int64_t s8;
         double f8;
-        struct stack_slot_t *slot;
         char string[1];
     } data;
 };
@@ -708,11 +712,15 @@ static struct instruction_t *
 compile_load_slot(struct compiler_context_t *context, struct instruction_t *next, struct stack_slot_t *slot)
 {
     struct instruction_t *instruction;
+    int index;
+
+    index = slot->index;
+    assert(index >= 0 && index < 65536);
 
     instruction = allocate_instruction(context);
     instruction->opcode = OPCODE_LDSLOT_X;
     instruction->size = 2;
-    instruction->data.slot = slot;
+    instruction->data.u2 = (unsigned short)index;
     instruction->link.next = &next->link;
 
     return instruction;
@@ -752,16 +760,132 @@ compile_lambda(struct compiler_context_t *context, struct instruction_t *next, s
     return NULL;
 }
 
+static int
+count_active_stack_slots(struct stack_slot_t *slots)
+{
+    int i;
+
+    for (i = 0; slots != NULL; slots = (struct stack_slot_t *)slots->link.next, ++i)
+        ;
+
+    return i;
+}
+
 static struct instruction_t *
 compile_let(struct compiler_context_t *context, struct instruction_t *next, struct object_t *args)
 {
-    UNUSED(context);
-    UNUSED(next);
-    UNUSED(args);
+    int i;
+    int num_slots;
+    int current_active_stack_slots;
+    struct object_t *binding_list;
+    struct object_t *body;
+    struct stack_slot_t *slot;
 
-    BREAK();
+    /*
+     * This code evaluates the let statements in program order and so is able
+     * to provide the same implementation for both let and let*.
+     */
 
-    return NULL;
+    num_slots = 0;
+    current_active_stack_slots = count_active_stack_slots(context->stack_slots);
+    body = CAR(CDR(args));
+
+    for (binding_list = CAR(args); binding_list != empty_pair; binding_list = CDR(binding_list), ++num_slots)
+    {
+        struct object_t *binding_pair;
+        struct object_t *symbol;
+        struct stack_slot_t *stack_slot;
+        struct instruction_t *initializer;
+        struct instruction_t *initializer_store;
+        int slot_index;
+
+        binding_pair = CAR(binding_list);
+        symbol = CAR(binding_pair);
+
+        assert(symbol->tag_count.tag == TAG_SYMBOL);
+
+        if (CDR(symbol) != empty_pair)
+        {
+            struct object_t *initializer_form;
+
+            /*
+             * If the code provides an initializer this code compiles the
+             * initialization form and pushes the result to the stack. The
+             * resulting stack value is used as the slot for the newly 
+             * created "variable".
+             */
+
+            initializer_form = CAR(CDR(binding_pair));
+            initializer = compile_form(context, next, initializer_form);
+        }
+        else
+        {
+            /*
+             * Same deal as above but we initialize the slot to '() if no
+             * initializer form is specialized.
+             */
+            initializer = allocate_instruction(context);
+            initializer->opcode = OPCODE_LDEMPTY;
+            initializer->link.next = &next->link;
+        }
+
+        slot_index = current_active_stack_slots++;
+        assert(slot_index >= 0 && slot_index < 65536);
+
+        initializer_store = allocate_instruction(context);
+        initializer_store->opcode = OPCODE_STSLOT_X;
+        initializer_store->size = 2;
+        initializer_store->link.next = &initializer->link;
+        initializer_store->data.u2 = (unsigned short)slot_index;
+
+        stack_slot = pool_alloc(&context->pool, sizeof(struct stack_slot_t));
+        stack_slot->symbol_hash = symbol->value.symbol_hash;
+        stack_slot->initializer = initializer;
+        stack_slot->link.next = &context->stack_slots->link;
+        stack_slot->index = slot_index;
+
+        context->stack_slots = stack_slot;
+        next = initializer_store;
+    }
+
+    context->max_stack_slots = MAX(context->max_stack_slots, current_active_stack_slots);
+
+    /*
+     * Compile body of let here.
+     */
+
+    next = compile_form(context, next, body);
+#if 0
+    /* 
+     * Move the resulting expression to the top of the stack, collapsing
+     * this innermost scope. 
+     *
+     * TODO: This should also check how many stack slots are created in this 
+     * scope, although it's probably easiest to do this after.
+     */
+
+    nip = allocate_instruction(context);
+    nip->opcode = OPCODE_NIP_X;
+    nip->size = 2;
+    nip->data.u2 = (unsigned short)num_slots;
+    nip->link.next = &next->link;
+#endif
+    
+    /*
+     * Collapse scopes so that the symbols are no longer visible after control
+     * leaves this let block.
+     */
+
+    slot = context->stack_slots;
+
+    for (i = 0; i < num_slots; ++i)
+    {
+        slot = (struct stack_slot_t *)slot->link.next;
+    }
+
+    context->stack_slots = slot;
+
+    return next;
 }
 
 #define COMPILE_CONS_ACCESSOR(ACCESSOR, OPCODE)                                                                     \
@@ -881,6 +1005,7 @@ evil_print("** %s (0x%" PRIx64 ") **\n",
     /*
      * We need to check stack slots (ie:scopes created with (let) expressions)
      * for symbols before we check arguments.
+     *
      * TODO: Stack slots and arguments could probably follow the same code path
      * without much extra work and it'd cut out a bunch of code. Refactor later!
      */
@@ -960,6 +1085,21 @@ assemble(struct environment_t *environment, struct compiler_context_t *context, 
 
         switch (opcode)
         {
+            case OPCODE_STSLOT_X:
+            case OPCODE_LDSLOT_X:
+                {
+                    union convert_two_t c2;
+                    int index;
+
+                    index = insn->data.u2;
+                    index += 3;
+                    index = -index;
+
+                    c2.s2 = (short)index;
+                    memcpy(&bytes[idx], c2.bytes, 2);
+                    idx += 2;
+                }
+                break;
             case OPCODE_BRANCH:
             case OPCODE_COND_BRANCH:
                 {
@@ -992,6 +1132,7 @@ assemble(struct environment_t *environment, struct compiler_context_t *context, 
             case OPCODE_LDIMM_1_FLONUM:
                 bytes[idx++] = (unsigned char)insn->data.u1;
                 break;
+            case OPCODE_STARG_X:
             case OPCODE_LDARG_X:
                 bytes[idx++] = insn->data.u1;
                 break;
@@ -1238,6 +1379,49 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
                 }
 
                 i += 2;
+                break;
+            case OPCODE_LDSLOT_X:
+                {
+                    union convert_two_t c2;
+                    int index;
+
+                    memcpy(c2.bytes, ptr + i + 1, 2);
+                    index = c2.s2;
+                    index = -index;
+                    index -= 2;
+                    print_hex_bytes(ptr + i, 3);
+
+                    evil_print("LDSLOT %d\n", index);
+                }
+
+                i += 3;
+                break;
+            case OPCODE_STARG_X:
+                {
+                    unsigned char index;
+
+                    index = ptr[i + 1];
+                    print_hex_bytes(ptr + i, 2);
+                    evil_print("STARG %u\n", index);
+                }
+
+                i += 2;
+                break;
+            case OPCODE_STSLOT_X:
+                {
+                    union convert_two_t c2;
+                    int index;
+
+                    memcpy(c2.bytes, ptr + i + 1, 2);
+                    index = c2.s2;
+                    index = -index;
+                    index -= 3;
+                    print_hex_bytes(ptr + i, 3);
+
+                    evil_print("STSLOT %d\n", index);
+                }
+
+                i += 3;
                 break;
             case OPCODE_LDIMM_1_BOOL:
                 {
@@ -1600,6 +1784,10 @@ lambda(struct environment_t *environment, struct object_t *lambda_body)
     }
 
     root = add_return_insn(&context, root);
+    /*
+     * TODO: Add this.
+     * root = initialize_slots(&context, root);
+     */
     collapse_nops(root);
     eliminate_branch_to_return(root);
     root = promote_tailcalls(root);

@@ -32,25 +32,26 @@ DISABLE_WARNING(4996)
 #endif
 
 #if ENABLE_VM_ASSERTS
-#   define VM_ASSERT(x) if (!(x)) { fprintf(stderr, "%s:%d: Assertion failed: %s", __FILE__, __LINE__, #x); BREAK(); } else (void)0
+#   define VM_ASSERT_NOTRACE(x) if (!(x)) { fprintf(stderr, "%s:%d: Assertion failed: %s", __FILE__, __LINE__, #x); BREAK(); } else (void)0
+#   define VM_ASSERT(x) if (!(x)) { vm_trace_stack(environment, sp, program_area); fprintf(stderr, "%s:%d: Assertion failed: %s", __FILE__, __LINE__, #x); BREAK(); } else (void)0
 #else
 #   define VM_ASSERT(x)
 #endif
 
-#define ENABLE_VM_TRACING 0
+#define ENABLE_VM_TRACING 1
 
 #if ENABLE_VM_TRACING
 #   define VM_TRACE_OP(x) do { fprintf(stderr, "[vm] %32s program_area begin: %p sp begin: %p", #x, program_area, sp); } while (0)
 #   define VM_TRACE(x) do { fprintf(stderr, "[vm] %s", x); } while (0)
-#   define VM_CONTINUE(); fprintf(stderr, " sp end: %p\n", sp); continue
+#   define VM_CONTINUE() fprintf(stderr, " sp end: %p\n", sp); vm_trace_stack(environment, sp, program_area); continue
 #else
 #   define VM_TRACE_OP(x)
 #   define VM_TRACE(x)
-#   define VM_CONTINUE();   continue
+#   define VM_CONTINUE() continue
 #endif
 
 #define STACK_PUSH(stack, x) do { *(stack--) = x; } while (0)
-#define STACK_POP(stack) *(stack++) 
+#define STACK_POP(stack) *(++stack) 
 #ifndef NDEBUG
 #   define VALIDATE_STACK(env) do { \
         assert(env->stack_ptr >= env->stack_bottom && env->stack_ptr < env->stack_top); } while(0)
@@ -286,7 +287,7 @@ vm_reference_type(struct object_t *ref)
     referenced_object = ref->value.ref;
 
 #if ENABLE_VM_ASSERTS
-    VM_ASSERT(ref_type == TAG_REFERENCE || ref_type == TAG_INNER_REFERENCE);
+    VM_ASSERT_NOTRACE(ref_type == TAG_REFERENCE || ref_type == TAG_INNER_REFERENCE);
 #endif
 
     return referenced_object->tag_count.tag;
@@ -295,7 +296,7 @@ vm_reference_type(struct object_t *ref)
 static inline void
 vm_demote_numeric(struct object_t *object)
 {
-    VM_ASSERT(object->tag_count.tag == TAG_FLONUM);
+    VM_ASSERT_NOTRACE(object->tag_count.tag == TAG_FLONUM);
 
     object->tag_count.tag = TAG_FLONUM;
     object->value.flonum_value = (double)(object->value.fixnum_value);
@@ -319,7 +320,7 @@ vm_compare_equal_reference_type(const struct object_t *a, const struct object_t 
     const unsigned char a_tag = a->tag_count.tag;
     const unsigned char b_tag = b->tag_count.tag;
 
-    VM_ASSERT(a_tag != TAG_REFERENCE && b_tag != TAG_REFERENCE);
+    VM_ASSERT_NOTRACE(a_tag != TAG_REFERENCE && b_tag != TAG_REFERENCE);
 
     /*
      * If the references point to the same object, they are equal.
@@ -417,6 +418,72 @@ vm_compare_equal(const struct object_t *a, const struct object_t *b)
     return 0;
 }
 
+static void
+vm_trace_stack(struct environment_t *environment, struct object_t *sp, struct object_t *program_area)
+{
+    struct object_t *stack_top;
+
+    fprintf(stderr, "\n");
+
+    for (stack_top = environment->stack_top - 1; stack_top >= sp; --stack_top)
+    {
+        if (stack_top == sp)
+        {
+            fprintf(stderr, "[vm] sp->\n");
+            break;
+        }
+        else if (stack_top == program_area)
+        {
+            fprintf(stderr, "[vm] pa-> ");
+        }
+        else
+        {
+            fprintf(stderr, "[vm]      ");
+        }
+
+        fprintf(stderr, "0x%p ", stack_top);
+
+        switch (stack_top->tag_count.tag)
+        {
+            case TAG_BOOLEAN:
+                fprintf(stderr, "BOOLEAN          %s", stack_top->value.fixnum_value ? "#t" : "#f");
+                break;
+            case TAG_SYMBOL:
+                fprintf(stderr, "SYMBOL           %" PRIx64 " %s", 
+                        stack_top->value.symbol_hash, 
+                        find_symbol_name(environment, stack_top->value.symbol_hash));
+                break;
+            case TAG_CHAR:
+                fprintf(stderr, "CHAR             %c", (char)stack_top->value.fixnum_value);
+                break;
+            case TAG_FIXNUM:
+                fprintf(stderr, "FIXNUM           %" PRId64, stack_top->value.fixnum_value);
+                break;
+            case TAG_FLONUM:
+                fprintf(stderr, "FLONUM           %lf", stack_top->value.flonum_value);
+                break;
+            case TAG_REFERENCE:
+                fprintf(stderr, "REFERENCE        0x%p", stack_top->value.ref);
+                break;
+            case TAG_INNER_REFERENCE:
+                fprintf(stderr, "INNER REFERENCE  0x%p,%d", stack_top->value.ref, stack_top->tag_count.count);
+                break;
+            case TAG_SPECIAL_FUNCTION:
+                fprintf(stderr, "SPECIAL FUNCTION 0x%p", stack_top->value.special_function_value);
+                break;
+                break;
+            case TAG_PROCEDURE:
+            case TAG_PAIR:
+            case TAG_VECTOR:
+            case TAG_STRING:
+                fprintf(stderr, "ERROR: REFERENCE TYPE ON STACK");
+                break;
+        }
+
+        fprintf(stderr, "\n");
+    }
+}
+
 struct object_t
 vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *args)
 {
@@ -456,7 +523,9 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
 
     sp = vm_push_ref(sp, NULL);                 /* program area chain */  
     sp = vm_push_return_address(sp, NULL, 0);   /* return address */
-    
+   
+#error this code needs to create the local area for the stack slots now on invocation/function call.
+
     for (;;)
     {
         unsigned byte = *pc++;
@@ -466,6 +535,32 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
             case OPCODE_INVALID:
                 VM_TRACE_OP(OPCODE_INVALID);
                 BREAK();
+                VM_CONTINUE();
+            case OPCODE_LDSLOT_X:
+                VM_TRACE_OP(OPCODE_LDSLOT_X);
+                {
+                    union convert_two_t c2;
+                    short offset;
+
+                    c2.bytes[0] = *pc++;
+                    c2.bytes[1] = *pc++;
+
+                    offset = c2.s2;
+                    STACK_PUSH(sp, program_area[offset]);
+                }
+                VM_CONTINUE();
+            case OPCODE_STSLOT_X:
+                VM_TRACE_OP(OPCODE_STSLOT_X);
+                {
+                    union convert_two_t c2;
+                    short offset;
+
+                    c2.bytes[0] = *pc++;
+                    c2.bytes[1] = *pc++;
+
+                    offset = c2.s2;
+                    program_area[offset] = STACK_POP(sp);
+                }
                 VM_CONTINUE();
             case OPCODE_LDARG_X:
                 VM_TRACE_OP(OPCODE_LDARG_X);
@@ -832,18 +927,6 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
                 VM_CONTINUE();
             case OPCODE_NOT:
                 VM_TRACE_OP(OPCODE_NOT);
-                BREAK();
-                VM_CONTINUE();
-            case OPCODE_DUP_X:
-                VM_TRACE_OP(OPCODE_DUP_X);
-                BREAK();
-                VM_CONTINUE();
-            case OPCODE_POP_X:
-                VM_TRACE_OP(OPCODE_POP_X);
-                BREAK();
-                VM_CONTINUE();
-            case OPCODE_SWAP_X:
-                VM_TRACE_OP(OPCODE_SWAP_X);
                 BREAK();
                 VM_CONTINUE();
             case OPCODE_NOP:

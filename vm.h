@@ -19,9 +19,17 @@ enum opcode_t
 
     /*
      * OPCODE_LDARG_X [arg #] | -> [value]
-     * Copy argument X (0 .. n-1) to the top of the stack
+     * Copy argument X (0 .. n-1) to the top of the stack.
+     * TODO: Fold LDARG/LDSLOT together.
      */
     OPCODE_LDARG_X,
+
+    /*
+     * OPCODE_LDSLOT_X [bytes 0..1] | -> [value]
+     * Load a value from slot X, where 0 <= X < 65536.
+     * TODO: Fold LDARG/LDSLOT together.
+     */
+    OPCODE_LDSLOT_X,
 
     /*
      * OPCODE_LDIMM_1_type [byte 0] | -> [value]
@@ -87,6 +95,21 @@ enum opcode_t
      * OPCODE_MAKE_REF | [reference] [index] -> [slot reference]
      */
     OPCODE_MAKE_REF,
+
+    /*
+     * OPCODE_STARG_X [arg #] | [reference|value] ->
+     * Store the value at the top of the stack at the specified arg slot.
+     * TODO: Fold STARG/STSLOT together.
+     */
+    OPCODE_STARG_X,
+
+    /*
+     * OPCODE_STSLOT_X [bytes 0..1] | [reference|value] ->
+     * Store the value at the top of the stack at the specified local variable
+     * slot.
+     * TODO: Fold STARG/STSLOT together.
+     */
+    OPCODE_STSLOT_X,
 
     /*
      * OPCODE_SET | [reference|value] [slot reference] -> 
@@ -204,24 +227,6 @@ enum opcode_t
     OPCODE_OR,
     OPCODE_XOR,
     OPCODE_NOT,
-
-    /*
-     * OPCODE_DUP_X | [a] ... (x - 1) ... -> [a] ... (x - 1) ... [a]
-     * Duplicates the stack element X items deep to the top of the stack.
-     */
-    OPCODE_DUP_X,
-
-    /*
-     * OPCODE_POP_X | [a] ... (x - 1) ... ->
-     * Pops X items from the top of the stack.
-     */
-    OPCODE_POP_X,
-
-    /*
-     * OPCODE_SWAP_X | [a] ... (x - 1) ... [b] -> [b] ... (x - 1) ... [a]
-     * Swaps the top of the stack with the value X items deep.
-     */
-    OPCODE_SWAP_X,
 
     /*
      * This opcode makes it easier to implement conditional branching in the
