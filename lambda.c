@@ -1071,6 +1071,7 @@ assemble(struct environment_t *environment, struct compiler_context_t *context, 
     procedure = mem;
     bytes = procedure->byte_code;
     procedure->num_args = context->num_args;
+    procedure->num_locals = context->max_stack_slots;
 
     for (i = insns; i != NULL; i = i->next)
     {

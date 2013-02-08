@@ -241,6 +241,7 @@ struct procedure_t
     struct tag_count_t tag_count;
     struct environment_t *environment;
     int num_args;
+    int num_locals;
     unsigned char byte_code[1];
 };
 

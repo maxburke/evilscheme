@@ -38,7 +38,7 @@ DISABLE_WARNING(4996)
 #   define VM_ASSERT(x)
 #endif
 
-#define ENABLE_VM_TRACING 1
+#define ENABLE_VM_TRACING 0
 
 #if ENABLE_VM_TRACING
 #   define VM_TRACE_OP(x) do { fprintf(stderr, "[vm] %32s program_area begin: %p sp begin: %p", #x, program_area, sp); } while (0)
@@ -523,9 +523,8 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
 
     sp = vm_push_ref(sp, NULL);                 /* program area chain */  
     sp = vm_push_return_address(sp, NULL, 0);   /* return address */
+    sp -= procedure->num_locals;
    
-#error this code needs to create the local area for the stack slots now on invocation/function call.
-
     for (;;)
     {
         unsigned byte = *pc++;
@@ -790,10 +789,11 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
                         program_area = sp + 1;
 
                         /*
-                         * Save the return address.
+                         * Save the return address and create space for the local slots.
                          */
                         sp = vm_push_ref(sp, old_program_area);
                         sp = vm_push_return_address(sp, fn, (unsigned short)return_offset);
+                        sp -= fn->num_locals;
 
                         /*
                          * call the function!
@@ -858,7 +858,17 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
                     pc = fn->byte_code;
                     pc_base = pc;
                     procedure = fn;
+
+                    /*
+                     * Adjust the stack pointer down below the program area and
+                     * below where the locals go.
+                     */
                     sp = arg_slot - 3;
+                    sp -= procedure->num_locals;
+
+                    /*
+                     * Set the new program area.
+                     */
                     program_area = arg_slot;
                 }
                 VM_CONTINUE();
