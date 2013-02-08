@@ -87,12 +87,30 @@ extern struct object_t *empty_pair;
 const char *
 type_name(enum tag_t tag);
 
+/*
+ * These macros are used to make it easy to index into vectors and access the
+ * innards of pairs. Pairs are implemented as vectors-of-length-two for the
+ * sake of simplicity, so (car x) is equivalent to (vector-ref x 0) basically.
+ * These types are tagged different though, for now, for aiding debugging in
+ * the parser.
+ */
 #define VECTOR_BASE(x) ((struct object_t *)(&(x)->value))
 #define RAW_CAR(x) (VECTOR_BASE(x))
 #define RAW_CDR(x) (VECTOR_BASE(x) + 1)
 #define CAR(x) deref((VECTOR_BASE(x)))
 #define CDR(x) deref((VECTOR_BASE(x) + 1))
 
+/*
+ * make_ref creates a reference to the specified object. The VM assumes that
+ * only value types (boolean/char/fixnum/flonum/references) exist on the
+ * evaluation stack, and that compound types (pairs, vectors) only hold value
+ * types. Basically this means that all reference types like pairs, vectors, or
+ * strings are handled through references.
+ *
+ * This is confusing but it makes several parts of the compiler easier to
+ * understand and implement, specifically the code that handles pairs as well
+ * as the VM stack.
+ */
 static inline struct object_t
 make_ref(struct object_t *ptr)
 {
@@ -114,18 +132,32 @@ make_ref(struct object_t *ptr)
     return *ptr;
 }
 
+/*
+ * This helper method creates a reference to the empty pair object. The
+ * compiler shouldn't ever barf on a NULL value as the empty pair is used
+ * instead to indicate the end of a list or indeterminate values (ie:
+ * functions with no defined return type.)
+ */
 static inline struct object_t
 make_empty_ref(void)
 {
     return make_ref(empty_pair);
 }
 
+/*
+ * Dereference an object if necessary.
+ * TODO: What should this do for inner reference types?
+ */
 static inline struct object_t *
 deref(struct object_t *ptr)
 {
     return (ptr == NULL) ? NULL : ((ptr->tag_count.tag == TAG_REFERENCE) ? ptr->value.ref : ptr);
 }
 
+/*
+ * Like deref but takes a pointer-to-const-object and returns a 
+ * pointer-to-const-object.
+ */
 static inline const struct object_t *
 const_deref(const struct object_t *ptr)
 {
