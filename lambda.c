@@ -1785,10 +1785,6 @@ lambda(struct environment_t *environment, struct object_t *lambda_body)
     }
 
     root = add_return_insn(&context, root);
-    /*
-     * TODO: Add this.
-     * root = initialize_slots(&context, root);
-     */
     collapse_nops(root);
     eliminate_branch_to_return(root);
     root = promote_tailcalls(root);
