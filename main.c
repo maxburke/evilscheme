@@ -79,7 +79,7 @@ main(void)
         "(disassemble 'hello-world-2)",
         "(define vector-test #(1 2 3))",
         "vector-test",
-        "(define let-test (lambda (foo) (let ((x 1) (y 2)) (+ x foo y))))",
+        "(define let-test (lambda (foo) (let ((x 1) (y (+ 1 x))) (+ x foo y))))",
         "(disassemble 'let-test)",
         "(let-test 3)",
         "(define closure-test (lambda (foo) (lambda () (set! foo (1+ foo)) foo)))",
