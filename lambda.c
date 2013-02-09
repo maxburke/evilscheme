@@ -888,6 +888,40 @@ compile_let(struct compiler_context_t *context, struct instruction_t *next, stru
     return next;
 }
 
+static struct instruction_t *
+compile_set(struct compiler_context_t *context, struct instruction_t *next, struct object_t *args)
+{
+    struct object_t *place;
+    struct object_t *value;
+
+    place = CAR(body);
+    value = CAR(CDR(body));
+
+    if (place->tag_count.tag == TAG_PAIR)
+    {
+        /*
+         * Evaluate the place.
+         */
+        BREAK();
+    }
+    else if (place->tag_count.tag == TAG_SYMBOL)
+    {
+        /*
+         * Fetch stack slot/arg/other binding.
+         */
+    }
+    else
+    {
+        /*
+         * The place must either be an expression that evaluates to an
+         * inner reference, or it must be a variable. If we're here, 
+         * something has gone terribly wrong.
+         */
+        BREAK();
+    }
+
+}
+
 #define COMPILE_CONS_ACCESSOR(ACCESSOR, OPCODE)                                                                     \
     static struct instruction_t *                                                                                   \
     compile_ ## ACCESSOR(struct compiler_context_t *context, struct instruction_t *next, struct object_t *symbol)   \
@@ -981,7 +1015,7 @@ compile_form(struct compiler_context_t *context, struct instruction_t *next, str
             case SYMBOL_LAMBDA:
                 return compile_lambda(context, next, function_args);
             case SYMBOL_SET:
-                BREAK();
+                return compile_set(context, next, function_args);
             case SYMBOL_LET:
             case SYMBOL_LETSTAR:
                 return compile_let(context, next, function_args);
