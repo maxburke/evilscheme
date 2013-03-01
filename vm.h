@@ -18,16 +18,8 @@ enum opcode_t
     OPCODE_INVALID,
 
     /*
-     * OPCODE_LDARG_X [arg #] | -> [value]
-     * Copy argument X (0 .. n-1) to the top of the stack.
-     * TODO: Fold LDARG/LDSLOT together.
-     */
-    OPCODE_LDARG_X,
-
-    /*
      * OPCODE_LDSLOT_X [bytes 0..1] | -> [value]
-     * Load a value from slot X, where 0 <= X < 65536.
-     * TODO: Fold LDARG/LDSLOT together.
+     * Load a value from slot X, where x E [-32768, 32767].
      */
     OPCODE_LDSLOT_X,
 
@@ -97,17 +89,9 @@ enum opcode_t
     OPCODE_MAKE_REF,
 
     /*
-     * OPCODE_STARG_X [arg #] | [reference|value] ->
-     * Store the value at the top of the stack at the specified arg slot.
-     * TODO: Fold STARG/STSLOT together.
-     */
-    OPCODE_STARG_X,
-
-    /*
      * OPCODE_STSLOT_X [bytes 0..1] | [reference|value] ->
      * Store the value at the top of the stack at the specified local variable
      * slot.
-     * TODO: Fold STARG/STSLOT together.
      */
     OPCODE_STSLOT_X,
 
@@ -185,7 +169,7 @@ enum opcode_t
      * For example, in this case: (define foo (lambda (x) (bar x)))
      *
      * This could be compiled to the following bytecode:
-     *    LDARG 0, LDIMM8_SYM <bar>, GET_BOUND_LOCATION, TAILCALL
+     *    LDSLOT 0, LDIMM8_SYM <bar>, GET_BOUND_LOCATION, TAILCALL
      *
      * Before the call to bar, the stack would look like this:
      *    x | [foo's return] | [program area chain] | [stack chain] | x | <bar>

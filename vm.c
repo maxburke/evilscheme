@@ -38,7 +38,7 @@ DISABLE_WARNING(4996)
 #   define VM_ASSERT(x)
 #endif
 
-#define ENABLE_VM_TRACING 0
+#define ENABLE_VM_TRACING 1
 
 #if ENABLE_VM_TRACING
 #   define VM_TRACE_OP(x) do { fprintf(stderr, "[vm] %32s program_area begin: %p sp begin: %p", #x, program_area, sp); } while (0)
@@ -570,13 +570,6 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
 
                     offset = c2.s2;
                     program_area[offset] = STACK_POP(sp);
-                }
-                VM_CONTINUE();
-            case OPCODE_LDARG_X:
-                VM_TRACE_OP(OPCODE_LDARG_X);
-                {
-                    unsigned char arg_index = *pc++;
-                    STACK_PUSH(sp, program_area[arg_index]);
                 }
                 VM_CONTINUE();
             case OPCODE_LDIMM_1_BOOL:

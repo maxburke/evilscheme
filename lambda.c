@@ -693,16 +693,12 @@ compile_load_arg(struct compiler_context_t *context, struct instruction_t *next,
 {
     struct instruction_t *instruction;
 
-    /*
-     * TODO: If we need to support more than 256 arguments the LDARG_X
-     * instruction will need to be augmented.
-     */
-    assert(arg_index < 256 && arg_index >= 0);
-    
+    assert(arg_index >= -32768 && arg_index < 32767);
+
     instruction = allocate_instruction(context);
-    instruction->opcode = OPCODE_LDARG_X;
-    instruction->size = 1;
-    instruction->data.u1 = (unsigned char)arg_index;
+    instruction->opcode = OPCODE_LDSLOT_X;
+    instruction->size = 2;
+    instruction->data.s2 = (short)arg_index;
     instruction->link.next = &next->link;
 
     return instruction;
@@ -720,7 +716,7 @@ compile_load_slot(struct compiler_context_t *context, struct instruction_t *next
     instruction = allocate_instruction(context);
     instruction->opcode = OPCODE_LDSLOT_X;
     instruction->size = 2;
-    instruction->data.u2 = (unsigned short)index;
+    instruction->data.s2 = (short)-(index + 3);
     instruction->link.next = &next->link;
 
     return instruction;
@@ -836,7 +832,7 @@ compile_let(struct compiler_context_t *context, struct instruction_t *next, stru
         initializer_store->opcode = OPCODE_STSLOT_X;
         initializer_store->size = 2;
         initializer_store->link.next = &initializer->link;
-        initializer_store->data.u2 = (unsigned short)slot_index;
+        initializer_store->data.s2 = -((short)slot_index + 3);
 
         stack_slot = pool_alloc(&context->pool, sizeof(struct stack_slot_t));
         stack_slot->symbol_hash = symbol->value.symbol_hash;
@@ -891,6 +887,7 @@ compile_let(struct compiler_context_t *context, struct instruction_t *next, stru
 static struct instruction_t *
 compile_set(struct compiler_context_t *context, struct instruction_t *next, struct object_t *args)
 {
+#if 0
     struct object_t *place;
     struct object_t *value;
 
@@ -919,7 +916,12 @@ compile_set(struct compiler_context_t *context, struct instruction_t *next, stru
          */
         BREAK();
     }
+#endif
+    UNUSED(context);
+    UNUSED(next);
+    UNUSED(args);
 
+    return NULL;
 }
 
 #define COMPILE_CONS_ACCESSOR(ACCESSOR, OPCODE)                                                                     \
@@ -1124,13 +1126,8 @@ assemble(struct environment_t *environment, struct compiler_context_t *context, 
             case OPCODE_LDSLOT_X:
                 {
                     union convert_two_t c2;
-                    int index;
 
-                    index = insn->data.u2;
-                    index += 3;
-                    index = -index;
-
-                    c2.s2 = (short)index;
+                    c2.s2 = insn->data.s2;
                     memcpy(&bytes[idx], c2.bytes, 2);
                     idx += 2;
                 }
@@ -1166,10 +1163,6 @@ assemble(struct environment_t *environment, struct compiler_context_t *context, 
                 break;
             case OPCODE_LDIMM_1_FLONUM:
                 bytes[idx++] = (unsigned char)insn->data.u1;
-                break;
-            case OPCODE_STARG_X:
-            case OPCODE_LDARG_X:
-                bytes[idx++] = insn->data.u1;
                 break;
             case OPCODE_LDIMM_4_FIXNUM:
                 {
@@ -1404,17 +1397,6 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
                 evil_print("INVALID\n");
                 ++i;
                 break;
-            case OPCODE_LDARG_X:
-                {
-                    unsigned char index;
-
-                    index = ptr[i + 1];
-                    print_hex_bytes(ptr + i, 2);
-                    evil_print("LDARG %u\n", index);
-                }
-
-                i += 2;
-                break;
             case OPCODE_LDSLOT_X:
                 {
                     union convert_two_t c2;
@@ -1422,25 +1404,12 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
 
                     memcpy(c2.bytes, ptr + i + 1, 2);
                     index = c2.s2;
-                    index = -index;
-                    index -= 2;
                     print_hex_bytes(ptr + i, 3);
 
                     evil_print("LDSLOT %d\n", index);
                 }
 
                 i += 3;
-                break;
-            case OPCODE_STARG_X:
-                {
-                    unsigned char index;
-
-                    index = ptr[i + 1];
-                    print_hex_bytes(ptr + i, 2);
-                    evil_print("STARG %u\n", index);
-                }
-
-                i += 2;
                 break;
             case OPCODE_STSLOT_X:
                 {
@@ -1449,8 +1418,6 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
 
                     memcpy(c2.bytes, ptr + i + 1, 2);
                     index = c2.s2;
-                    index = -index;
-                    index -= 3;
                     print_hex_bytes(ptr + i, 3);
 
                     evil_print("STSLOT %d\n", index);
