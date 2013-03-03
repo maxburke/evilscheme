@@ -93,18 +93,49 @@ struct stack_slot_t
     struct slist_t link;
     uint64_t symbol_hash;
     struct instruction_t *initializer;
-    int index;
+    short index;
 };
 
 struct compiler_context_t
 {
     struct memory_pool_t pool;
-    struct object_t *args;
     int num_args;
     struct environment_t *environment;
     struct stack_slot_t *stack_slots;
     int max_stack_slots;
 };
+
+static void
+create_slots_for_args(
+        struct compiler_context_t *context,
+        struct object_t *args,
+        int slot_index)
+{
+    /*
+     * This function creates the stack slot objects for all the function's
+     * arguments. It does so by recursing down the list of arguments to the
+     * end and then pushing them on from the end back to the beginning.
+     */
+
+    struct stack_slot_t *stack_slot;
+    struct object_t *arg_symbol;
+
+    if (args == empty_pair)
+        return;
+
+    create_slots_for_args(context, CDR(args), slot_index + 1);
+
+    arg_symbol = CAR(args);
+    assert(arg_symbol->tag_count.tag == TAG_SYMBOL);
+
+    stack_slot = pool_alloc(&context->pool, sizeof(struct stack_slot_t));
+    stack_slot->symbol_hash = arg_symbol->value.symbol_hash;
+    stack_slot->index = (short)slot_index;
+    stack_slot->link.next = &context->stack_slots->link;
+    stack_slot->initializer = NULL;
+
+    context->stack_slots = stack_slot;
+}
 
 static void
 initialize_compiler_context(
@@ -120,7 +151,8 @@ initialize_compiler_context(
         ;
 
     memset(context, 0, sizeof(struct compiler_context_t));
-    context->args = args;
+    create_slots_for_args(context, args, 0);
+
     context->environment = environment;
     context->num_args = num_args;
 }
@@ -129,27 +161,6 @@ static void
 destroy_compiler_context(struct compiler_context_t *context)
 {
     discard_pool(&context->pool);
-}
-
-static int
-get_arg_index(struct object_t *args, uint64_t hash)
-{
-    struct object_t *i;
-    int idx;
-
-    idx = 0;
-
-    for (i = args; i != empty_pair; i = CDR(i), ++idx)
-    {
-        struct object_t *arg_symbol;
-
-        arg_symbol = CAR(i);
-        assert(arg_symbol->tag_count.tag == TAG_SYMBOL);
-        if (arg_symbol->value.symbol_hash == hash)
-            return idx;
-    }
-
-    return UNKNOWN_ARG;
 }
 
 static struct stack_slot_t *
@@ -197,7 +208,10 @@ static struct instruction_t *
 compile_form(struct compiler_context_t *context, struct instruction_t *next, struct object_t *body);
 
 static struct instruction_t *
-compile_symbol_load(struct compiler_context_t *context, struct instruction_t *next, struct object_t *symbol);
+compile_get_bound_location(struct compiler_context_t *context, struct instruction_t *next, struct object_t *symbol);
+
+static struct instruction_t *
+compile_load(struct compiler_context_t *context, struct instruction_t *next);
 
 static struct instruction_t *
 find_before(struct instruction_t *start, struct instruction_t *target)
@@ -544,6 +558,7 @@ compile_call(struct compiler_context_t *context, struct instruction_t *next, str
 {
     struct instruction_t *evaluated_args;
     struct instruction_t *function_symbol;
+    struct instruction_t *bound_location;
     struct instruction_t *call;
 
     /*
@@ -558,7 +573,8 @@ compile_call(struct compiler_context_t *context, struct instruction_t *next, str
      */
 
     evaluated_args = compile_arg_eval(context, next, args);
-    function_symbol = compile_symbol_load(context, evaluated_args, function);
+    bound_location = compile_get_bound_location(context, evaluated_args, function);
+    function_symbol = compile_load(context, bound_location);
 
     /*
      * All function calls are emitted as normal calls here. Later we run a pass
@@ -689,59 +705,75 @@ compile_literal(struct compiler_context_t *context, struct instruction_t *next, 
 }
 
 static struct instruction_t *
-compile_load_arg(struct compiler_context_t *context, struct instruction_t *next, int arg_index)
-{
-    struct instruction_t *instruction;
-
-    assert(arg_index >= -32768 && arg_index < 32767);
-
-    instruction = allocate_instruction(context);
-    instruction->opcode = OPCODE_LDSLOT_X;
-    instruction->size = 2;
-    instruction->data.s2 = (short)arg_index;
-    instruction->link.next = &next->link;
-
-    return instruction;
-}
-
-static struct instruction_t *
 compile_load_slot(struct compiler_context_t *context, struct instruction_t *next, struct stack_slot_t *slot)
 {
     struct instruction_t *instruction;
-    int index;
-
-    index = slot->index;
-    assert(index >= 0 && index < 65536);
 
     instruction = allocate_instruction(context);
     instruction->opcode = OPCODE_LDSLOT_X;
     instruction->size = 2;
-    instruction->data.s2 = (short)-(index + 3);
+    instruction->data.s2 = slot->index;
     instruction->link.next = &next->link;
 
     return instruction;
 }
 
 static struct instruction_t *
-compile_symbol_load(struct compiler_context_t *context, struct instruction_t *next, struct object_t *symbol)
+compile_get_bound_location(struct compiler_context_t *context, struct instruction_t *next, struct object_t *symbol)
 {
-    struct instruction_t *ldimm_symbol;
     struct instruction_t *get_bound_location;
 
     assert(symbol->tag_count.tag == TAG_SYMBOL);
 
-    ldimm_symbol = allocate_instruction(context);
-    ldimm_symbol->opcode = OPCODE_LDIMM_8_SYMBOL;
-    ldimm_symbol->size = 8;
-    ldimm_symbol->data.u8 = symbol->value.symbol_hash;
-    ldimm_symbol->link.next = &next->link;
-
     get_bound_location = allocate_instruction(context); 
     get_bound_location->opcode = OPCODE_GET_BOUND_LOCATION;
-    get_bound_location->size = 0;
-    get_bound_location->link.next = &ldimm_symbol->link;
+    get_bound_location->size = 8;
+    get_bound_location->data.u8 = symbol->value.symbol_hash;
+    get_bound_location->link.next = &next->link;
 
     return get_bound_location;
+}
+
+static struct instruction_t *
+compile_load(struct compiler_context_t *context, struct instruction_t *next)
+{
+    struct instruction_t *load;
+
+    load = allocate_instruction(context);
+    load->opcode = OPCODE_LOAD;
+    load->size = 0;
+    load->link.next = &next->link;
+
+    return load;
+}
+
+static struct instruction_t *
+compile_store(struct compiler_context_t *context, struct instruction_t *next)
+{
+    struct instruction_t *store;
+
+    store = allocate_instruction(context);
+    store->opcode = OPCODE_STORE;
+    store->size = 0;
+    store->link.next = &next->link;
+
+    return store;
+}
+
+static struct instruction_t *
+compile_store_slot(struct compiler_context_t *context, struct instruction_t *next, int slot_index)
+{
+    struct instruction_t *store;
+
+    assert(slot_index >= -32768 && slot_index < 32768);
+
+    store = allocate_instruction(context);
+    store->opcode = OPCODE_STSLOT_X;
+    store->size = 2;
+    store->link.next = &next->link;
+    store->data.s2 = (short)slot_index;
+
+    return store;
 }
 
 static struct instruction_t *
@@ -761,7 +793,7 @@ count_active_stack_slots(struct stack_slot_t *slots)
 {
     int i;
 
-    for (i = 0; slots != NULL; slots = (struct stack_slot_t *)slots->link.next, ++i)
+    for (i = 0; slots != NULL && slots->index < -2; slots = (struct stack_slot_t *)slots->link.next, ++i)
         ;
 
     return i;
@@ -828,17 +860,21 @@ compile_let(struct compiler_context_t *context, struct instruction_t *next, stru
         slot_index = current_active_stack_slots++;
         assert(slot_index >= 0 && slot_index < 65536);
 
-        initializer_store = allocate_instruction(context);
-        initializer_store->opcode = OPCODE_STSLOT_X;
-        initializer_store->size = 2;
-        initializer_store->link.next = &initializer->link;
-        initializer_store->data.s2 = -((short)slot_index + 3);
+        /*
+         * The stack is arranged, from high address to low:
+         * [arg 1][arg 0][return][chain][first slot]
+         *    1      0       -1     -2       -3
+         * This bit of strange math below calculates the stack slot:
+         */
+        slot_index = -((short)slot_index + 3);
+
+        initializer_store = compile_store_slot(context, initializer, slot_index);
 
         stack_slot = pool_alloc(&context->pool, sizeof(struct stack_slot_t));
         stack_slot->symbol_hash = symbol->value.symbol_hash;
         stack_slot->initializer = initializer;
         stack_slot->link.next = &context->stack_slots->link;
-        stack_slot->index = slot_index;
+        stack_slot->index = (short)slot_index;
 
         context->stack_slots = stack_slot;
         next = initializer_store;
@@ -849,23 +885,7 @@ compile_let(struct compiler_context_t *context, struct instruction_t *next, stru
     /*
      * Compile body of let here.
      */
-
     next = compile_form(context, next, body);
-#if 0
-    /* 
-     * Move the resulting expression to the top of the stack, collapsing
-     * this innermost scope. 
-     *
-     * TODO: This should also check how many stack slots are created in this 
-     * scope, although it's probably easiest to do this after.
-     */
-
-    nip = allocate_instruction(context);
-    nip->opcode = OPCODE_NIP_X;
-    nip->size = 2;
-    nip->data.u2 = (unsigned short)num_slots;
-    nip->link.next = &next->link;
-#endif
     
     /*
      * Collapse scopes so that the symbols are no longer visible after control
@@ -887,60 +907,103 @@ compile_let(struct compiler_context_t *context, struct instruction_t *next, stru
 static struct instruction_t *
 compile_set(struct compiler_context_t *context, struct instruction_t *next, struct object_t *args)
 {
-#if 0
-    struct object_t *place;
-    struct object_t *value;
+    struct object_t *place_form;
+    struct object_t *value_form;
+    struct instruction_t *value;
 
-    place = CAR(body);
-    value = CAR(CDR(body));
-
-    if (place->tag_count.tag == TAG_PAIR)
-    {
-        /*
-         * Evaluate the place.
-         */
-        BREAK();
-    }
-    else if (place->tag_count.tag == TAG_SYMBOL)
-    {
-        /*
-         * Fetch stack slot/arg/other binding.
-         */
-    }
-    else
-    {
-        /*
-         * The place must either be an expression that evaluates to an
-         * inner reference, or it must be a variable. If we're here, 
-         * something has gone terribly wrong.
-         */
-        BREAK();
-    }
-#endif
-    UNUSED(context);
     UNUSED(next);
-    UNUSED(args);
+    UNUSED(context);
+
+    place_form = CAR(args);
+    value_form = CAR(CDR(args));
+
+    value = compile_form(context, next, value_form);
+
+    if (place_form->tag_count.tag == TAG_PAIR)
+    {
+        struct instruction_t *place;
+        struct instruction_t *set;
+
+        /*
+         * Evaluate the place. This should always evaluate to an inner 
+         * reference. I think. I hope.
+         */
+        place = compile_form(context, value, place_form);
+
+        set = allocate_instruction(context);
+        set->opcode = OPCODE_SET;
+        set->size = 0;
+        set->link.next = &place->link;
+
+        return set;
+    }
+
+    if (place_form->tag_count.tag == TAG_SYMBOL)
+    {
+        uint64_t hash;
+        struct stack_slot_t *stack_slot;
+        struct instruction_t *store;
+
+        hash = place_form->value.symbol_hash;
+        stack_slot = get_stack_slot(context->stack_slots, hash);
+
+        if (stack_slot == NULL)
+        {
+            struct instruction_t *bound_location;
+
+            bound_location = compile_get_bound_location(context, value, place_form);
+            store = compile_store(context, bound_location);
+        }
+        else
+        {
+            store = compile_store_slot(context, value, stack_slot->index);
+        }
+
+        return store;
+    }
+
+    /*
+     * The place must either be an expression that evaluates to an
+     * inner reference, or it must be a variable. If we're here, 
+     * something has gone terribly wrong.
+     */
+    BREAK();
 
     return NULL;
 }
 
-#define COMPILE_CONS_ACCESSOR(ACCESSOR, OPCODE)                                                                     \
+#define COMPILE_PAIR_ACCESSOR(ACCESSOR, INDEX)                                                                      \
     static struct instruction_t *                                                                                   \
     compile_ ## ACCESSOR(struct compiler_context_t *context, struct instruction_t *next, struct object_t *symbol)   \
     {                                                                                                               \
-        struct instruction_t *insn;                                                                                 \
+        struct instruction_t *index;                                                                                \
+        struct instruction_t *ref;                                                                                  \
+        struct instruction_t *load;                                                                                 \
+        struct instruction_t *list;                                                                                 \
                                                                                                                     \
-        UNUSED(symbol);                                                                                             \
+        list = compile_form(context, next, CAR(symbol));                                                            \
                                                                                                                     \
-        insn = allocate_instruction(context);                                                                       \
-        insn->link.next = &next->link;                                                                              \
-        insn->opcode = OPCODE;                                                                                      \
+        index = allocate_instruction(context);                                                                      \
+        index->opcode = OPCODE_LDIMM_1_FIXNUM;                                                                      \
+        index->size = 1;                                                                                            \
+        index->data.s1 = INDEX;                                                                                     \
+        index->link.next = &list->link;                                                                             \
                                                                                                                     \
-        return insn;                                                                                                \
+        ref = allocate_instruction(context);                                                                        \
+        ref->opcode = OPCODE_MAKE_REF;                                                                              \
+        ref->size = 0;                                                                                              \
+        ref->link.next = &index->link;                                                                              \
+                                                                                                                    \
+        load = allocate_instruction(context);                                                                       \
+        load->opcode = OPCODE_LOAD;                                                                                 \
+        load->size = 0;                                                                                             \
+        load->link.next = &ref->link;                                                                               \
+                                                                                                                    \
+        return load;                                                                                                \
     }
 
-COMPILE_CONS_ACCESSOR(first, OPCODE_LDCAR)
-COMPILE_CONS_ACCESSOR(rest, OPCODE_LDCDR)
+COMPILE_PAIR_ACCESSOR(first, 0)
+COMPILE_PAIR_ACCESSOR(rest, 1)
 
 #define SYMBOL_IF       0x8325f07b4eb2a24
 #define SYMBOL_ADD      0xaf63bd4c8601b7f4
@@ -967,8 +1030,8 @@ compile_form(struct compiler_context_t *context, struct instruction_t *next, str
 {
     struct object_t *symbol_object;
     uint64_t symbol_hash;
-    int arg_index;
     struct stack_slot_t *slot;
+    struct instruction_t *bound_location;
 
     symbol_object = body;
 
@@ -1038,13 +1101,6 @@ evil_print("** %s (0x%" PRIx64 ") **\n",
 
     symbol_hash = symbol_object->value.symbol_hash;
 
-    /*
-     * We need to check stack slots (ie:scopes created with (let) expressions)
-     * for symbols before we check arguments.
-     *
-     * TODO: Stack slots and arguments could probably follow the same code path
-     * without much extra work and it'd cut out a bunch of code. Refactor later!
-     */
     slot = get_stack_slot(context->stack_slots, symbol_hash);
 
     if (slot != NULL)
@@ -1052,14 +1108,8 @@ evil_print("** %s (0x%" PRIx64 ") **\n",
         return compile_load_slot(context, next, slot);
     }
 
-    arg_index = get_arg_index(context->args, symbol_hash);
-
-    if (arg_index != UNKNOWN_ARG)
-    {
-        return compile_load_arg(context, next, arg_index);
-    }
-
-    return compile_symbol_load(context, next, symbol_object);
+    bound_location = compile_get_bound_location(context, next, symbol_object);
+    return compile_load(context, bound_location);
 }
 
 static size_t
@@ -1196,10 +1246,11 @@ assemble(struct environment_t *environment, struct compiler_context_t *context, 
                     idx += 8;
                 }
                 break;
+            case OPCODE_GET_BOUND_LOCATION:
             case OPCODE_LDIMM_8_SYMBOL:
                 {
                     union convert_eight_t c8;
-                    c8.u8 = insn->data.s8;
+                    c8.u8 = insn->data.u8;
                     memcpy(&bytes[idx], c8.bytes, 8);
                     idx += 8;
                 }
@@ -1552,14 +1603,9 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
                 evil_print("LDEMPTY\n");
                 ++i;
                 break;
-            case OPCODE_LDCAR:
+            case OPCODE_STORE:
                 print_hex_bytes(ptr + i, 1);
-                evil_print("LDCAR\n");
-                ++i;
-                break;
-            case OPCODE_LDCDR:
-                print_hex_bytes(ptr + i, 1);
-                evil_print("LDCDR\n");
+                evil_print("STORE\n");
                 ++i;
                 break;
             case OPCODE_LOAD:
@@ -1575,16 +1621,6 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
             case OPCODE_SET:
                 print_hex_bytes(ptr + i, 1);
                 evil_print("SET\n");
-                ++i;
-                break;
-            case OPCODE_SET_CAR:
-                print_hex_bytes(ptr + i, 1);
-                evil_print("SET_CAR\n");
-                ++i;
-                break;
-            case OPCODE_SET_CDR:
-                print_hex_bytes(ptr + i, 1);
-                evil_print("SET_CDR\n");
                 ++i;
                 break;
             case OPCODE_NEW:
@@ -1674,9 +1710,16 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
                 ++i;
                 break;
             case OPCODE_GET_BOUND_LOCATION:
-                print_hex_bytes(ptr + i, 1);
-                evil_print("GET_BOUND_LOCATION\n");
-                ++i;
+                {
+                    union convert_eight_t c8;
+
+                    memcpy(c8.bytes, ptr + i + 1, 8);
+                    print_hex_bytes(ptr + i, 9);
+
+                    evil_print("GET_BOUND_LOCATION %s\n", find_symbol_name(environment, c8.u8));
+                }
+
+                i += 9;
                 break;
             case OPCODE_ADD:
                 print_hex_bytes(ptr + i, 1);

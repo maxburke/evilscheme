@@ -72,16 +72,14 @@ enum opcode_t
     OPCODE_LDEMPTY,
 
     /*
-     * TODO: if pairs were vectors of length 2, these won't be needed.
-     * OPCODE_LDCxR
-     */
-    OPCODE_LDCAR,
-    OPCODE_LDCDR,
-
-    /*
-     * OPCODE_LOAD | [slot reference] -> [reference|value]
+     * OPCODE_LOAD | [reference] -> [reference|value]
      */
     OPCODE_LOAD,
+
+    /*
+     * OPCODE_STORE | [reference|value] [reference] -> 
+     */
+    OPCODE_STORE,
 
     /*
      * OPCODE_MAKE_REF | [reference] [index] -> [slot reference]
@@ -97,16 +95,10 @@ enum opcode_t
 
     /*
      * OPCODE_SET | [reference|value] [slot reference] -> 
-     * Set the slot reference to the reference provided.
+     * Set the slot reference to the reference provided. This is for aggregate
+     * types like strings and vectors only.
      */
     OPCODE_SET,
-
-    /*
-     * OPCODE_SET_CxR | [value|reference] [pair reference] ->
-     * Set the car/cdr of the specified pair to the value/reference provided.
-     */
-    OPCODE_SET_CAR,
-    OPCODE_SET_CDR,
 
     /*
      * OPCODE_NEW [type] | [reference]
@@ -189,7 +181,7 @@ enum opcode_t
     OPCODE_RETURN,
 
     /*
-     * OPCODE_GET_BOUND_LOCATION | [symbol] -> [slot reference | false]
+     * OPCODE_GET_BOUND_LOCATION [0 .. 7] | -> [slot reference | false]
      * Look up the symbol in the symbol table and push a slot reference to the
      * top of the stack if it exists or #f if it does not.
      */

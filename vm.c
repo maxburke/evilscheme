@@ -628,7 +628,26 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
                 VM_CONTINUE();
             case OPCODE_LOAD:
                 VM_TRACE_OP(OPCODE_LOAD);
-                BREAK();
+                {
+                    struct object_t *ref;
+                    struct object_t *object;
+                    unsigned char tag;
+
+                    ref = sp + 1;
+
+                    tag = ref->tag_count.tag;
+                    VM_ASSERT(tag == TAG_REFERENCE || tag == TAG_INNER_REFERENCE);
+
+                    if (tag == TAG_INNER_REFERENCE)
+                    {
+                        BREAK();
+                    }
+                    else
+                    {
+                        object = ref;
+                        *ref = *deref(object);
+                    }
+                }
                 VM_CONTINUE();
             case OPCODE_MAKE_REF:
                 VM_TRACE_OP(OPCODE_MAKE_REF);
@@ -675,14 +694,6 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
 
                     sp += 2;
                 }
-                VM_CONTINUE();
-            case OPCODE_SET_CAR:
-                VM_TRACE_OP(OPCODE_SET_CAR);
-                BREAK();
-                VM_CONTINUE();
-            case OPCODE_SET_CDR:
-                VM_TRACE_OP(OPCODE_SET_CDR);
-                BREAK();
                 VM_CONTINUE();
             case OPCODE_NEW:
                 VM_TRACE_OP(OPCODE_NEW);
@@ -758,16 +769,14 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
             case OPCODE_GET_BOUND_LOCATION:
                 VM_TRACE_OP(OPCODE_GET_BOUND_LOCATION);
                 {
-                    struct object_t *symbol;
+                    union convert_eight_t c8;
                     struct object_t *object;
-                    uint64_t symbol_hash;
 
-                    symbol = sp + 1;
-                    VM_ASSERT(symbol->tag_count.tag == TAG_SYMBOL);
-                    symbol_hash = symbol->value.symbol_hash;
+                    memcpy(c8.bytes, pc, 8);
+                    pc += 8;
 
-                    object = get_bound_location(environment, symbol_hash, 1);
-                    *symbol = *object;
+                    object = get_bound_location(environment, c8.u8, 1);
+                    sp = vm_push_ref(sp, object);
                 }
                 VM_CONTINUE();
             case OPCODE_CALL:
