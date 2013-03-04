@@ -41,9 +41,9 @@ DISABLE_WARNING(4996)
 #define ENABLE_VM_TRACING 1
 
 #if ENABLE_VM_TRACING
-#   define VM_TRACE_OP(x) do { fprintf(stderr, "[vm] %32s program_area begin: %p sp begin: %p", #x, program_area, sp); } while (0)
+#   define VM_TRACE_OP(x) do { fprintf(stderr, "[vm] %32s program_area begin: %p sp begin: %p", #x, (void *)program_area, (void *)sp); } while (0)
 #   define VM_TRACE(x) do { fprintf(stderr, "[vm] %s", x); } while (0)
-#   define VM_CONTINUE() fprintf(stderr, " sp end: %p\n", sp); vm_trace_stack(environment, sp, program_area); continue
+#   define VM_CONTINUE() fprintf(stderr, " sp end: %p\n", (void *)sp); vm_trace_stack(environment, sp, program_area); continue
 #else
 #   define VM_TRACE_OP(x)
 #   define VM_TRACE(x)
