@@ -1,5 +1,13 @@
-CC = gcc
-LD = gcc
+OS = $(shell uname)
+
+ifeq ($(OS), Darwin)
+    CC = clang
+    LD = clang
+else
+    CC = gcc
+    LD = gcc
+endif
+
 CFLAGS = -Wall -Wextra -pedantic -g -D_POSIX_C_SOURCE=200112L
 LDFLAGS = -g
 OBJS = $(patsubst %.c,%.o,$(wildcard *.c))
