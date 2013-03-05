@@ -118,6 +118,7 @@ object_from_symbol(struct environment_t *environment, const struct token_t *inpu
     if (input->text[0] == '#') 
     {
         struct object_t object;
+        const char *char_ptr;
 
         /* 
          * #t/#f -> boolean
@@ -140,7 +141,8 @@ object_from_symbol(struct environment_t *environment, const struct token_t *inpu
         object.tag_count.tag = TAG_CHAR;
         object.tag_count.flag = 0;
         object.tag_count.count = 1;
-        object.value.fixnum_value = strstr(input->text, "newline") != NULL ? '\n' : input->text[2];
+        char_ptr = input->text + 2;
+        object.value.fixnum_value = strstr(input->text, "newline") != NULL ? '\n' : *char_ptr;
         return object;
     }
     else if (is_number(input)) 
