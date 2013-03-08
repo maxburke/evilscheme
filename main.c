@@ -85,8 +85,8 @@ main(void)
         "(define set-arg-test (lambda (bar) (set! bar 3) bar))",
         "(disassemble 'set-arg-test)",
         "(set-arg-test 3)",
-        "(define closure-test (lambda (foo) (lambda () (set! foo (1+ foo)) foo)))",
-        "(define closure-test-fn (closure-test))",
+        "(define closure-test (lambda (foo) (lambda () (set! foo (+ 1 foo)) foo)))",
+        "(define closure-test-fn (closure-test 0))",
         "(closure-test-fn)",
         "(closure-test-fn)",
     };
