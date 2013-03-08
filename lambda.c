@@ -783,6 +783,34 @@ compile_lambda(struct compiler_context_t *context, struct instruction_t *next, s
     UNUSED(next);
     UNUSED(args);
 
+    /*
+     * If this function is called then we're compiling a function that, when
+     * called, generates a function. Just keep that in mind.
+     */
+
+    /*
+     * Okay so here's what we need to do.
+     *   1) Call lambda() to compile the lambda into a function object. When
+     *      compiling lambda(), indicate that we want to check the parent
+     *      scope(s) for values to capture.
+     *   2) If we find a value in a parent scope to capture, re-compile the
+     *      parent scope and turn that value into an environment global.
+     *   3) Repeat until complete.
+     *   n) when this function is called it needs to copy the function and
+     *      copy the environment it links to. This will probably need new
+     *      opcodes. (new closure?).
+     *
+     * Questions
+     *   * It kinda makes sense to turn a function object into a structure
+     *     that contains a pair of pointers, one to code, and one to its
+     *     environment. Creating a new closure would create a new instance of
+     *     this structure pointing to a cloned environment and the existing
+     *     code.
+     *   * When we create a new closure instance in code we need to track the
+     *     code object somewhere. Do we bury a reference into the body of
+     *     the code? Do we have some special function lookup table/registry?
+     */
+
     BREAK();
 
     return NULL;
