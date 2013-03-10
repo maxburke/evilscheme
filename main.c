@@ -113,7 +113,7 @@ main(void)
     stack = malloc(stack_size);
     posix_memalign(&heap, 4096, heap_size);
 
-    environment = environment_create(stack, stack_size, heap, heap_size);
+    environment = evil_environment_create(stack, stack_size, heap, heap_size);
 
     for (i = 0; i < sizeof inputs / sizeof inputs[0]; ++i)
     {
