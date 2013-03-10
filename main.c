@@ -44,6 +44,18 @@
     }
 #endif
 
+#ifdef EVIL_RUN_RESTS
+
+#include "test.h"
+
+int
+main(void)
+{
+    return evil_run_tests();
+}
+
+#else
+
 void
 evil_print(const char *format, ...)
 {
@@ -129,4 +141,6 @@ main(void)
 
     return 0;
 }
+
+#endif
 
