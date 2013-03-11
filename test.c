@@ -11,6 +11,7 @@
 #define _CRT_SECURE_NO_WARNINGS
 
 #include <assert.h>
+#include <ctype.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -226,7 +227,6 @@ run_test(struct environment_t *environment, const char *test, const char *expect
 
 #ifdef _MSC_VER
     typedef HANDLE directory_t;
-
     static WIN32_FIND_DATA file_data;
     static char directory_root[260];
     int traversal_done;
@@ -307,11 +307,13 @@ run_test(struct environment_t *environment, const char *test, const char *expect
     }
 #else
     typedef DIR *directory_t;
-    const char *directory_name;
+    static char directory_root[256];
 
     static directory_t
     begin_directory_traversal(const char *directory)
     {
+        strncpy(directory_root, directory, sizeof directory_root);
+
         return opendir(directory);
     }
 
@@ -335,9 +337,9 @@ run_test(struct environment_t *environment, const char *test, const char *expect
                 return 1;
             }
 
-            if (strstr(entry->d_name, ".test" != 0))
+            if (strstr(entry->d_name, ".test") != 0)
             {
-                snprintf(name_buffer, name_buffer_length, "%s/%s", directory_name, entry->d_name);
+                snprintf(name_buffer, name_buffer_length, "%s/%s", directory_root, entry->d_name);
                 return 0;
             }
         }
@@ -369,7 +371,7 @@ dump_buffer_as_hex(const void *buffer, size_t length)
 
         num = MIN(length - i, 16);
 
-        printf("%04x: ", i);
+        printf("%04x: ", (unsigned int)i);
 
         for (ii = 0; ii < num; ++ii)
         {
