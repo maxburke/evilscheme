@@ -16,35 +16,41 @@
 #include "gc.h"
 #include "read.h"
 #include "runtime.h"
+#include "user.h"
 
 #ifdef _MSC_VER
     #include <malloc.h>
 
-    static int
-    posix_memalign(void **ptr, size_t alignment, size_t size)
+    void *
+    evil_aligned_alloc(size_t alignment, size_t size)
     {
-        void *mem;
-
-        mem = _aligned_malloc(size, alignment);
-        *ptr = mem;
-
-        return mem != 0;
+        return _aligned_malloc(size, alignment);
     }
 
-    static void
-    posix_memfree(void *ptr)
+    void
+    evil_aligned_free(void *ptr)
     {
         _aligned_free(ptr);
     }
 #else
-    static void
-    posix_memfree(void *ptr)
+    void *
+    evil_aligned_alloc(size_t alignment, size_t size)
+    {
+        void *mem;
+
+        posix_memalign(&mem, alignment, size);
+
+        return mem;
+    }
+
+    void
+    evil_aligned_free(void *ptr)
     {
         free(ptr);
     }
 #endif
 
-#ifdef EVIL_RUN_RESTS
+#ifdef EVIL_RUN_TESTS
 
 #include "test.h"
 
@@ -111,7 +117,7 @@ main(void)
     size_t heap_size = 1024 * 1024;
 
     stack = malloc(stack_size);
-    posix_memalign(&heap, 4096, heap_size);
+    heap = evil_aligned_alloc(4096, heap_size);
 
     environment = evil_environment_create(stack, stack_size, heap, heap_size);
 
@@ -137,7 +143,7 @@ main(void)
         evil_print("\n");
     }
 
-    posix_memfree(heap);
+    evil_aligned_free(heap);
 
     return 0;
 }

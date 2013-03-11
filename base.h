@@ -62,12 +62,6 @@
 
 #define UNUSED(x) (void)x
 
-
-/*
- * The user is responsible for implementing these functions.
- */
-
-void
-evil_print(const char *format, ...);
+#include "user.h"
 
 #endif

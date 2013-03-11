@@ -4,12 +4,27 @@
  * See LICENSE.TXT for details.
  ***********************************************************************/
 
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+
+#define _CRT_SECURE_NO_WARNINGS
+
 #include <assert.h>
-#include <dirent.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifdef _MSC_VER
+    #define WIN32_LEAN_AND_MEAN
+    #pragma warning(push, 0)
+    #include <Windows.h>
+    #pragma warning(pop)
+    #define snprintf _snprintf
+#else
+    #include <dirent.h>
+#endif
 
 #include "base.h"
 #include "builtins.h"
@@ -19,6 +34,11 @@
 #include "read.h"
 #include "runtime.h"
 #include "test.h"
+#include "user.h"
+
+#ifndef MIN
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#endif
 
 char *print_buffer;
 int print_buffer_offset;
@@ -27,6 +47,10 @@ int print_buffer_size;
 void
 evil_print(const char *format, ...)
 {
+    /*
+     * This overloads the evil_print function with our own hook to record all
+     * data written via evil_print.
+     */
     va_list args;
     int required_length;
     int buffer_space;
@@ -36,24 +60,32 @@ evil_print(const char *format, ...)
     buffer_space = print_buffer_size - print_buffer_offset;
     required_length = vsnprintf(print_buffer + print_buffer_offset, buffer_space, format, args);
 
-    if (required_length < buffer_space)
+    if (buffer_space < required_length)
     {
         size_t size;
         const int reallocation_delta = 4096;
 
         size = (size_t)(print_buffer_size + reallocation_delta);
         print_buffer = realloc(print_buffer, size);
-        memset(print_buffer, 0, size);
+        memset(print_buffer + print_buffer_size, 0, reallocation_delta);
         print_buffer_size = size;
 
         vsnprintf(print_buffer + print_buffer_offset, print_buffer_size - print_buffer_offset, format, args);
     }
+
+    print_buffer_offset += required_length;
 }
 
 static void
 reset_print_buffer(void)
 {
     print_buffer_offset = 0;
+}
+
+static void
+free_print_buffer(void)
+{
+    free(print_buffer);
 }
 
 static char *
@@ -95,6 +127,10 @@ remove_character(char *buffer, const char * const end, char character)
 static char * 
 remove_comments(char *buffer, const char * const end)
 {
+    /*
+     * Comments in the test code are represented like scheme comments,
+     * that is they start with a semicolon and go to the end of the line.
+     */
     const char *read;
     char *write;
 
@@ -133,7 +169,7 @@ read_test_file(const char *filename)
     size_t size;
     char *buffer;
     
-    fp = fopen("rb", filename);
+    fp = fopen(filename, "rb");
     fseek(fp, 0, SEEK_END);
     size = (size_t)ftell(fp);
     fseek(fp, 0, SEEK_SET);
@@ -157,7 +193,7 @@ create_test_environment(void)
     stack_size = 1024 * sizeof(struct object_t);
     heap_size = 1024 * 1024;
     stack = malloc(stack_size);
-    posix_memalign(&heap, 4096, heap_size);
+    heap = evil_aligned_alloc(4096, heap_size);
 
     return evil_environment_create(stack, stack_size, heap, heap_size);
 }
@@ -185,63 +221,408 @@ run_test(struct environment_t *environment, const char *test, const char *expect
     result = eval(environment, &object);
     print(environment, &result);
 
-    return strcmp(expected, print_buffer) != 0;
+    return strcmp(expected, print_buffer) == 0;
+}
+
+#ifdef _MSC_VER
+    typedef HANDLE directory_t;
+
+    static WIN32_FIND_DATA file_data;
+    static char directory_root[260];
+    int traversal_done;
+
+    static directory_t
+    begin_directory_traversal(const char *directory)
+    {
+        directory_t dir;
+        char directory_buffer[260];
+
+        GetCurrentDirectory(sizeof directory_root, directory_root);
+        strncat(directory_root, "\\", sizeof directory_root);
+        strncat(directory_root, directory, sizeof directory_root);
+
+        strncpy(directory_buffer, directory_root, sizeof directory_buffer);
+        strncat(directory_buffer, "\\*.test", sizeof directory_buffer);
+
+        dir = FindFirstFile(directory_buffer, &file_data);
+
+        if (dir == INVALID_HANDLE_VALUE)
+        {
+            if (GetLastError() == ERROR_FILE_NOT_FOUND)
+            {
+                printf("Could not find test files.\n");
+            }
+
+            if (GetLastError() == ERROR_PATH_NOT_FOUND)
+            {
+                printf("Could not find test directory.\n");
+            }
+        }
+
+        return dir;
+    }
+
+    static int
+    is_valid_directory(directory_t dir)
+    {
+        return dir != INVALID_HANDLE_VALUE;
+    }
+
+    static int
+    get_next_file(directory_t dir, char *name_buffer, size_t name_buffer_length)
+    {
+        BOOL result;
+
+        if (traversal_done)
+        {
+            return 1;
+        }
+
+        strncpy(name_buffer, directory_root, name_buffer_length);
+        strncat(name_buffer, "\\", name_buffer_length);
+        strncat(name_buffer, file_data.cFileName, name_buffer_length);
+
+        name_buffer[name_buffer_length - 1] = 0;
+
+        result = FindNextFile(dir, &file_data);
+
+        if (result == FALSE)
+        {
+            if (GetLastError() != ERROR_NO_MORE_FILES)
+            {
+                printf("Unknown error in FindNextFile: %d\n", GetLastError());
+                return 1;
+            }
+
+            traversal_done = 1;
+        }
+
+        return 0; 
+    }
+
+    static void
+    end_directory_traversal(directory_t dir)
+    {
+        FindClose(dir);
+    }
+#else
+    typedef DIR *directory_t;
+    const char *directory_name;
+
+    static directory_t
+    begin_directory_traversal(const char *directory)
+    {
+        return opendir(directory);
+    }
+
+    static int
+    is_valid_directory(directory_t dir)
+    {
+        return dir != NULL;
+    }
+
+    static int
+    get_next_file(directory_t dir, char *name_buffer, size_t name_buffer_length)
+    {
+        struct dirent *entry;
+
+        for (;;)
+        {
+            entry = readdir(dir);
+
+            if (entry == NULL)
+            {
+                return 1;
+            }
+
+            if (strstr(entry->d_name, ".test" != 0))
+            {
+                snprintf(name_buffer, name_buffer_length, "%s/%s", directory_name, entry->d_name);
+                return 0;
+            }
+        }
+    }
+
+    static void
+    end_directory_traversal(directory_t dir)
+    {
+        closedir(dir);
+    }
+#endif
+
+static void
+dump_buffer_as_hex(const void *buffer, size_t length)
+{
+    /*
+     * This prints a hex dump of a buffer to stdout with the offsets,
+     * hex bytes, and the char representation.
+     */
+    size_t i;
+    const unsigned char *ptr;
+
+    ptr = buffer;
+
+    for (i = 0; i < length; i += 16)
+    {
+        size_t num;
+        size_t ii;
+
+        num = MIN(length - i, 16);
+
+        printf("%04x: ", i);
+
+        for (ii = 0; ii < num; ++ii)
+        {
+            printf("%02x ", ptr[i + ii]);
+        }
+
+        for (; ii < 16; ++ii)
+        {
+            printf("   ");
+        }
+
+        for (ii = 0; ii < num; ++ii)
+        {
+            char c;
+
+            c = isprint((char)ptr[i + ii]) ? (char)ptr[i + ii] : '.';
+
+            printf("%c", c);
+        }
+
+        printf("\n");
+    }
+}
+
+static const char *
+print_prefixed_line(const char *str, char c)
+{
+    /*
+     * This function is a helper for the unified diff method below and prints a
+     * line of text prefixed, either with a ' ' for no diff, '+' for lines added,
+     * and '-' for lines removed.
+     */
+    printf("%c", c);
+
+    for (;;)
+    {
+        char c = *str++;
+
+        if (c == '\0')
+        {
+            return NULL;
+        }
+
+        printf("%c", c);
+
+        if (c == '\n')
+        {
+            break;
+        }
+    }
+
+    return str;
+}
+
+static void
+diff_strings(const char *a, const char *b)
+{
+    /*
+     * Sometimes it's difficult to see the difference between the actual and
+     * expected output from just hex dumps/raw strings, so this prints out a
+     * unified diff of the two strings.
+     */
+    const char *newline_a;
+    const char *newline_b;
+
+    for (;;)
+    {
+        size_t a_line_length;
+        size_t b_line_length;
+
+        newline_a = strchr(a, '\n');
+        newline_b = strchr(b, '\n');
+
+        if (newline_a == NULL && newline_b == NULL)
+        {
+            if (strcmp(a, b) != 0)
+            {
+                print_prefixed_line(a, '-');
+                print_prefixed_line(b, '+');
+            }
+            else
+            {
+                print_prefixed_line(a, ' ');
+            }
+
+            return;
+        }
+        else if (newline_a == NULL)
+        {
+            const char *ptr;
+
+            print_prefixed_line(a, '-');
+            printf("\n");
+
+            ptr = b;
+            while ((ptr = print_prefixed_line(ptr, '+')) != NULL)
+                ;
+
+            return;
+        }
+        else if (newline_b == NULL)
+        {
+            const char *ptr;
+
+            ptr = a;
+            while ((ptr = print_prefixed_line(ptr, '-')) != NULL)
+                ;
+
+            printf("\n");
+            print_prefixed_line(b, '+');
+
+            return;
+        }
+
+        a_line_length = newline_a - a;
+        b_line_length = newline_b - b;
+
+        if ((a_line_length != b_line_length) || (memcmp(a, b, a_line_length) != 0))
+        {
+            print_prefixed_line(a, '-');
+            print_prefixed_line(b, '+');
+            a = newline_a + 1;
+            b = newline_b + 1;
+            continue;
+        }
+
+        print_prefixed_line(a, ' ');
+        a = newline_a + 1;
+        b = newline_b + 1;
+        continue;
+    }
+}
+
+static void
+report_test_result(const char *test_name, int result, const char *expected)
+{
+    if (result == 0)
+    {
+        /*
+         * If a test fails this routine prints out what we expected the
+         * output to look like, what it actually was, hex dumps of both,
+         * and a unified diff of the output to make it easier to debug.
+         */
+        printf("%s FAILED\n", test_name);
+        printf("Expected:\n");
+        printf("----------------------------------------\n");
+        printf("%s\n", expected);
+        dump_buffer_as_hex(expected, strlen(expected));
+
+        printf("\nActual:\n");
+        printf("----------------------------------------\n");
+        printf("%s\n", print_buffer);
+        dump_buffer_as_hex(print_buffer, strlen(print_buffer));
+
+        printf("\nDiffs:\n");
+        printf("----------------------------------------\n");
+        diff_strings(expected, print_buffer);
+    }
+    else
+    {
+        printf("%s PASSED\n", test_name);
+    }
 }
 
 int
 evil_run_tests(void)
 {
-    DIR *dir;
-    struct dirent *entry;
+    directory_t dir;
     int result;
     struct environment_t *environment;
+    int num_tests;
+    int num_passed;
 
     #define TEST_DIR "tests"
 
     result = 0;
+    num_tests = 0;
+    num_passed = 0;
     environment = create_test_environment();
-    dir = opendir(TEST_DIR);
+    dir = begin_directory_traversal(TEST_DIR);
 
-    do
+    if (!is_valid_directory(dir))
     {
-        char filename[256];
+        return 1;
+    }
 
-        entry = readdir(dir);
+    for (;;)
+    {
+        char filename[260];
+        char *test_file;
+        char *test_end;
+        char *test;
+        char *expected;
+        int result;
 
-        if (strstr(entry->d_name, ".test") != 0)
+        if (get_next_file(dir, filename, sizeof filename))
         {
-            char *test_file;
-            char *test_end;
-            char *test;
-            char *expected;
-
-            snprintf(filename, sizeof(filename), TEST_DIR "/%s", entry->d_name);
-            test_file = read_test_file(filename);
-            test_end = test_file + strlen(test_file);
-
-            test_end = remove_character(test_file, test_end, '\r');
-            test_end = remove_comments(test_file, test_end);
-
-            test = test_file;
-            if (strstr(test_file, ">") == 0)
-            {
-                continue;
-            }
-
-            expected = strstr(test_file, ">") + 1;
-            *expected = 0;
-            ++expected;
-
-            test_end = remove_character(expected, test_end, '>');
-
-            result += run_test(environment, test, expected);
-
-            free(test);
+            break;
         }
 
-    } while (entry != NULL);
+        test_file = read_test_file(filename);
+        test_end = test_file + strlen(test_file);
 
-    closedir(dir);
+        test_end = remove_character(test_file, test_end, '\r');
+        test_end = remove_comments(test_file, test_end);
 
-    return result;
+        test = test_file;
+      
+        expected = test_file;
+
+        /*
+         * Expected output is listed in the test file as lines starting with
+         * the > character. The loop is to differentiate, say, (if (> foo bar) ...)
+         * from proper test structure, like this:
+         * (display "hello world")
+         * >"hello world"
+         */
+        for (;;)
+        {
+            expected = strchr(expected, '>');
+
+            if (expected == NULL)
+            {
+                goto next_test;
+            }
+
+            if (*(expected - 1) == '\n')
+            {
+                break;
+            }
+        }
+
+        *expected = 0;
+        ++expected;
+
+        test_end = remove_character(expected, test_end, '>');
+
+        result = run_test(environment, test, expected);
+
+        report_test_result(filename, result, expected);
+
+        ++num_tests;
+        num_passed += result;
+
+    next_test:
+        free(test);
+    }
+
+    end_directory_traversal(dir);
+    free_print_buffer();
+
+    printf("\n========================================\n");
+    printf("%d/%d tests passed", num_passed, num_tests);
+
+    return num_tests - num_passed;
 }

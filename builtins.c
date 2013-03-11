@@ -342,6 +342,8 @@ print(struct environment_t *environment, struct object_t *args)
             break;
     }
 
+    evil_print("\n");
+
     return make_empty_ref();
 }
 
