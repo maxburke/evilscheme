@@ -612,15 +612,14 @@ evil_run_tests(void)
             {
                 break;
             }
+            
+            ++expected;
         }
 
         *expected = 0;
         ++expected;
 
-        test_end = remove_character(expected, test_end, '>');
-
         result = run_test(environment, test, expected);
-
         report_test_result(filename, result, expected);
 
         ++num_tests;
@@ -634,7 +633,7 @@ evil_run_tests(void)
     free_print_buffer();
 
     printf("\n========================================\n");
-    printf("%d/%d tests passed", num_passed, num_tests);
+    printf("%d/%d tests passed\n", num_passed, num_tests);
 
     return num_tests - num_passed;
 }
