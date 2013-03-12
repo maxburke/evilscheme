@@ -46,6 +46,16 @@ int print_buffer_offset;
 int print_buffer_size;
 
 void
+evil_debug_print(const char *format, ...)
+{
+    /*
+     * Swallow all debug output while the tests are exsecuting.
+     */
+
+    UNUSED(format);
+}
+
+void
 evil_print(const char *format, ...)
 {
     /*
