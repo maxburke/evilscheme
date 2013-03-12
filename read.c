@@ -82,7 +82,7 @@ find_current_token_end(const char **input_ptr, enum token_type_t *token_type)
     }
 
     *token_type = TOKEN_SYMBOL;
-    while (*input && *input != '(' && *input != ')' && *input != ' ')
+    while (*input && *input != '(' && *input != ')' && !isspace(*input))
         ++input;
 
     return input;
