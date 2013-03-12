@@ -1,0 +1,19 @@
+(disassemble 'list-length)
+>list-length:
+        0: 01 00 00                      LDSLOT 0
+        3: 0C                            LDEMPTY
+        4: 14                            CMP_EQUAL
+        5: 1B 16 00                      COND_BRANCH 30
+        8: 04 01                         LDIMM_1_FIXNUM 1
+       10: 01 00 00                      LDSLOT 0
+       13: 04 01                         LDIMM_1_FIXNUM 1
+       15: 0F                            MAKE_REF
+       16: 0D                            LOAD
+       17: 1F 9E 35 0A DD BB 8C 4D 42    GET_BOUND_LOCATION list-length
+       26: 0D                            LOAD
+       27: 1C                            CALL
+       28: 20                            ADD
+       29: 1E                            RETURN
+       30: 04 00                         LDIMM_1_FIXNUM 0
+       32: 1E                            RETURN
+'()
