@@ -1117,9 +1117,9 @@ compile_form(struct compiler_context_t *context, struct instruction_t *next, str
                  * The function/procedure isn't one that is handled by the
                  * compiler so we need to emit a call to it.
                  */
-evil_print("** %s (0x%" PRIx64 ") **\n", 
-        find_symbol_name(context->environment, function_hash),
-        function_hash);
+                evil_debug_print("** %s (0x%" PRIx64 ") **\n", 
+                    find_symbol_name(context->environment, function_hash),
+                    function_hash);
                 return compile_call(context, next, function_symbol, function_args);
         }
     }
