@@ -277,7 +277,7 @@ print(struct environment_t *environment, struct object_t *args)
 
     if (object == empty_pair)
     {
-        evil_print("'()");
+        evil_print("'()\n");
         return make_empty_ref();
     }
 
