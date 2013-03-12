@@ -1,2 +1,2 @@
-(define hello-world (lambda () (display \"hello world!\") (newline)))
+(define hello-world (lambda () (display "hello world!") (newline)))
 ><procedure>
