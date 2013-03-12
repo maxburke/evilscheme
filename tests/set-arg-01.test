@@ -1,0 +1,2 @@
+(define set-arg-test (lambda (bar) (set! bar 3) bar))
+><procedure>

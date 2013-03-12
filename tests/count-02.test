@@ -1,0 +1,23 @@
+(disassemble 'count)
+>count:
+        0: 01 01 00                      LDSLOT 1
+        3: 1B 03 00                      COND_BRANCH 9
+        6: 04 00                         LDIMM_1_FIXNUM 0
+        8: 1E                            RETURN
+        9: 01 01 00                      LDSLOT 1
+       12: 04 00                         LDIMM_1_FIXNUM 0
+       14: 0F                            MAKE_REF
+       15: 0D                            LOAD
+       16: 01 00 00                      LDSLOT 0
+       19: 14                            CMP_EQUAL
+       20: 01 01 00                      LDSLOT 1
+       23: 04 01                         LDIMM_1_FIXNUM 1
+       25: 0F                            MAKE_REF
+       26: 0D                            LOAD
+       27: 01 00 00                      LDSLOT 0
+       30: 1F E2 90 4C A6 B3 EF 84 01    GET_BOUND_LOCATION count
+       39: 0D                            LOAD
+       40: 1C                            CALL
+       41: 20                            ADD
+       42: 1E                            RETURN
+'()
