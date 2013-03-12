@@ -406,115 +406,6 @@ dump_buffer_as_hex(const void *buffer, size_t length)
     }
 }
 
-static const char *
-print_prefixed_line(const char *str, char c)
-{
-    /*
-     * This function is a helper for the unified diff method below and prints a
-     * line of text prefixed, either with a ' ' for no diff, '+' for lines added,
-     * and '-' for lines removed.
-     */
-    printf("%c", c);
-
-    for (;;)
-    {
-        char c = *str++;
-
-        if (c == '\0')
-        {
-            return NULL;
-        }
-
-        printf("%c", c);
-
-        if (c == '\n')
-        {
-            break;
-        }
-    }
-
-    return str;
-}
-
-static void
-diff_strings(const char *a, const char *b)
-{
-    /*
-     * Sometimes it's difficult to see the difference between the actual and
-     * expected output from just hex dumps/raw strings, so this prints out a
-     * unified diff of the two strings.
-     */
-    const char *newline_a;
-    const char *newline_b;
-
-    for (;;)
-    {
-        size_t a_line_length;
-        size_t b_line_length;
-
-        newline_a = strchr(a, '\n');
-        newline_b = strchr(b, '\n');
-
-        if (newline_a == NULL && newline_b == NULL)
-        {
-            if (strcmp(a, b) != 0)
-            {
-                print_prefixed_line(a, '-');
-                print_prefixed_line(b, '+');
-            }
-            else
-            {
-                print_prefixed_line(a, ' ');
-            }
-
-            return;
-        }
-        else if (newline_a == NULL)
-        {
-            const char *ptr;
-
-            print_prefixed_line(a, '-');
-            printf("\n");
-
-            ptr = b;
-            while ((ptr = print_prefixed_line(ptr, '+')) != NULL)
-                ;
-
-            return;
-        }
-        else if (newline_b == NULL)
-        {
-            const char *ptr;
-
-            ptr = a;
-            while ((ptr = print_prefixed_line(ptr, '-')) != NULL)
-                ;
-
-            printf("\n");
-            print_prefixed_line(b, '+');
-
-            return;
-        }
-
-        a_line_length = newline_a - a;
-        b_line_length = newline_b - b;
-
-        if ((a_line_length != b_line_length) || (memcmp(a, b, a_line_length) != 0))
-        {
-            print_prefixed_line(a, '-');
-            print_prefixed_line(b, '+');
-            a = newline_a + 1;
-            b = newline_b + 1;
-            continue;
-        }
-
-        print_prefixed_line(a, ' ');
-        a = newline_a + 1;
-        b = newline_b + 1;
-        continue;
-    }
-}
-
 static void
 report_test_result(const char *test_name, int result, const char *expected)
 {
@@ -535,10 +426,6 @@ report_test_result(const char *test_name, int result, const char *expected)
         printf("----------------------------------------\n");
         printf("%s\n", print_buffer);
         dump_buffer_as_hex(print_buffer, strlen(print_buffer));
-
-        printf("\nDiffs:\n");
-        printf("----------------------------------------\n");
-        diff_strings(expected, print_buffer);
     }
     else
     {
