@@ -5,6 +5,7 @@
  ***********************************************************************/
 
 #include <assert.h>
+#include <setjmp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -98,6 +99,8 @@ struct stack_slot_t
 
 struct compiler_context_t
 {
+    struct compiler_context_t *previous_context;
+    jmp_buf context_state;
     struct memory_pool_t pool;
     int num_args;
     struct environment_t *environment;
@@ -141,7 +144,8 @@ static void
 initialize_compiler_context(
         struct compiler_context_t *context,
         struct environment_t *environment,
-        struct object_t *args)
+        struct object_t *args,
+        struct compiler_context_t *previous_context)
 {
     struct object_t *i;
     int num_args;
@@ -155,6 +159,7 @@ initialize_compiler_context(
 
     context->environment = environment;
     context->num_args = num_args;
+    context->previous_context = previous_context;
 }
 
 static void
@@ -777,11 +782,17 @@ compile_store_slot(struct compiler_context_t *context, struct instruction_t *nex
 }
 
 static struct instruction_t *
-compile_lambda(struct compiler_context_t *context, struct instruction_t *next, struct object_t *args)
+compile_lambda(struct compiler_context_t *incoming_context, struct instruction_t *next, struct object_t *args)
 {
+    struct compiler_context_t context;
+
     UNUSED(context);
     UNUSED(next);
     UNUSED(args);
+
+    assert(context != null);
+    initialize_compiler_context(&context, context->environment, args, incoming_context);
+
 
     /*
      * If this function is called then we're compiling a function that, when
@@ -1839,6 +1850,8 @@ disassemble(struct environment_t *environment, struct object_t *args)
 struct object_t
 lambda(struct environment_t *environment, struct object_t *lambda_body)
 {
+
+    /*
     struct object_t *args;
     struct object_t *body;
     struct object_t *procedure;

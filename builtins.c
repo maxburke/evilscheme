@@ -255,7 +255,31 @@ eval(struct environment_t *environment, struct object_t *args)
             assert(bound_location != NULL);
             return *bound_location;
         case TAG_PAIR:
-            return apply(environment, first_arg);
+            {
+                /*
+                 * Let's try something new and exciting here. Instead of
+                 * calling apply(...), which is dead easy, let's try turning
+                 * our expression into ((lambda () expr)) -- ie: (+ 1 1)
+                 * becomes ((lambda () (+ 1 1)). If we don't do this then
+                 * we need to have separate implementations, both VM and
+                 * interpreted, for every bit of functionality supported
+                 * by the runtime. And that's just not lazy!
+                 */
+                struct object_t *args;
+                struct object_t *body;
+                struct object_t fn;
+
+                args = gc_alloc(environment->heap, TAG_PAIR, 0);
+                body = gc_alloc(environment->heap, TAG_PAIR, 0);
+
+                *RAW_CAR(args) = make_empty_ref();
+                *RAW_CDR(args) = make_ref(body);
+                *RAW_CAR(body) = make_ref(first_arg);
+                *RAW_CDR(body) = make_empty_ref();
+
+                fn = lambda(environment, args);
+                return vm_run(environment, &fn, empty_pair);
+            }
             break;
     }
 
