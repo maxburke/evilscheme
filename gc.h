@@ -18,6 +18,19 @@ struct heap_t
     size_t size;
 };
 
+struct evil_object_handle_t
+{
+    struct object_t * volatile object;
+    struct evil_object_handle_t *prev;
+    struct evil_object_handle_t *next;
+};
+
+struct evil_object_handle_t
+evil_create_object_handle(struct heap_t *heap, struct object_t *object);
+
+void
+evil_destroy_object_handle(struct heap_t *heap, struct evil_object_handle_t handle);
+
 struct heap_t *
 gc_create(void *heap_mem, size_t heap_size);
 

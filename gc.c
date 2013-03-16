@@ -64,10 +64,6 @@ gc_alloc(struct heap_t *heap, enum tag_t type, size_t extra_bytes)
     {
         size = sizeof(struct environment_t);
     }
-    else if (type == TAG_PROCEDURE)
-    {
-        size = sizeof(struct procedure_t) + extra_bytes;
-    }
     else if (type == TAG_PAIR)
     {
         size = offsetof(struct object_t, value) + 2 * sizeof(struct object_t);
@@ -122,5 +118,35 @@ gc_collect(struct heap_t *env)
 {
     UNUSED(env);
     BREAK();
+}
+
+struct evil_object_handle_t
+evil_create_object_handle(struct heap_t *heap, struct object_t *object)
+{
+    struct evil_object_handle_t handle;
+
+    /*
+     * TODO: This needs to link object handles together so that we can iterate
+     * over them during garbage collection.
+     */
+
+    UNUSED(heap);
+
+    handle.object = object;
+    handle.prev = NULL;
+    handle.next = NULL;
+
+    return handle;
+}
+
+void
+evil_destroy_object_handle(struct heap_t *heap, struct evil_object_handle_t handle)
+{
+    /*
+     * TODO: This needs to un-link object handles from the master list.
+     */
+
+    UNUSED(heap);
+    UNUSED(handle);
 }
 

@@ -38,7 +38,7 @@ DISABLE_WARNING(4996)
 #   define VM_ASSERT(x)
 #endif
 
-#define ENABLE_VM_TRACING 0
+#define ENABLE_VM_TRACING 1
 
 #if ENABLE_VM_TRACING
 #   define VM_TRACE_OP(x) do { fprintf(stderr, "[vm] %32s program_area begin: %p sp begin: %p", #x, (void *)program_area, (void *)sp); } while (0)
@@ -217,14 +217,14 @@ vm_push_args_to_stack(struct environment_t *environment, struct object_t *args)
 }
 
 static inline struct object_t *
-vm_push_return_address(struct object_t *sp, struct procedure_t *object, unsigned short offset)
+vm_push_return_address(struct object_t *sp, struct object_t *fn, unsigned short offset)
 {
     struct object_t return_address;
 
     return_address.tag_count.tag = TAG_INNER_REFERENCE;
     return_address.tag_count.flag = 0;
     return_address.tag_count.count = offset;
-    return_address.value.ref = (struct object_t *)object;
+    return_address.value.ref = fn;
 
     *(sp--) = return_address;
 
@@ -344,13 +344,6 @@ vm_compare_equal_reference_type(const struct object_t *a, const struct object_t 
 
     switch (a_tag)
     {
-        case TAG_PROCEDURE:
-            {
-                const struct procedure_t *proc_a = (const struct procedure_t *)a;
-                const struct procedure_t *proc_b = (const struct procedure_t *)b;
-
-                return memcmp(proc_a->byte_code, proc_b->byte_code, a->tag_count.count) == 0;
-            }
         case TAG_SPECIAL_FUNCTION:
             return a->value.special_function_value == b->value.special_function_value;
         case TAG_ENVIRONMENT:
@@ -359,6 +352,11 @@ vm_compare_equal_reference_type(const struct object_t *a, const struct object_t 
             return 0;
         case TAG_PAIR:
             return vm_compare_equal(CAR(a), CAR(b)) && vm_compare_equal(CDR(a), CDR(b));
+        case TAG_PROCEDURE:
+            /*
+             * Procedures are a special case of vector. They compare equal iff
+             * all the fields are equal.
+             */
         case TAG_VECTOR:
             {
                 unsigned short i, e;
@@ -374,6 +372,9 @@ vm_compare_equal_reference_type(const struct object_t *a, const struct object_t 
                 return 1;
             }
         case TAG_STRING:
+            if (a->tag_count.count != b->tag_count.count)
+                return 0;
+
             return memcmp(a->value.string_value, b->value.string_value, a->tag_count.count) == 0;
         default:
             BREAK();
@@ -495,22 +496,64 @@ vm_trace_stack(struct environment_t *environment, struct object_t *sp, struct ob
     }
 }
 
-struct object_t
-vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *args)
+static inline unsigned char *
+vm_extract_code_pointer(struct object_t *procedure)
 {
-    struct procedure_t *procedure;
+    struct object_t *byte_code;
+
+    byte_code = deref(&VECTOR_BASE(procedure)[FIELD_CODE]);
+    assert(byte_code->tag_count.tag == TAG_STRING);
+
+    return (unsigned char *)byte_code->value.string_value;
+}
+
+static inline int
+vm_extract_num_args(struct object_t *procedure)
+{
+    struct object_t *num_args;
+
+    num_args = deref(&VECTOR_BASE(procedure)[FIELD_NUM_ARGS]);
+    assert(num_args->tag_count.tag == TAG_FIXNUM);
+
+    return (int)num_args->value.fixnum_value;
+}
+
+static inline int
+vm_extract_num_locals(struct object_t *procedure)
+{
+    struct object_t *num_locals;
+
+    num_locals = deref(&VECTOR_BASE(procedure)[FIELD_NUM_LOCALS]);
+    assert(num_locals->tag_count.tag == TAG_FIXNUM);
+
+    return (int)num_locals->value.fixnum_value;
+}
+
+struct object_t
+vm_run(struct environment_t *environment, struct object_t *initial_function, struct object_t *args)
+{
+    struct object_t *procedure;
     struct object_t *program_area;
     struct object_t *sp;
     struct object_t *old_stack;
     int num_args;
     unsigned char *pc_base;
     unsigned char *pc;
-   
-    procedure = (struct procedure_t *)fn;
+
+    /*
+     * This is going to get really ugly if the GC moves our procedure object
+     * while we are executing something. Maybe we should pin the procedures
+     * while we are executing? Refresh after every function call and/or 
+     * object creation?
+     */
+
+    procedure = deref(initial_function);
+    assert(procedure->tag_count.tag == TAG_PROCEDURE);
+
     old_stack = environment->stack_ptr;
     sp = old_stack;
-    pc = procedure->byte_code;
-    pc_base = procedure->byte_code;
+    pc = vm_extract_code_pointer(procedure);
+    pc_base = pc;
 
     /*
      * Stack layout for VM:
@@ -523,7 +566,7 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
      */
 
     num_args = vm_push_args_to_stack(environment, args);
-    assert(num_args == procedure->num_args);
+    assert(num_args == vm_extract_num_args(procedure));
     sp = environment->stack_ptr;
 
     /*
@@ -534,7 +577,7 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
 
     sp = vm_push_ref(sp, NULL);                 /* program area chain */  
     sp = vm_push_return_address(sp, NULL, 0);   /* return address */
-    sp -= procedure->num_locals;
+    sp -= vm_extract_num_locals(procedure);
    
     for (;;)
     {
@@ -626,6 +669,10 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
                 VM_TRACE_OP(OPCODE_LDEMPTY);
                 sp = vm_push_ref(sp, empty_pair);
                 VM_CONTINUE();
+            case OPCODE_LDFN:
+                VM_TRACE_OP(OPCODE_LDFN);
+                sp = vm_push_ref(sp, procedure);
+                VM_CONTINUE();
             case OPCODE_LOAD:
                 VM_TRACE_OP(OPCODE_LOAD);
                 {
@@ -640,7 +687,22 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
 
                     if (tag == TAG_INNER_REFERENCE)
                     {
-                        BREAK();
+                        unsigned char object_tag;
+
+                        object = ref->value.ref;
+                        object_tag = object->tag_count.tag;
+                        
+                        if (object_tag == TAG_VECTOR || object_tag == TAG_PROCEDURE)
+                        {
+                            unsigned short index;
+
+                            index = ref->tag_count.count;
+                            *ref = VECTOR_BASE(object)[index];
+                        }
+                        else
+                        {
+                            BREAK();
+                        }
                     }
                     else
                     {
@@ -783,10 +845,10 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
                 VM_TRACE_OP(OPCODE_CALL);
                 {
                     struct object_t *old_program_area;
-                    struct procedure_t *fn;
+                    struct object_t *fn;
                     unsigned char tag;
 
-                    fn = (struct procedure_t *)deref(sp + 1);
+                    fn = deref(sp + 1);
                     ++sp;
                     tag = fn->tag_count.tag;
 
@@ -806,12 +868,12 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
                          */
                         sp = vm_push_ref(sp, old_program_area);
                         sp = vm_push_return_address(sp, fn, (unsigned short)return_offset);
-                        sp -= fn->num_locals;
+                        sp -= vm_extract_num_locals(fn);
 
                         /*
                          * call the function!
                          */
-                        pc = fn->byte_code;
+                        pc = vm_extract_code_pointer(fn);
                         pc_base = pc;
                         procedure = fn;
                     }
@@ -829,14 +891,14 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
             case OPCODE_TAILCALL:
                 VM_TRACE_OP(OPCODE_TAILCALL);
                 {
-                    struct procedure_t *fn;
+                    struct object_t *fn;
                     struct object_t *arg_slot;
                     unsigned char tag;
                     int current_fn_num_args;
                     int num_args;
                     int arg_diff;
 
-                    fn = (struct procedure_t *)deref(sp + 1);
+                    fn = deref(sp + 1);
                     ++sp;
                     tag = fn->tag_count.tag;
 
@@ -860,15 +922,15 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
                      * change, they can just remain the same.
                      */
 
-                    current_fn_num_args = procedure->num_args;
-                    num_args = fn->num_args;
+                    current_fn_num_args = vm_extract_num_args(procedure);
+                    num_args = vm_extract_num_args(fn);
                     arg_diff = current_fn_num_args - num_args;
 
                     arg_slot = program_area + arg_diff;
                     memmove(arg_slot - 2, program_area - 2, 2 * sizeof(struct object_t));
                     memmove(arg_slot, sp + 1, num_args * sizeof(struct object_t));
 
-                    pc = fn->byte_code;
+                    pc = vm_extract_code_pointer(fn);
                     pc_base = pc;
                     procedure = fn;
 
@@ -877,7 +939,7 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
                      * below where the locals go.
                      */
                     sp = arg_slot - 3;
-                    sp -= procedure->num_locals;
+                    sp -= vm_extract_num_locals(procedure);
 
                     /*
                      * Set the new program area.
@@ -891,29 +953,29 @@ vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *
                     struct object_t *return_address;
                     struct object_t *prev_program_area_ref;
                     struct object_t *return_value;
-                    struct procedure_t *parent;
+                    struct object_t *parent;
 
                     return_value = sp + 1;
                     return_address = program_area - 2;
                     prev_program_area_ref = program_area - 1;
                     VM_ASSERT(return_address->tag_count.tag == TAG_INNER_REFERENCE);
                     VM_ASSERT(prev_program_area_ref->tag_count.tag == TAG_REFERENCE);
-                    parent = (struct procedure_t *)return_address->value.ref;
+                    parent = return_address->value.ref;
 
                     if (parent != NULL)
                     {
-                        pc = parent->byte_code + return_address->tag_count.count;
+                        pc = vm_extract_code_pointer(parent) + return_address->tag_count.count;
                         pc_base = pc;
                         procedure = parent;
 
-                        sp = program_area + procedure->num_args - 2;
+                        sp = program_area + vm_extract_num_args(procedure) - 2;
                         *(sp + 1) = *return_value;
 
                         program_area = deref(prev_program_area_ref);
                     }
                     else
                     {
-                        sp = program_area + procedure->num_args - 2;
+                        sp = program_area + vm_extract_num_args(procedure) - 2;
                         *(sp + 1) = *return_value;
 
                         goto vm_execution_done;

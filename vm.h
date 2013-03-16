@@ -72,6 +72,12 @@ enum opcode_t
     OPCODE_LDEMPTY,
 
     /*
+     * OPCODE_LDFN | -> [function reference]
+     * Push a reference to the currently executing function to the stack.
+     */
+    OPCODE_LDFN,
+
+    /*
      * OPCODE_LOAD | [reference] -> [reference|value]
      */
     OPCODE_LOAD,
@@ -212,13 +218,14 @@ enum opcode_t
     OPCODE_NOP
 };
 
-struct procedure_t
+enum procedure_field_index_t
 {
-    struct tag_count_t tag_count;
-    struct environment_t *environment;
-    int num_args;
-    int num_locals;
-    unsigned char byte_code[1];
+    FIELD_ENVIRONMENT,
+    FIELD_NUM_ARGS,
+    FIELD_NUM_LOCALS,
+    FIELD_NUM_FN_LOCALS,
+    FIELD_CODE,
+    FIELD_LOCALS
 };
 
 struct object_t

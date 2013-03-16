@@ -60,6 +60,8 @@ pool_alloc(struct memory_pool_t *pool, size_t size)
             void *mem = i->top;
             i->top += size;
 
+            memset(mem, 0, size);
+
             return mem;
         }
     }
@@ -97,6 +99,12 @@ struct stack_slot_t
     short index;
 };
 
+struct function_local_t
+{
+    struct slist_t link;
+    struct evil_object_handle_t fn;
+};
+
 struct compiler_context_t
 {
     struct compiler_context_t *previous_context;
@@ -106,6 +114,8 @@ struct compiler_context_t
     struct environment_t *environment;
     struct stack_slot_t *stack_slots;
     int max_stack_slots;
+    int num_fn_locals;
+    struct function_local_t *locals;
 };
 
 static void
@@ -217,6 +227,9 @@ compile_get_bound_location(struct compiler_context_t *context, struct instructio
 
 static struct instruction_t *
 compile_load(struct compiler_context_t *context, struct instruction_t *next);
+
+static struct instruction_t *
+compile_lambda(struct compiler_context_t *incoming_context, struct instruction_t *next, struct object_t *lambda_body);
 
 static struct instruction_t *
 find_before(struct instruction_t *start, struct instruction_t *target)
@@ -746,7 +759,6 @@ compile_load(struct compiler_context_t *context, struct instruction_t *next)
 
     load = allocate_instruction(context);
     load->opcode = OPCODE_LOAD;
-    load->size = 0;
     load->link.next = &next->link;
 
     return load;
@@ -759,7 +771,6 @@ compile_store(struct compiler_context_t *context, struct instruction_t *next)
 
     store = allocate_instruction(context);
     store->opcode = OPCODE_STORE;
-    store->size = 0;
     store->link.next = &next->link;
 
     return store;
@@ -779,52 +790,6 @@ compile_store_slot(struct compiler_context_t *context, struct instruction_t *nex
     store->data.s2 = (short)slot_index;
 
     return store;
-}
-
-static struct instruction_t *
-compile_lambda(struct compiler_context_t *incoming_context, struct instruction_t *next, struct object_t *args)
-{
-    struct compiler_context_t context;
-
-    UNUSED(context);
-    UNUSED(next);
-    UNUSED(args);
-
-    assert(context != null);
-    initialize_compiler_context(&context, context->environment, args, incoming_context);
-
-
-    /*
-     * If this function is called then we're compiling a function that, when
-     * called, generates a function. Just keep that in mind.
-     */
-
-    /*
-     * Okay so here's what we need to do.
-     *   1) Call lambda() to compile the lambda into a function object. When
-     *      compiling lambda(), indicate that we want to check the parent
-     *      scope(s) for values to capture.
-     *   2) If we find a value in a parent scope to capture, re-compile the
-     *      parent scope and turn that value into an environment global.
-     *   3) Repeat until complete.
-     *   n) when this function is called it needs to copy the function and
-     *      copy the environment it links to. This will probably need new
-     *      opcodes. (new closure?).
-     *
-     * Questions
-     *   * It kinda makes sense to turn a function object into a structure
-     *     that contains a pair of pointers, one to code, and one to its
-     *     environment. Creating a new closure would create a new instance of
-     *     this structure pointing to a cloned environment and the existing
-     *     code.
-     *   * When we create a new closure instance in code we need to track the
-     *     code object somewhere. Do we bury a reference into the body of
-     *     the code? Do we have some special function lookup table/registry?
-     */
-
-    BREAK();
-
-    return NULL;
 }
 
 static int
@@ -971,7 +936,6 @@ compile_set(struct compiler_context_t *context, struct instruction_t *next, stru
 
         set = allocate_instruction(context);
         set->opcode = OPCODE_SET;
-        set->size = 0;
         set->link.next = &place->link;
 
         return set;
@@ -1030,12 +994,10 @@ compile_set(struct compiler_context_t *context, struct instruction_t *next, stru
                                                                                                                     \
         ref = allocate_instruction(context);                                                                        \
         ref->opcode = OPCODE_MAKE_REF;                                                                              \
-        ref->size = 0;                                                                                              \
         ref->link.next = &index->link;                                                                              \
                                                                                                                     \
         load = allocate_instruction(context);                                                                       \
         load->opcode = OPCODE_LOAD;                                                                                 \
-        load->size = 0;                                                                                             \
         load->link.next = &ref->link;                                                                               \
                                                                                                                     \
         return load;                                                                                                \
@@ -1175,14 +1137,17 @@ calculate_bytecode_size_and_offsets(struct slist_t *root)
 static struct object_t *
 assemble(struct environment_t *environment, struct compiler_context_t *context, struct instruction_t *root)
 {
+    struct slist_t *local_slots;
     struct slist_t *insns;
     struct slist_t *i;
-    struct procedure_t *procedure;
-    void *mem;
+    struct evil_object_handle_t byte_code_ptr;
+    struct object_t *procedure;
+    struct object_t *byte_code;
     unsigned char *bytes;
     size_t num_bytes;
     size_t idx;
-    UNUSED(environment);
+    size_t fn_local_idx;
+    struct object_t *procedure_base;
 
     /*
      * This must be the last function called as it destructively alters the
@@ -1192,11 +1157,25 @@ assemble(struct environment_t *environment, struct compiler_context_t *context, 
     insns = slist_reverse(&root->link);
     idx = 0;
     num_bytes = calculate_bytecode_size_and_offsets(insns);
-    mem = gc_alloc(environment->heap, TAG_PROCEDURE, num_bytes);
-    procedure = mem;
-    bytes = procedure->byte_code;
-    procedure->num_args = context->num_args;
-    procedure->num_locals = context->max_stack_slots;
+
+    byte_code = gc_alloc(environment->heap, TAG_STRING, num_bytes);
+
+    /*
+     * If this gc_alloc call triggers a gc we can lose the byte_code reference
+     * above which would be bad (or entertaining) and cause many problems.
+     *
+     * GC TODO: Add the pointer referenced above to a managed pointer structure.
+     */
+    byte_code_ptr = evil_create_object_handle(environment->heap, byte_code);
+    procedure = gc_alloc(environment->heap, TAG_PROCEDURE, sizeof(struct object_t) * (FIELD_LOCALS + context->num_fn_locals));
+    byte_code = byte_code_ptr.object;
+
+    bytes = (unsigned char *)byte_code->value.string_value;
+    procedure_base = VECTOR_BASE(procedure);
+    procedure_base[FIELD_NUM_ARGS] = make_fixnum_object(context->num_args);
+    procedure_base[FIELD_NUM_LOCALS] = make_fixnum_object(context->max_stack_slots);
+    procedure_base[FIELD_NUM_FN_LOCALS] = make_fixnum_object(context->num_fn_locals);
+    procedure_base[FIELD_CODE] = make_ref(byte_code);
 
     for (i = insns; i != NULL; i = i->next)
     {
@@ -1307,7 +1286,27 @@ assemble(struct environment_t *environment, struct compiler_context_t *context, 
      */
     assert(idx == num_bytes);
 
-    return (struct object_t *)mem;
+    /*
+     * Insert the function local objects into the slotsin the function object.
+     */
+    local_slots = slist_reverse(&context->locals->link);
+
+    for (fn_local_idx = 0; local_slots != NULL; local_slots = local_slots->next, ++fn_local_idx)
+    {
+        struct function_local_t *local;
+        
+        local = (struct function_local_t *)local_slots;
+
+        procedure_base[FIELD_LOCALS + fn_local_idx] = make_ref(local->fn.object);
+        evil_destroy_object_handle(environment->heap, local->fn);
+    }
+    
+    /*
+     * The object handle is no longer needed at this point.
+     */
+    evil_destroy_object_handle(environment->heap, byte_code_ptr);
+
+    return procedure;
 }
 
 static struct instruction_t *
@@ -1394,6 +1393,10 @@ eliminate_branch_to_return(struct instruction_t *root)
         {
             if (insn->reloc->opcode == OPCODE_RETURN)
             {
+                /*
+                 * As this code writes over an existing opcode with a RETURN,
+                 * we need to explicitly set the opcode size here to zero.
+                 */
                 insn->opcode = OPCODE_RETURN;
                 insn->size = 0;
                 insn->reloc = NULL;
@@ -1461,16 +1464,19 @@ print_hex_bytes(const unsigned char *c, size_t size)
 static void
 disassemble_procedure(struct environment_t *environment, struct object_t *args, const char *name)
 {
-    void *mem;
-    struct procedure_t *procedure;
+    struct object_t *procedure;
+    struct object_t *byte_code_object;
     const unsigned char *ptr;
     size_t i;
     size_t num_bytes;
 
-    mem = args;
-    procedure = mem;
+    procedure = args;
     assert(procedure->tag_count.tag == TAG_PROCEDURE);
-    ptr = procedure->byte_code;
+
+    byte_code_object = deref(&VECTOR_BASE(procedure)[FIELD_CODE]);
+    assert(byte_code_object->tag_count.tag == TAG_STRING);
+
+    ptr = (unsigned char *)byte_code_object->value.string_value;
 
     evil_print("%s:\n", name);
 
@@ -1640,6 +1646,11 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
             case OPCODE_LDEMPTY:
                 print_hex_bytes(ptr + i, 1);
                 evil_print("LDEMPTY\n");
+                ++i;
+                break;
+            case OPCODE_LDFN:
+                print_hex_bytes(ptr + i, 1);
+                evil_print("LDFN\n");
                 ++i;
                 break;
             case OPCODE_STORE:
@@ -1848,10 +1859,8 @@ disassemble(struct environment_t *environment, struct object_t *args)
 }
 
 struct object_t
-lambda(struct environment_t *environment, struct object_t *lambda_body)
+compile_form_to_bytecode(struct compiler_context_t *previous_context, struct environment_t *environment, struct object_t *lambda_body)
 {
-
-    /*
     struct object_t *args;
     struct object_t *body;
     struct object_t *procedure;
@@ -1862,7 +1871,7 @@ lambda(struct environment_t *environment, struct object_t *lambda_body)
     body = CAR(CDR(lambda_body));
     root = NULL;
 
-    initialize_compiler_context(&context, environment, args);
+    initialize_compiler_context(&context, environment, args, previous_context);
 
     for (body = CDR(lambda_body); body != empty_pair; body = CDR(body))
     {
@@ -1879,5 +1888,92 @@ lambda(struct environment_t *environment, struct object_t *lambda_body)
     destroy_compiler_context(&context);
 
     return make_ref(procedure);
+}
+
+static struct instruction_t *
+compile_lambda(struct compiler_context_t *context, struct instruction_t *next, struct object_t *lambda_body)
+{
+    struct object_t procedure;
+    struct evil_object_handle_t procedure_handle;
+    int local_idx;
+    struct function_local_t *function_local;
+    struct instruction_t *load_this_fn;
+    struct instruction_t *index;
+    struct instruction_t *make_ref;
+    struct instruction_t *load;
+    struct environment_t *environment;
+
+    /*
+     * If this function is called then we're compiling a function that, when
+     * called, generates a function. Just keep that in mind.
+     */
+
+    /*
+     * Okay so here's what we need to do.
+     *   1) Call lambda() to compile the lambda into a function object. When
+     *      compiling lambda(), indicate that we want to check the parent
+     *      scope(s) for values to capture.
+     *   2) If we find a value in a parent scope to capture, re-compile the
+     *      parent scope and turn that value into an environment global.
+     *   3) Repeat until complete.
+     *   n) when this function is called it needs to copy the function and
+     *      copy the environment it links to. This will probably need new
+     *      opcodes. (new closure?).
+     *
+     * Questions
+     *   * It kinda makes sense to turn a function object into a structure
+     *     that contains a pair of pointers, one to code, and one to its
+     *     environment. Creating a new closure would create a new instance of
+     *     this structure pointing to a cloned environment and the existing
+     *     code.
+     *   * When we create a new closure instance in code we need to track the
+     *     code object somewhere. Do we bury a reference into the body of
+     *     the code? Do we have some special function lookup table/registry?
+     */
+
+    environment = context->environment;
+
+    procedure = compile_form_to_bytecode(context, environment, lambda_body);
+    procedure_handle = evil_create_object_handle(environment->heap, procedure.value.ref);
+
+    function_local = pool_alloc(&context->pool, sizeof(struct function_local_t));
+    function_local->fn = procedure_handle;
+    function_local->link.next = &context->locals->link;
+    context->locals = function_local;
+    local_idx = context->num_fn_locals++;
+
+    assert(local_idx <= (127 - FIELD_LOCALS));
+
+    load_this_fn = allocate_instruction(context);
+    load_this_fn->opcode = OPCODE_LDFN;
+    load_this_fn->link.next = &next->link;
+
+    index = allocate_instruction(context);
+    index->opcode = OPCODE_LDIMM_1_FIXNUM;
+    index->data.s1 = (char)(local_idx + FIELD_LOCALS);
+    index->size = 1;
+    index->link.next = &load_this_fn->link;
+
+    make_ref = allocate_instruction(context);
+    make_ref->opcode = OPCODE_MAKE_REF;
+    make_ref->link.next = &index->link;
+
+    load = allocate_instruction(context);
+    load->opcode = OPCODE_LOAD;
+    load->link.next = &make_ref->link;
+
+    return load;
+}
+
+struct object_t
+lambda(struct environment_t *environment, struct object_t *lambda_body)
+{
+    struct object_t procedure;
+
+    procedure = compile_form_to_bytecode(NULL, environment, lambda_body);
+    disassemble_procedure(environment, deref(&procedure), "unnamed_procedure");
+
+    return procedure;
+    //return compile_form_to_bytecode(NULL, environment, lambda_body);
 }
 

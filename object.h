@@ -13,30 +13,30 @@
 
 enum tag_t
 {
-    TAG_INVALID,
-    TAG_BOOLEAN,
-    TAG_SYMBOL,
-    TAG_CHAR,
-    TAG_VECTOR,
-    TAG_PAIR,
-    TAG_FIXNUM,
-    TAG_FLONUM,
-    TAG_STRING,
-    TAG_PROCEDURE,
+    TAG_INVALID,            /* 0 */
+    TAG_BOOLEAN,            /* 1 */
+    TAG_SYMBOL,             /* 2 */
+    TAG_CHAR,               /* 3 */
+    TAG_VECTOR,             /* 4 */
+    TAG_PAIR,               /* 5 */
+    TAG_FIXNUM,             /* 6 */
+    TAG_FLONUM,             /* 7 */
+    TAG_STRING,             /* 8 */
+    TAG_PROCEDURE,          /* 9 */
 
     /*
      * Special functions include read, eval, print, define. These functions 
      * are part of the core but must also be accessible and usable from within
      * the script.
      */
-    TAG_SPECIAL_FUNCTION,
+    TAG_SPECIAL_FUNCTION,   /* a */
 
     /*
      * The environment and heap are both given object tags as they will both
      * be traversed during garbage collection.
      */
-    TAG_ENVIRONMENT,
-    TAG_HEAP,
+    TAG_ENVIRONMENT,        /* b */
+    TAG_HEAP,               /* c */
 
     /*
      * References are how aggregate objects are handled within the system
@@ -44,7 +44,7 @@ enum tag_t
      * it is a reference to it that will be stored in a pair, or on the stack,
      * or within another vector.
      */
-    TAG_REFERENCE,
+    TAG_REFERENCE,          /* d */
 
     /*
      * Inner references are a type of reference to the inside of an aggregate
@@ -52,7 +52,7 @@ enum tag_t
      * pointers. Typically these are created with functions like vector-ref,
      * string-ref, vector-set!, string-set!
      */
-    TAG_INNER_REFERENCE
+    TAG_INNER_REFERENCE     /* e */
 };
 
 struct tag_count_t
@@ -142,6 +142,19 @@ static inline struct object_t
 make_empty_ref(void)
 {
     return make_ref(empty_pair);
+}
+
+static inline struct object_t
+make_fixnum_object(int64_t value)
+{
+    struct object_t object;
+
+    object.tag_count.tag = TAG_FIXNUM;
+    object.tag_count.flag = 0;
+    object.tag_count.count = 1;
+    object.value.fixnum_value = value;
+
+    return object;
 }
 
 /*
