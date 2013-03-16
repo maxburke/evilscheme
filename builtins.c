@@ -137,7 +137,7 @@ vector(struct environment_t *environment, struct object_t *args)
 
     assert(idx < 65536);
 
-    vector = gc_alloc(environment->heap, TAG_VECTOR, sizeof(struct object_t) * idx);
+    vector = gc_alloc_vector(environment->heap, idx);
     vector->tag_count.count = (unsigned short)idx;
 
     base = VECTOR_BASE(vector);

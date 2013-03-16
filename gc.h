@@ -37,6 +37,9 @@ gc_create(void *heap_mem, size_t heap_size);
 struct object_t *
 gc_alloc(struct heap_t *heap, enum tag_t type, size_t extra_bytes);
 
+struct object_t *
+gc_alloc_vector(struct heap_t *heap, size_t count);
+
 void
 gc_collect(struct heap_t *heap);
 

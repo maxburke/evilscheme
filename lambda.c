@@ -1025,6 +1025,7 @@ COMPILE_PAIR_ACCESSOR(rest, 1)
 #define SYMBOL_LET      0xd8b7ad186b906050
 #define SYMBOL_LETSTAR  0xd07b707ec653a7da
 #define SYMBOL_LETREC   0x4c663d13ff171fa
+#define SYMBOL_DEFINE   0xf418d40f59d3f9a4
 
 static struct instruction_t *
 compile_form(struct compiler_context_t *context, struct instruction_t *next, struct object_t *body)
@@ -1085,6 +1086,8 @@ compile_form(struct compiler_context_t *context, struct instruction_t *next, str
             case SYMBOL_LET:
             case SYMBOL_LETSTAR:
                 return compile_let(context, next, function_args);
+            case SYMBOL_DEFINE:
+                return compile_define(context, next, function_args);
             default:
                 /*
                  * The function/procedure isn't one that is handled by the
@@ -1167,7 +1170,9 @@ assemble(struct environment_t *environment, struct compiler_context_t *context, 
      * GC TODO: Add the pointer referenced above to a managed pointer structure.
      */
     byte_code_ptr = evil_create_object_handle(environment->heap, byte_code);
-    procedure = gc_alloc(environment->heap, TAG_PROCEDURE, sizeof(struct object_t) * (FIELD_LOCALS + context->num_fn_locals));
+    procedure = gc_alloc_vector(environment->heap, FIELD_LOCALS + context->num_fn_locals);
+    procedure->tag_count.tag = TAG_PROCEDURE;
+
     byte_code = byte_code_ptr.object;
 
     bytes = (unsigned char *)byte_code->value.string_value;
@@ -1480,7 +1485,7 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
 
     evil_print("%s:\n", name);
 
-    for (i = 0, num_bytes = procedure->tag_count.count; i < num_bytes;)
+    for (i = 0, num_bytes = byte_code_object->tag_count.count; i < num_bytes;)
     {
         unsigned char c = ptr[i];
 
