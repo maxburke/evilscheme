@@ -48,11 +48,15 @@ int print_buffer_size;
 void
 evil_debug_print(const char *format, ...)
 {
+    va_list args;
+
     /*
-     * Swallow all debug output while the tests are exsecuting.
+     * Spew all debug output to stdout for the tests, but don't track it below.
      */
 
-    UNUSED(format);
+    va_start(args, format);
+    vprintf(format, args);
+    va_end(args);
 }
 
 void
@@ -85,6 +89,8 @@ evil_print(const char *format, ...)
     }
 
     print_buffer_offset += required_length;
+
+    vprintf(format, args);
 }
 
 static void
