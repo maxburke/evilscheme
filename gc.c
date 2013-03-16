@@ -75,13 +75,22 @@ gc_alloc(struct heap_t *heap, enum tag_t type, size_t extra_bytes)
 
     object = gc_perform_alloc(heap, size);
 
-    if (type == TAG_STRING || type == TAG_PROCEDURE)
+    /*
+     * Vectors (and procedures) need to be allocated through gc_alloc_vector
+     * below.
+     */
+    assert(type != TAG_VECTOR && type != TAG_PROCEDURE);
+
+    if (type == TAG_STRING)
     {
         assert(extra_bytes < 65536);
         object->tag_count.count = (unsigned short)extra_bytes;
     }
     else if (type == TAG_PAIR)
     {
+        /*
+         * TODO: pairs should probably go through gc_alloc_vector below.
+         */
         object->tag_count.count = 2;
     }
     else
