@@ -457,18 +457,15 @@ tokenize(const char *input)
 }
 
 struct object_t
-read(struct environment_t *environment, struct object_t *args)
+read(struct environment_t *environment, int num_args, struct object_t *args)
 {
-    struct object_t *object;
     struct object_t *arg;
     struct token_t *head;
 
-    object = deref(args);
-
     UNUSED(environment);
-    assert(object->tag_count.tag == TAG_PAIR);
-
-    arg = CAR(object);
+    assert(num_args == 1);
+    
+    arg = deref(args);
     assert(arg->tag_count.tag == TAG_STRING);
 
     head = tokenize(arg->value.string_value);

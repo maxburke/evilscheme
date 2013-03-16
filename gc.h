@@ -28,6 +28,9 @@ struct evil_object_handle_t
 struct evil_object_handle_t
 evil_create_object_handle(struct heap_t *heap, struct object_t *object);
 
+struct evil_object_handle_t
+evil_create_object_handle_from_value(struct heap_t *heap, struct object_t object);
+
 void
 evil_destroy_object_handle(struct heap_t *heap, struct evil_object_handle_t handle);
 

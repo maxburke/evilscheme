@@ -50,26 +50,17 @@ get_bound_location(struct environment_t *environment, uint64_t symbol_hash, int 
 }
 
 struct object_t *
-bind(struct environment_t *environment, struct object_t *args)
+bind(struct environment_t *environment, struct object_t symbol)
 {
     struct object_t *location;
-    struct object_t *symbol;
-    struct object_t *object;
     struct symbol_table_fragment_t *current_fragment;
     struct symbol_table_fragment_t *new_fragment;
     size_t i;
 
-    object = deref(args);
-    assert(object->tag_count.tag == TAG_PAIR);
-    symbol = CAR(object);
-
-    assert(symbol->tag_count.tag == TAG_SYMBOL);
-    location = get_bound_location(environment, symbol->value.symbol_hash, 0);
+    assert(symbol.tag_count.tag == TAG_SYMBOL);
+    location = get_bound_location(environment, symbol.value.symbol_hash, 0);
     if (location != NULL)
         return location;
-
-    current_fragment = environment->symbol_table_fragment;
-    symbol = CAR(object);
 
     for (current_fragment = environment->symbol_table_fragment;
             current_fragment != NULL;
@@ -81,7 +72,7 @@ bind(struct environment_t *environment, struct object_t *args)
         {
             if (entries[i].symbol.value.symbol_hash == INVALID_HASH)
             {
-                entries[i].symbol = *symbol;
+                entries[i].symbol = symbol;
                 return &entries[i].object;
             }
         }
@@ -90,7 +81,7 @@ bind(struct environment_t *environment, struct object_t *args)
     new_fragment = calloc(sizeof(struct symbol_table_fragment_t), 1);
     new_fragment->next_fragment = environment->symbol_table_fragment;
     environment->symbol_table_fragment = new_fragment;
-    new_fragment->entries[0].symbol = *symbol;
+    new_fragment->entries[0].symbol = symbol;
 
     return &new_fragment->entries[0].object;
 }

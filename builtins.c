@@ -17,37 +17,43 @@
 #include "vm.h"
 
 struct object_t
-quote(struct environment_t *environment, struct object_t *args)
+quote(struct environment_t *environment, int num_args, struct object_t *args)
 {
     UNUSED(environment);
-    assert(args->tag_count.tag == TAG_PAIR);
-    return *CAR(args);
+    UNUSED(num_args);
+
+    assert(num_args == 1);
+
+    return *args;
 }
 
 struct object_t
-cons(struct environment_t *environment, struct object_t *args)
+cons(struct environment_t *environment, int num_args, struct object_t *args)
 {
     struct object_t *object;
 
     UNUSED(environment);
-    
-    assert(args->tag_count.tag == TAG_PAIR);
-    assert(CDR(args)->tag_count.tag == TAG_PAIR);
+    UNUSED(num_args);
 
+    assert(num_args == 2);
+    
     object = gc_alloc(environment->heap, TAG_PAIR, 0);
 
-    *RAW_CAR(object) = make_ref(CAR(args));
-    *RAW_CDR(object) = make_ref(CAR(CDR(args)));
+    *RAW_CAR(object) = args[0];
+    *RAW_CDR(object) = args[1];
 
     return make_ref(object);
 }
 
 struct object_t
-car(struct environment_t *environment, struct object_t *args)
+car(struct environment_t *environment, int num_args, struct object_t *args)
 {
     struct object_t *object;
 
     UNUSED(environment);
+    UNUSED(num_args);
+
+    assert(num_args == 1);
 
     object = deref(args);
     assert(object->tag_count.tag == TAG_PAIR);
@@ -56,11 +62,14 @@ car(struct environment_t *environment, struct object_t *args)
 }
 
 struct object_t
-cdr(struct environment_t *environment, struct object_t *args)
+cdr(struct environment_t *environment, int num_args, struct object_t *args)
 {
     struct object_t *object;
 
     UNUSED(environment);
+    UNUSED(num_args);
+
+    assert(num_args == 1);
 
     object = deref(args);
     assert(object->tag_count.tag == TAG_PAIR);
@@ -70,149 +79,147 @@ cdr(struct environment_t *environment, struct object_t *args)
 
 
 struct object_t
-set(struct environment_t *environment, struct object_t *args)
+set(struct environment_t *environment, int num_args, struct object_t *args)
 {
     struct object_t *object;
+    struct object_t *reference;
+    struct object_t *target;
+    unsigned char ref_type;
 
     UNUSED(environment);
+    UNUSED(num_args);
 
-    object = deref(args);
-    assert(object->tag_count.tag == TAG_PAIR);
-    assert(CDR(object)->tag_count.tag == TAG_PAIR);
-    BREAK();
+    assert(num_args == 2);
+
+    reference = args + 0;
+    ref_type = reference->tag_count.tag;
+    target = reference->value.ref;
+
+    object = args + 1;
+    
+    if (ref_type == TAG_INNER_REFERENCE)
+    {
+        unsigned char target_type;
+        unsigned short offset;
+
+        target_type = target->tag_count.tag;
+        offset = reference->tag_count.count;
+
+        if (target_type == TAG_STRING)
+        {
+            char *ptr;
+
+            assert(object->tag_count.tag == TAG_CHAR);
+            ptr = target->value.string_value + offset;
+            *ptr = (char)object->value.fixnum_value;
+        }
+        else
+        {
+            struct object_t *resolved_reference;
+            assert(target_type == TAG_VECTOR);
+            resolved_reference = &VECTOR_BASE(object)[offset];
+            *resolved_reference = *object;
+        }
+    }
+    else
+    {
+        assert(ref_type == TAG_REFERENCE);
+
+        *target = *object;
+    }
 
     return make_empty_ref();
 }
 
 struct object_t
-define(struct environment_t *environment, struct object_t *args)
+define(struct environment_t *environment, int num_args, struct object_t *args)
 {
-    /* fetch symbol binding location */
-    /* evaluate argument */
-    /* call set! on it */
-    /* TODO: I think this incorrect, I don't think we need to evaluate place, it will
-       either be a variable or a list of (variable lambda-list*) */
-    struct object_t *object;
     struct object_t *place;
-    struct object_t *rest;
-    struct object_t value;
+    struct object_t *value;
+    UNUSED(num_args);
 
-    object = deref(args);
-    assert(object->tag_count.tag == TAG_PAIR);
+    assert(num_args == 2);
 
-    rest = CDR(object);
-    assert(rest->tag_count.tag == TAG_PAIR);
-    place = CAR(object);
-    value = eval(environment, rest);
-    
-    assert(place->tag_count.tag == TAG_SYMBOL || place->tag_count.tag == TAG_PAIR);
+    place = args + 0;
+    value = args + 1;
+
     if (place->tag_count.tag == TAG_SYMBOL)
     {
-        struct object_t *location = bind(environment, object);
-        *location = value;
+        struct object_t *location;
+
+        location = bind(environment, *place);
+        *location = *value;
     }
     else
     {
+        /*
+         * We're evaluating (define (x y z) ...) where the place is the name of
+         * a function plus a lambda list. Maybe expressions of this form can be
+         * turned into (define x (lambda (y z) ...)) by the reader? Maybe down
+         * the road...
+         */
         BREAK();
-        /* Here is where the "place" evaluates to a function + lambda list */
     }
 
-    return value;
+    return *value;
 }
 
 struct object_t
-vector(struct environment_t *environment, struct object_t *args)
+vector(struct environment_t *environment, int num_args, struct object_t *args)
 {
-    struct object_t *object;
-    struct object_t *i;
     struct object_t *vector;
-    struct object_t *base;
-    size_t idx;
+    struct object_t *vector_base;
+    int i;
 
-    object = deref(args);
-    idx = 0;
+    assert(num_args < 65536);
 
-    for (i = object; i != empty_pair; i = CDR(i), ++idx)
-        ;
+    vector = gc_alloc_vector(environment->heap, num_args);
+    vector_base = VECTOR_BASE(vector);
 
-    assert(idx < 65536);
-
-    vector = gc_alloc_vector(environment->heap, idx);
-    vector->tag_count.count = (unsigned short)idx;
-
-    base = VECTOR_BASE(vector);
-    idx = 0;
-
-    for (i = object; i != empty_pair; i = CDR(i), ++idx)
+    for (i = 0; i < num_args; ++i)
     {
-        struct object_t value;
-
-        value = eval(environment, i);
-
-        switch (value.tag_count.tag)
-        {
-            case TAG_BOOLEAN:
-            case TAG_SYMBOL:
-            case TAG_CHAR:
-            case TAG_FIXNUM:
-            case TAG_FLONUM:
-            case TAG_PAIR:
-            case TAG_REFERENCE:
-            case TAG_INNER_REFERENCE:
-                base[idx] = value;
-                break;
-            case TAG_VECTOR:
-            case TAG_STRING:
-            case TAG_PROCEDURE:
-            case TAG_SPECIAL_FUNCTION:
-                /*
-                 * Only references to these types should ever be returned here.
-                 * This is an error condition.
-                 */
-                BREAK();
-                break;
-            case TAG_ENVIRONMENT:
-            case TAG_HEAP:
-                BREAK();
-                break;
-        }
+        vector_base[i] = args[i];
     }
 
     return make_ref(vector);
 }
 
 struct object_t
-apply(struct environment_t *environment, struct object_t *args)
+apply(struct environment_t *environment, int num_args, struct object_t *args)
 {
-    struct object_t *object;
-    struct object_t *bound_location;
-    struct object_t *function_args;
-    struct object_t *function;
+    struct object_t *fn;
+    struct object_t *fn_args;
+    unsigned char fn_tag;
+    int num_args_for_fn;
 
-    /*
-     * TODO: This function should verify that the number of arguments passed
-     * in matches what the function can take, otherwise things will blow up.
-     * Alternative TODO: &rest-style handling of extra arguments.
-     */
+    fn = deref(args + 0);
+    fn_tag = fn->tag_count.tag;
+    fn_args = args + 1;
+    num_args_for_fn = num_args - 1;
 
-    object = deref(args);
-    function = CAR(object);
-    function_args = CDR(object);
-
-    if (function->tag_count.tag == TAG_SYMBOL)
+    if (fn_tag == TAG_SYMBOL)
     {
-        bound_location = get_bound_location(environment, function->value.symbol_hash, 1);
+        struct object_t *bound_location;
+
+        bound_location = get_bound_location(environment, fn->value.symbol_hash, 1);
         assert(bound_location != NULL);
-        function = bound_location;
+
+        fn = deref(bound_location);
+        fn_tag = fn->tag_count.tag;
     }
 
-    function = deref(function);
-    switch (function->tag_count.tag)
+    switch (fn->tag_count.tag)
     {
         case TAG_SPECIAL_FUNCTION:
-            return function->value.special_function_value(environment, function_args);
+            {
+                special_function_t special_fn;
+
+                special_fn = fn->value.special_function_value;
+                return special_fn(environment, num_args_for_fn, fn_args);
+            }
         case TAG_PROCEDURE:
-            return vm_run(environment, function, function_args);
+            return vm_run(environment, fn, num_args_for_fn, fn_args);
+            break;
         default:
             BREAK();
             break;
@@ -224,36 +231,34 @@ apply(struct environment_t *environment, struct object_t *args)
 /*
  * eval
  */
-
 struct object_t
-eval(struct environment_t *environment, struct object_t *args)
+eval(struct environment_t *environment, int num_args, struct object_t *args)
 {
     struct object_t *object;
-    struct object_t *first_arg;
-    struct object_t *bound_location;
+
+    assert(num_args == 1);
 
     object = deref(args);
-
-    assert(object->tag_count.tag == TAG_PAIR);
-
-    first_arg = CAR(object);
-    switch (first_arg->tag_count.tag)
+    switch (object->tag_count.tag)
     {
-        case TAG_SPECIAL_FUNCTION:
-            return first_arg->value.special_function_value(environment, CDR(object));
         case TAG_BOOLEAN:
         case TAG_CHAR:
         case TAG_FIXNUM:
         case TAG_FLONUM:
-            return *first_arg;
+            return *object;
         case TAG_VECTOR:
+        case TAG_SPECIAL_FUNCTION:
         case TAG_PROCEDURE:
         case TAG_STRING:
-            return make_ref(first_arg);
+            return *args;
         case TAG_SYMBOL:
-            bound_location = get_bound_location(environment, first_arg->value.symbol_hash, 1);
-            assert(bound_location != NULL);
-            return *bound_location;
+            {
+                struct object_t *bound_location;
+
+                bound_location = get_bound_location(environment, object->value.symbol_hash, 1);
+                assert(bound_location != NULL);
+                return *bound_location;
+            }
         case TAG_PAIR:
             {
                 /*
@@ -265,21 +270,23 @@ eval(struct environment_t *environment, struct object_t *args)
                  * interpreted, for every bit of functionality supported
                  * by the runtime. And that's just not lazy!
                  */
-                struct object_t *args;
-                struct object_t *body;
+                struct object_t *wrapper_args;
+                struct object_t *wrapper_body;
                 struct object_t fn;
 
-                args = gc_alloc(environment->heap, TAG_PAIR, 0);
-                body = gc_alloc(environment->heap, TAG_PAIR, 0);
+                wrapper_args = gc_alloc(environment->heap, TAG_PAIR, 0);
+                wrapper_body = gc_alloc(environment->heap, TAG_PAIR, 0);
 
-                *RAW_CAR(args) = make_empty_ref();
-                *RAW_CDR(args) = make_ref(body);
-                *RAW_CAR(body) = make_ref(first_arg);
-                *RAW_CDR(body) = make_empty_ref();
+                *RAW_CAR(wrapper_args) = make_empty_ref();
+                *RAW_CDR(wrapper_args) = make_ref(wrapper_body);
+                *RAW_CAR(wrapper_body) = *args;
+                *RAW_CDR(wrapper_body) = make_empty_ref();
 
-                fn = lambda(environment, args);
-                return vm_run(environment, &fn, empty_pair);
+                fn = lambda(environment, 1, wrapper_body);
+                return vm_run(environment, &fn, 0, empty_pair);
             }
+            break;
+        default:
             break;
     }
 
@@ -290,13 +297,15 @@ eval(struct environment_t *environment, struct object_t *args)
 /*
  * print
  */
-
 struct object_t
-print(struct environment_t *environment, struct object_t *args)
+print(struct environment_t *environment, int num_args, struct object_t *args)
 {
     struct object_t *object;
 
     UNUSED(environment);
+    UNUSED(num_args);
+    assert(num_args == 1);
+
     object = deref(args);
 
     if (object == empty_pair)
@@ -325,7 +334,7 @@ print(struct environment_t *environment, struct object_t *args)
                 evil_print("#(");
                 for (i = 0; i < count; ++i)
                 {
-                    print(environment, base + i);
+                    print(environment, 1, base + i);
 
                     if (i < (count - 1))
                     {
@@ -354,9 +363,9 @@ print(struct environment_t *environment, struct object_t *args)
                 break;
             }
         case TAG_PAIR:
-            print(environment, CAR(object));
+            print(environment, 1, CAR(object));
             evil_print(" ");
-            print(environment, CDR(object));
+            print(environment, 1, CDR(object));
             break;
         case TAG_SPECIAL_FUNCTION:
             evil_print("<special function>");
@@ -370,6 +379,4 @@ print(struct environment_t *environment, struct object_t *args)
 
     return make_empty_ref();
 }
-
-
 

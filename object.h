@@ -64,7 +64,7 @@ struct tag_count_t
 
 struct object_t;
 struct environment_t;
-typedef struct object_t (*special_function_t)(struct environment_t *, struct object_t *);
+typedef struct object_t (*special_function_t)(struct environment_t *, int, struct object_t *);
 
 union object_value_t
 {

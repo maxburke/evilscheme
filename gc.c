@@ -148,6 +148,42 @@ evil_create_object_handle(struct heap_t *heap, struct object_t *object)
     return handle;
 }
 
+struct evil_object_handle_t
+evil_create_object_handle_from_value(struct heap_t *heap, struct object_t object)
+{
+    unsigned char tag;
+
+    tag = object.tag_count.tag;
+    switch (tag)
+    {
+        case TAG_VECTOR:
+        case TAG_PROCEDURE:
+        case TAG_STRING:
+        case TAG_PAIR:
+        case TAG_ENVIRONMENT:
+        case TAG_HEAP:
+            /*
+             * We shouldn't see reference types here directly.
+             */
+            BREAK();
+            break;
+        case TAG_REFERENCE:
+            return evil_create_object_handle(heap, object.value.ref);
+        default:
+            {
+                struct object_t *boxed_object;
+
+                boxed_object = gc_alloc(heap, tag, 0);
+                *boxed_object = object;
+
+                return evil_create_object_handle(heap, boxed_object);
+            }
+    }
+
+    BREAK();
+    return evil_create_object_handle(heap, NULL);
+}
+
 void
 evil_destroy_object_handle(struct heap_t *heap, struct evil_object_handle_t handle)
 {

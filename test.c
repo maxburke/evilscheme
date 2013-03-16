@@ -218,25 +218,23 @@ create_test_environment(void)
 static int
 run_test(struct environment_t *environment, const char *test, const char *expected)
 {
+    struct evil_object_handle_t string_handle;
+    struct evil_object_handle_t ast_handle;
+    struct evil_object_handle_t result_handle;
+
+    struct object_t *string;
     size_t test_length;
-    struct object_t *args;
-    struct object_t *input_object;
-    struct object_t arg_ref;
-    struct object_t object;
-    struct object_t result;
 
     reset_print_buffer();
-
     test_length = strlen(test);
-    args = gc_alloc(environment->heap, TAG_PAIR, 0);
-    input_object = gc_alloc(environment->heap, TAG_STRING, test_length);
-    memmove(input_object->value.string_value, test, test_length);
 
-    *CAR(args) = make_ref(input_object);
-    arg_ref = make_ref(args);
-    object = read(environment, &arg_ref);
-    result = eval(environment, &object);
-    print(environment, &result);
+    string = gc_alloc(environment->heap, TAG_STRING, test_length);
+    memmove(string->value.string_value, test, test_length);
+    string_handle = evil_create_object_handle(environment->heap, string);
+
+    ast_handle = evil_create_object_handle_from_value(environment->heap, read(environment, 1, string_handle.object));
+    result_handle = evil_create_object_handle_from_value(environment->heap, eval(environment, 1, ast_handle.object));
+    print(environment, 1, result_handle.object);
 
     return strcmp(expected, print_buffer) == 0;
 }

@@ -74,11 +74,9 @@ environment_initialize(struct environment_t *environment)
 
     for (i = 0; i < NUM_INITIALIZERS; ++i)
     {
-        struct object_t *p0;
         struct object_t *place;
         struct object_t symbol;
         struct object_t function;
-        struct object_t arg_ref;
 
         symbol.tag_count.tag = TAG_SYMBOL;
         symbol.tag_count.flag = 0;
@@ -90,12 +88,7 @@ environment_initialize(struct environment_t *environment)
         function.tag_count.count = 1;
         function.value.special_function_value = initializers[i].function;
 
-        p0 = gc_alloc(environment->heap, TAG_PAIR, 0);
-        *CAR(p0) = symbol;
-        *CDR(p0) = make_empty_ref();
-        arg_ref = make_ref(p0);
-
-        place = bind(environment, &arg_ref);
+        place = bind(environment, symbol);
         *place = function;
     }
 }

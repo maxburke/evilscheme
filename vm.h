@@ -229,7 +229,7 @@ enum procedure_field_index_t
 };
 
 struct object_t
-vm_run(struct environment_t *environment, struct object_t *fn, struct object_t *args);
+vm_run(struct environment_t *environment, struct object_t *fn, int num_args, struct object_t *args);
 
 union convert_two_t
 {

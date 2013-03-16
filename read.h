@@ -11,7 +11,7 @@ struct object_t;
 struct environment_t;
 
 struct object_t
-read(struct environment_t *environment, struct object_t *object);
+read(struct environment_t *environment, int num_args, struct object_t *object);
 
 #endif
 

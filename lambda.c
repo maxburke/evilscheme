@@ -909,14 +909,29 @@ compile_let(struct compiler_context_t *context, struct instruction_t *next, stru
 }
 
 static struct instruction_t *
+compile_define(struct compiler_context_t *context, struct instruction_t *next, struct object_t *args)
+{
+    struct object_t *symbol_form;
+    struct object_t *value_form;
+
+    symbol_form = CAR(args);
+    value_form = CAR(CDR(args));
+
+    UNUSED(context);
+    UNUSED(next);
+    BREAK();
+
+    assert(symbol_form->tag_count.tag == TAG_SYMBOL);
+
+    return NULL;
+}
+
+static struct instruction_t *
 compile_set(struct compiler_context_t *context, struct instruction_t *next, struct object_t *args)
 {
     struct object_t *place_form;
     struct object_t *value_form;
     struct instruction_t *value;
-
-    UNUSED(next);
-    UNUSED(context);
 
     place_form = CAR(args);
     value_form = CAR(CDR(args));
@@ -1829,14 +1844,16 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
 }
 
 struct object_t
-disassemble(struct environment_t *environment, struct object_t *args)
+disassemble(struct environment_t *environment, int num_args, struct object_t *args)
 {
     struct object_t symbol;
     struct object_t *slot;
     struct object_t *function;
     const char *name;
 
-    symbol = eval(environment, args);
+    UNUSED(num_args);
+    assert(num_args == 1);
+    symbol = *args;
 
     assert(symbol.tag_count.tag == TAG_SYMBOL);
     slot = get_bound_location(environment, symbol.value.symbol_hash, 1);
@@ -1971,12 +1988,15 @@ compile_lambda(struct compiler_context_t *context, struct instruction_t *next, s
 }
 
 struct object_t
-lambda(struct environment_t *environment, struct object_t *lambda_body)
+lambda(struct environment_t *environment, int num_args, struct object_t *lambda_body)
 {
     struct object_t procedure;
 
+    UNUSED(num_args);
+    assert(num_args == 1);
+
     procedure = compile_form_to_bytecode(NULL, environment, lambda_body);
-    disassemble_procedure(environment, deref(&procedure), "unnamed_procedure");
+disassemble_procedure(environment, deref(&procedure), "unnamed procedure");
 
     return procedure;
     //return compile_form_to_bytecode(NULL, environment, lambda_body);

@@ -30,6 +30,6 @@ struct object_t *
 get_bound_location(struct environment_t *environment, uint64_t symbol_hash, int recurse);
 
 struct object_t *
-bind(struct environment_t *environment, struct object_t *args);
+bind(struct environment_t *environment, struct object_t symbol);
 
 #endif

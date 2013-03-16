@@ -171,49 +171,18 @@ vm_compare_equal(const struct object_t *a, const struct object_t *b);
         ++sp;                                                                               \
     }
 
-static int
-vm_push_args_to_stack(struct environment_t *environment, struct object_t *args)
+static void
+vm_push_args_to_stack(struct environment_t *environment, int num_args, struct object_t *args)
 {
-    struct object_t *i;
     struct object_t *stack_ptr;
-    struct object_t *ptr;
-    int count;
 
-    /*
-     * vm_push_args_to_stack pushes the args in forward order to the bottom of
-     * the stack and then memcpy's them to where they need to be. This allows
-     * them to be in the correct order without having to do some complex
-     * push + reversal.
-     */
-    
     stack_ptr = environment->stack_ptr;
-    ptr = environment->stack_bottom;
-    count = 0;
+    stack_ptr -= num_args;
+    memmove(stack_ptr, args, num_args * sizeof(struct object_t));
 
-    for (i = args; i != empty_pair; i = CDR(i))
-    {
-        struct object_t *object;
-        
-        object = CAR(i);
-        assert(object->tag_count.count == 1);
-        assert(ptr < stack_ptr);
-        *ptr++ = *object;
-        ++count;
-    }
-
-    stack_ptr -= count;
-
-    memmove(stack_ptr,
-            environment->stack_bottom,
-            count * sizeof(struct object_t));
-
-    memset(environment->stack_bottom,
-            0,
-            count * sizeof(struct object_t));
+    memset(environment->stack_bottom, 0, num_args * sizeof(struct object_t));
 
     environment->stack_ptr = stack_ptr - 1;
-
-    return count;
 }
 
 static inline struct object_t *
@@ -530,13 +499,12 @@ vm_extract_num_locals(struct object_t *procedure)
 }
 
 struct object_t
-vm_run(struct environment_t *environment, struct object_t *initial_function, struct object_t *args)
+vm_run(struct environment_t *environment, struct object_t *initial_function, int num_args, struct object_t *args)
 {
     struct object_t *procedure;
     struct object_t *program_area;
     struct object_t *sp;
     struct object_t *old_stack;
-    int num_args;
     unsigned char *pc_base;
     unsigned char *pc;
 
@@ -565,7 +533,7 @@ vm_run(struct environment_t *environment, struct object_t *initial_function, str
      * arg0 is at program_area[1]
      */
 
-    num_args = vm_push_args_to_stack(environment, args);
+    vm_push_args_to_stack(environment, num_args, args);
     assert(num_args == vm_extract_num_args(procedure));
     sp = environment->stack_ptr;
 
