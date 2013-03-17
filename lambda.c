@@ -1484,6 +1484,13 @@ promote_tailcalls(struct instruction_t *root)
             {
                 next->opcode = OPCODE_TAILCALL;
 
+                /*
+                 * This used to eliminate the return instruction that occurred
+                 * after a tailcall but I think it needs to be here still. For
+                 * VM bytecode functions this is an unreachable instruction
+                 * but it will be necessary for non-bytecode (ie, external C)
+                 * functions.
+
                 if (prev != NULL)
                 {
                     prev->link.next = &next->link;
@@ -1492,6 +1499,7 @@ promote_tailcalls(struct instruction_t *root)
                 {
                     root = next;
                 }
+                */
             }
         }
 
