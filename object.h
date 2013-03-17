@@ -101,6 +101,16 @@ type_name(enum tag_t tag);
 #define CAR(x) deref((VECTOR_BASE(x)))
 #define CDR(x) deref((VECTOR_BASE(x) + 1))
 
+static inline int
+is_reference_type(struct object_t *ptr)
+{
+    unsigned char tag;
+
+    tag = ptr->tag_count.tag;
+
+    return (tag == TAG_PAIR || tag == TAG_VECTOR || tag == TAG_PROCEDURE || tag == TAG_STRING || tag == TAG_SPECIAL_FUNCTION || tag == TAG_ENVIRONMENT);
+}
+
 /*
  * make_ref creates a reference to the specified object. The VM assumes that
  * only value types (boolean/char/fixnum/flonum/references) exist on the
@@ -116,11 +126,8 @@ static inline struct object_t
 make_ref(struct object_t *ptr)
 {
     struct object_t ref;
-    unsigned char tag;
 
-    tag = ptr->tag_count.tag;
-
-    if (tag == TAG_PAIR || tag == TAG_VECTOR || tag == TAG_PROCEDURE || tag == TAG_STRING || tag == TAG_SPECIAL_FUNCTION)
+    if (is_reference_type(ptr)) 
     {
         ref.tag_count.tag = TAG_REFERENCE;
         ref.tag_count.flag = 0;
