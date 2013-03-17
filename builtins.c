@@ -153,10 +153,13 @@ define(struct environment_t *environment, int num_args, struct object_t *args)
     else
     {
         /*
-         * We're evaluating (define (x y z) ...) where the place is the name of
-         * a function plus a lambda list. Maybe expressions of this form can be
-         * turned into (define x (lambda (y z) ...)) by the reader? Maybe down
-         * the road...
+         * We're likley evaluating (define (x y z) ...) where the place is the
+         * name of a function plus a lambda list. Maybe expressions of this
+         * form can be turned into (define x (lambda (y z) ...)) by the reader?
+         * Maybe down the road...
+         *
+         * We may also have some bad syntax here and are evaluating something
+         * like (define 2 3).
          */
         BREAK();
     }

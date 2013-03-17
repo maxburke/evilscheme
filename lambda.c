@@ -28,6 +28,27 @@
 #define MAX(a,b) ((a)>(b)?(a):(b))
 #endif
 
+#define SYMBOL_IF       0x8325f07b4eb2a24
+#define SYMBOL_ADD      0xaf63bd4c8601b7f4
+#define SYMBOL_SUB      0xaf63bd4c8601b7f2
+#define SYMBOL_MUL      0xaf63bd4c8601b7f5
+#define SYMBOL_DIV      0xaf63bd4c8601b7f0
+#define SYMBOL_EQ       0xaf63bd4c8601b7e2
+#define SYMBOL_LT       0xaf63bd4c8601b7e3
+#define SYMBOL_GT       0xaf63bd4c8601b7e1
+#define SYMBOL_LE       0x8328c07b4eb7684
+#define SYMBOL_GE       0x8328a07b4eb736e
+#define SYMBOL_EQUALP   0xeacd8283b4334dba
+#define SYMBOL_NULLP    0xb4d24b59678288cd
+#define SYMBOL_FIRST    0xc0de9a9b8ec0e479
+#define SYMBOL_REST     0x9ab4817ea75b3deb
+#define SYMBOL_LAMBDA   0xdb4485ae65d0c568
+#define SYMBOL_SET      0x92eb577ea331d824
+#define SYMBOL_LET      0xd8b7ad186b906050
+#define SYMBOL_LETSTAR  0xd07b707ec653a7da
+#define SYMBOL_LETREC   0x4c663d13ff171fa
+#define SYMBOL_DEFINE   0xf418d40f59d3f9a4
+
 struct memory_pool_chunk_t
 {
     struct memory_pool_chunk_t *next;
@@ -648,7 +669,7 @@ compile_literal(struct compiler_context_t *context, struct instruction_t *next, 
         case TAG_SYMBOL:
             instruction->opcode = OPCODE_LDIMM_8_SYMBOL;
             instruction->size = 8;
-            instruction->data.u8 = (char)literal->value.symbol_hash;
+            instruction->data.u8 = literal->value.symbol_hash;
             break;
         case TAG_CHAR:
             instruction->opcode = OPCODE_LDIMM_1_CHAR;
@@ -913,17 +934,39 @@ compile_define(struct compiler_context_t *context, struct instruction_t *next, s
 {
     struct object_t *symbol_form;
     struct object_t *value_form;
+    struct instruction_t *value;
+    struct instruction_t *symbol;
+    struct instruction_t *define_symbol_location;
+    struct instruction_t *define_function;
+    struct instruction_t *call;
+    struct object_t define_symbol;
 
     symbol_form = CAR(args);
     value_form = CAR(CDR(args));
 
-    UNUSED(context);
-    UNUSED(next);
-    BREAK();
+    value = compile_form(context, next, value_form);
 
     assert(symbol_form->tag_count.tag == TAG_SYMBOL);
 
-    return NULL;
+    symbol = allocate_instruction(context);
+    symbol->opcode = OPCODE_LDIMM_8_SYMBOL;
+    symbol->size = 8;
+    symbol->data.u8 = symbol_form->value.symbol_hash;
+    symbol->link.next = &value->link;
+
+    define_symbol.tag_count.tag = TAG_SYMBOL;
+    define_symbol.tag_count.flag = 0;
+    define_symbol.tag_count.count = 1;
+    define_symbol.value.symbol_hash = SYMBOL_DEFINE;
+
+    define_symbol_location = compile_get_bound_location(context, symbol, &define_symbol);
+    define_function = compile_load(context, define_symbol_location);
+
+    call = allocate_instruction(context);
+    call->opcode = OPCODE_CALL;
+    call->link.next = &define_function->link;
+
+    return call;
 }
 
 static struct instruction_t *
@@ -1020,27 +1063,6 @@ compile_set(struct compiler_context_t *context, struct instruction_t *next, stru
 
 COMPILE_PAIR_ACCESSOR(first, 0)
 COMPILE_PAIR_ACCESSOR(rest, 1)
-
-#define SYMBOL_IF       0x8325f07b4eb2a24
-#define SYMBOL_ADD      0xaf63bd4c8601b7f4
-#define SYMBOL_SUB      0xaf63bd4c8601b7f2
-#define SYMBOL_MUL      0xaf63bd4c8601b7f5
-#define SYMBOL_DIV      0xaf63bd4c8601b7f0
-#define SYMBOL_EQ       0xaf63bd4c8601b7e2
-#define SYMBOL_LT       0xaf63bd4c8601b7e3
-#define SYMBOL_GT       0xaf63bd4c8601b7e1
-#define SYMBOL_LE       0x8328c07b4eb7684
-#define SYMBOL_GE       0x8328a07b4eb736e
-#define SYMBOL_EQUALP   0xeacd8283b4334dba
-#define SYMBOL_NULLP    0xb4d24b59678288cd
-#define SYMBOL_FIRST    0xc0de9a9b8ec0e479
-#define SYMBOL_REST     0x9ab4817ea75b3deb
-#define SYMBOL_LAMBDA   0xdb4485ae65d0c568
-#define SYMBOL_SET      0x92eb577ea331d824
-#define SYMBOL_LET      0xd8b7ad186b906050
-#define SYMBOL_LETSTAR  0xd07b707ec653a7da
-#define SYMBOL_LETREC   0x4c663d13ff171fa
-#define SYMBOL_DEFINE   0xf418d40f59d3f9a4
 
 static struct instruction_t *
 compile_form(struct compiler_context_t *context, struct instruction_t *next, struct object_t *body)
