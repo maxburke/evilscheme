@@ -79,7 +79,7 @@ gc_alloc(struct heap_t *heap, enum tag_t type, size_t extra_bytes)
      * Vectors (and procedures) need to be allocated through gc_alloc_vector
      * below.
      */
-    assert(type != TAG_VECTOR && type != TAG_PROCEDURE);
+    assert(type != TAG_VECTOR && type != TAG_PROCEDURE && type != TAG_SPECIAL_FUNCTION);
 
     if (type == TAG_STRING)
     {
@@ -113,7 +113,7 @@ gc_alloc_vector(struct heap_t *heap, size_t count)
     size_t total_alloc_size; 
     struct object_t *object;
 
-    total_alloc_size = (count * sizeof(struct object_t)) + sizeof(struct tag_count_t);
+    total_alloc_size = (count * sizeof(struct object_t)) + offsetof(struct object_t, value);
     object = gc_perform_alloc(heap, total_alloc_size);
 
     object->tag_count.tag = TAG_VECTOR;
