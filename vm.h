@@ -152,14 +152,14 @@ enum opcode_t
     OPCODE_COND_BRANCH,
 
     /*
-     * OPCODE_CALL 
+     * OPCODE_CALL [num args bytes 0..1]
      * Pops the target function from the stack. Pushes the return address, 
      * program area chain, and stack chain. Jumps to the specified method.
      */
     OPCODE_CALL,
 
     /*
-     * OPCODE_TAILCALL
+     * OPCODE_TAILCALL [num args bytes 0..1]
      * Pops the target function from the stack. Erases the invoking function
      * from the stack and then performs the function invocation as if it were
      * a call instruction.
@@ -227,6 +227,8 @@ enum procedure_field_index_t
     FIELD_CODE,
     FIELD_LOCALS
 };
+
+#define VARIADIC 0xffff
 
 struct object_t
 vm_run(struct environment_t *environment, struct object_t *fn, int num_args, struct object_t *args);

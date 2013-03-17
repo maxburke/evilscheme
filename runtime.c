@@ -17,6 +17,7 @@
 #include "read.h"
 #include "object.h"
 #include "runtime.h"
+#include "vm.h"
 
 struct object_t empty_pair_storage = { { TAG_PAIR, 0, 0 }, { 0 } };
 struct object_t *empty_pair = &empty_pair_storage;
@@ -52,22 +53,23 @@ environment_initialize(struct environment_t *environment)
     {
         const char *name;
         special_function_t function;
+        int num_args;
     };
 
     static struct special_function_initializer_t initializers[] = 
     {
-        { "quote", quote },
-        { "read", read },
-        { "eval", eval },
-        { "print", print },
-        { "set!", set },
-        { "cons", cons },
-        { "car", car },
-        { "cdr", cdr },
-        { "define", define },
-        { "lambda", lambda },
-        { "vector", vector },
-        { "disassemble", disassemble },
+        { "quote", quote, 1 },
+        { "read", read, 1 },
+        { "eval", eval, 1 },
+        { "print", print, 1 },
+        { "set!", set, 2 },
+        { "cons", cons, 2 },
+        { "car", car, 1 },
+        { "cdr", cdr, 1 },
+        { "define", define, 2 },
+        { "lambda", lambda, 1 },
+        { "vector", vector, VARIADIC },
+        { "disassemble", disassemble, 1 },
     };
     #define NUM_INITIALIZERS (sizeof initializers / sizeof initializers[0])
     size_t i;
@@ -76,6 +78,9 @@ environment_initialize(struct environment_t *environment)
     {
         struct object_t *place;
         struct object_t symbol;
+        struct object_t *procedure;
+        struct object_t *procedure_base;
+
         struct object_t function;
 
         symbol.tag_count.tag = TAG_SYMBOL;
@@ -83,13 +88,21 @@ environment_initialize(struct environment_t *environment)
         symbol.tag_count.count = 1;
         symbol.value.symbol_hash = register_symbol_from_string(environment, initializers[i].name);
 
-        function.tag_count.tag = TAG_SPECIAL_FUNCTION;
+        function.tag_count.tag = TAG_EXTERNAL_FUNCTION;
         function.tag_count.flag = 0;
         function.tag_count.count = 1;
         function.value.special_function_value = initializers[i].function;
 
+        procedure = gc_alloc_vector(environment->heap, FIELD_LOCALS);
+        procedure->tag_count.tag = TAG_SPECIAL_FUNCTION;
+        procedure_base = VECTOR_BASE(procedure);
+
+        procedure_base[FIELD_ENVIRONMENT] = make_ref((struct object_t *)environment);
+        procedure_base[FIELD_NUM_ARGS] = make_fixnum_object(initializers[i].num_args);
+        procedure_base[FIELD_CODE] = function;
+
         place = bind(environment, symbol);
-        *place = function;
+        *place = make_ref(procedure);
     }
 }
 

@@ -30,13 +30,14 @@ enum tag_t
      * the script.
      */
     TAG_SPECIAL_FUNCTION,   /* a */
+    TAG_EXTERNAL_FUNCTION,  /* b */
 
     /*
      * The environment and heap are both given object tags as they will both
      * be traversed during garbage collection.
      */
-    TAG_ENVIRONMENT,        /* b */
-    TAG_HEAP,               /* c */
+    TAG_ENVIRONMENT,        /* c */
+    TAG_HEAP,               /* d */
 
     /*
      * References are how aggregate objects are handled within the system
@@ -44,7 +45,7 @@ enum tag_t
      * it is a reference to it that will be stored in a pair, or on the stack,
      * or within another vector.
      */
-    TAG_REFERENCE,          /* d */
+    TAG_REFERENCE,          /* e */
 
     /*
      * Inner references are a type of reference to the inside of an aggregate
@@ -52,7 +53,7 @@ enum tag_t
      * pointers. Typically these are created with functions like vector-ref,
      * string-ref, vector-set!, string-set!
      */
-    TAG_INNER_REFERENCE     /* e */
+    TAG_INNER_REFERENCE     /* f */
 };
 
 struct tag_count_t
@@ -119,7 +120,7 @@ make_ref(struct object_t *ptr)
 
     tag = ptr->tag_count.tag;
 
-    if (tag == TAG_PAIR || tag == TAG_VECTOR || tag == TAG_PROCEDURE || tag == TAG_STRING)
+    if (tag == TAG_PAIR || tag == TAG_VECTOR || tag == TAG_PROCEDURE || tag == TAG_STRING || tag == TAG_SPECIAL_FUNCTION)
     {
         ref.tag_count.tag = TAG_REFERENCE;
         ref.tag_count.flag = 0;

@@ -481,7 +481,7 @@ vm_extract_num_args(struct object_t *procedure)
 {
     struct object_t *num_args;
 
-    num_args = deref(&VECTOR_BASE(procedure)[FIELD_NUM_ARGS]);
+    num_args = &VECTOR_BASE(procedure)[FIELD_NUM_ARGS];
     assert(num_args->tag_count.tag == TAG_FIXNUM);
 
     return (int)num_args->value.fixnum_value;
@@ -492,7 +492,7 @@ vm_extract_num_locals(struct object_t *procedure)
 {
     struct object_t *num_locals;
 
-    num_locals = deref(&VECTOR_BASE(procedure)[FIELD_NUM_LOCALS]);
+    num_locals = &VECTOR_BASE(procedure)[FIELD_NUM_LOCALS];
     assert(num_locals->tag_count.tag == TAG_FIXNUM);
 
     return (int)num_locals->value.fixnum_value;
@@ -660,7 +660,7 @@ vm_run(struct environment_t *environment, struct object_t *initial_function, int
                         object = ref->value.ref;
                         object_tag = object->tag_count.tag;
                         
-                        if (object_tag == TAG_VECTOR || object_tag == TAG_PROCEDURE)
+                        if (object_tag == TAG_VECTOR || object_tag == TAG_PROCEDURE || object_tag == TAG_SPECIAL_FUNCTION)
                         {
                             unsigned short index;
 
@@ -815,6 +815,10 @@ vm_run(struct environment_t *environment, struct object_t *initial_function, int
                     struct object_t *old_program_area;
                     struct object_t *fn;
                     unsigned char tag;
+                    union convert_two_t c2;
+
+                    memcpy(c2.bytes, pc, 2);
+                    pc += 2;
 
                     fn = deref(sp + 1);
                     ++sp;
@@ -837,6 +841,8 @@ vm_run(struct environment_t *environment, struct object_t *initial_function, int
                         sp = vm_push_ref(sp, old_program_area);
                         sp = vm_push_return_address(sp, fn, (unsigned short)return_offset);
                         sp -= vm_extract_num_locals(fn);
+
+                        assert((int)c2.u2 == vm_extract_num_args(fn));
 
                         /*
                          * call the function!
@@ -865,20 +871,17 @@ vm_run(struct environment_t *environment, struct object_t *initial_function, int
                     int current_fn_num_args;
                     int num_args;
                     int arg_diff;
+                    union convert_two_t c2;
+
+                    memcpy(c2.bytes, pc, 2);
+                    pc += 2;
 
                     fn = deref(sp + 1);
                     ++sp;
                     tag = fn->tag_count.tag;
 
-                    if (tag == TAG_SPECIAL_FUNCTION)
-                    {
-                        /*
-                         * Tail calls to C functions are not currently 
-                         * supported.
-                         */
-
-                        BREAK();
-                    }
+                    num_args = vm_extract_num_args(fn);
+                    assert(num_args == (int)c2.u2);
 
                     /*
                      * This code erases the current frame replacing it with the new call.
@@ -890,17 +893,22 @@ vm_run(struct environment_t *environment, struct object_t *initial_function, int
                      * change, they can just remain the same.
                      */
 
+/*
+ * TODO: This is quite broken currently. If we tail-call from the top frame
+ * we overwrite our arguments with the top-level return address/program area
+ * chain.
+ *
+ * Also, tailcalling to a C-function from the top level is going to cause some
+ * interesting problems when it comes to deciding how/when we return. 
+ *
+ * Thought needed!
+ */
                     current_fn_num_args = vm_extract_num_args(procedure);
-                    num_args = vm_extract_num_args(fn);
                     arg_diff = current_fn_num_args - num_args;
 
                     arg_slot = program_area + arg_diff;
                     memmove(arg_slot - 2, program_area - 2, 2 * sizeof(struct object_t));
                     memmove(arg_slot, sp + 1, num_args * sizeof(struct object_t));
-
-                    pc = vm_extract_code_pointer(fn);
-                    pc_base = pc;
-                    procedure = fn;
 
                     /*
                      * Adjust the stack pointer down below the program area and
@@ -913,6 +921,26 @@ vm_run(struct environment_t *environment, struct object_t *initial_function, int
                      * Set the new program area.
                      */
                     program_area = arg_slot;
+
+                    if (tag == TAG_SPECIAL_FUNCTION)
+                    {
+                        struct object_t *procedure_base;
+                        struct object_t result;
+                        special_function_t function_pointer;
+
+                        procedure_base = VECTOR_BASE(fn);
+                        function_pointer = procedure_base[FIELD_CODE].value.special_function_value;
+
+                        result = function_pointer(environment, num_args, sp + 1);
+                        sp += num_args;
+                        *(sp + 1) = result;
+                    }
+                    else
+                    {
+                        pc = vm_extract_code_pointer(fn);
+                        pc_base = pc;
+                        procedure = fn;
+                    }
                 }
                 VM_CONTINUE();
             case OPCODE_RETURN:

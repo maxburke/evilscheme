@@ -580,14 +580,15 @@ COMPILE_COMPARE(le, OPCODE_CMPN_LE)
 COMPILE_COMPARE(ge, OPCODE_CMPN_GE)
 
 static struct instruction_t *
-compile_arg_eval(struct compiler_context_t *context, struct instruction_t *next, struct object_t *args)
+compile_arg_eval(struct compiler_context_t *context, struct instruction_t *next, struct object_t *args, int *num_args)
 {
     struct instruction_t *evaluated_args;
 
     if (args == empty_pair)
         return next;
 
-    evaluated_args = compile_arg_eval(context, next, CDR(args));
+    ++*num_args;
+    evaluated_args = compile_arg_eval(context, next, CDR(args), num_args);
 
     return compile_form(context, evaluated_args, CAR(args));
 }
@@ -599,6 +600,7 @@ compile_call(struct compiler_context_t *context, struct instruction_t *next, str
     struct instruction_t *function_symbol;
     struct instruction_t *bound_location;
     struct instruction_t *call;
+    int num_args;
 
     /*
      * Optimization opportunity -- tail calls to self can be replaced with 
@@ -611,17 +613,25 @@ compile_call(struct compiler_context_t *context, struct instruction_t *next, str
      * TODO: Once the parser recognizes (define (foo x) ...), add this in.
      */
 
-    evaluated_args = compile_arg_eval(context, next, args);
+    num_args = 0;
+    evaluated_args = compile_arg_eval(context, next, args, &num_args);
     bound_location = compile_get_bound_location(context, evaluated_args, function);
     function_symbol = compile_load(context, bound_location);
 
     /*
      * All function calls are emitted as normal calls here. Later we run a pass
      * over the bytecode that converts calls to tailcalls if possible.
+     *
+     * We embed the number of arguments passed into this particular invocation
+     * so that at runtime we can verify that the arity is correct for the
+     * function call.
      */
+    assert(num_args < 65536);
 
     call = allocate_instruction(context);
     call->link.next = &function_symbol->link;
+    call->data.u2 = (unsigned short)num_args;
+    call->size = 2;
     call->opcode = OPCODE_CALL;
 
     return call;
@@ -963,6 +973,8 @@ compile_define(struct compiler_context_t *context, struct instruction_t *next, s
     define_function = compile_load(context, define_symbol_location);
 
     call = allocate_instruction(context);
+    call->data.u2 = 2;
+    call->size = 2;
     call->opcode = OPCODE_CALL;
     call->link.next = &define_function->link;
 
@@ -1232,6 +1244,8 @@ assemble(struct environment_t *environment, struct compiler_context_t *context, 
 
         switch (opcode)
         {
+            case OPCODE_CALL:
+            case OPCODE_TAILCALL:
             case OPCODE_STSLOT_X:
             case OPCODE_LDSLOT_X:
                 {
@@ -1787,14 +1801,28 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
                 i += 3;
                 break;
             case OPCODE_CALL:
-                print_hex_bytes(ptr + i, 1);
-                evil_print("CALL\n");
-                ++i;
+                {
+                    union convert_two_t c2;
+
+                    memcpy(c2.bytes, ptr + i + 1, 2);
+                    print_hex_bytes(ptr + i, 3);
+
+                    evil_print("CALL %d\n", c2.s2);
+                }
+
+                i += 3;
                 break;
             case OPCODE_TAILCALL:
-                print_hex_bytes(ptr + i, 1);
-                evil_print("TAILCALL\n");
-                ++i;
+                {
+                    union convert_two_t c2;
+
+                    memcpy(c2.bytes, ptr + i + 1, 2);
+                    print_hex_bytes(ptr + i, 3);
+
+                    evil_print("TAILCALL %d\n", c2.s2);
+                }
+
+                i += 3;
                 break;
             case OPCODE_RETURN:
                 print_hex_bytes(ptr + i, 1);
