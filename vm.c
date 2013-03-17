@@ -816,6 +816,7 @@ vm_run(struct environment_t *environment, struct object_t *initial_function, int
                     struct object_t *fn;
                     unsigned char tag;
                     union convert_two_t c2;
+                    ptrdiff_t return_offset;
 
                     memcpy(c2.bytes, pc, 2);
                     pc += 2;
@@ -826,24 +827,22 @@ vm_run(struct environment_t *environment, struct object_t *initial_function, int
 
                     VM_ASSERT(tag == TAG_PROCEDURE || tag == TAG_SPECIAL_FUNCTION);
 
+                    return_offset = pc - pc_base;
+                    VM_ASSERT(return_offset >= 0 && return_offset < fn->tag_count.count);
+                    old_program_area = program_area;
+                    program_area = sp + 1;
+
+                    /*
+                     * Save the return address and create space for the local slots.
+                     */
+                    sp = vm_push_ref(sp, old_program_area);
+                    sp = vm_push_return_address(sp, fn, (unsigned short)return_offset);
+                    sp -= vm_extract_num_locals(fn);
+
+                    assert((int)c2.u2 == vm_extract_num_args(fn));
+
                     if (tag == TAG_PROCEDURE)
                     {
-                        ptrdiff_t return_offset;
-
-                        return_offset = pc - pc_base;
-                        VM_ASSERT(return_offset >= 0 && return_offset < fn->tag_count.count);
-                        old_program_area = program_area;
-                        program_area = sp + 1;
-
-                        /*
-                         * Save the return address and create space for the local slots.
-                         */
-                        sp = vm_push_ref(sp, old_program_area);
-                        sp = vm_push_return_address(sp, fn, (unsigned short)return_offset);
-                        sp -= vm_extract_num_locals(fn);
-
-                        assert((int)c2.u2 == vm_extract_num_args(fn));
-
                         /*
                          * call the function!
                          */
@@ -853,12 +852,19 @@ vm_run(struct environment_t *environment, struct object_t *initial_function, int
                     }
                     else
                     {
-                        /*
-                         * TODO: This needs to take the arguments from the 
-                         * stack and combine them into a list. This is probably
-                         * going to be really ugly.
-                         */
-                        BREAK();
+                        struct object_t *procedure_base;
+                        void *environment_address;
+                        struct environment_t *fn_environment;
+                        special_function_t function_pointer;
+                        struct object_t result;
+
+                        procedure_base = VECTOR_BASE(fn);
+                        environment_address = deref(&procedure_base[FIELD_ENVIRONMENT]);
+                        fn_environment = environment_address;
+                        function_pointer = procedure_base[FIELD_CODE].value.special_function_value;
+
+                        result = function_pointer(fn_environment, num_args, program_area);
+                        *sp-- = result;
                     }
                 }
                 VM_CONTINUE();
@@ -944,15 +950,18 @@ vm_run(struct environment_t *environment, struct object_t *initial_function, int
                     if (tag == TAG_SPECIAL_FUNCTION)
                     {
                         struct object_t *procedure_base;
-                        struct object_t result;
+                        void *environment_address;
+                        struct environment_t *fn_environment;
                         special_function_t function_pointer;
+                        struct object_t result;
 
                         procedure_base = VECTOR_BASE(fn);
+                        environment_address = deref(&procedure_base[FIELD_ENVIRONMENT]);
+                        fn_environment = environment_address;
                         function_pointer = procedure_base[FIELD_CODE].value.special_function_value;
 
-                        result = function_pointer(environment, num_args, program_area);
-                        sp += num_args;
-                        *(sp + 1) = result;
+                        result = function_pointer(fn_environment, num_args, program_area);
+                        *sp-- = result;
                     }
                     else
                     {
