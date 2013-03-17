@@ -238,7 +238,7 @@ eval(struct environment_t *environment, int num_args, struct object_t *args)
 
     assert(num_args == 1);
 
-    object = deref(args);
+    object = deref(CAR(args));
     switch (object->tag_count.tag)
     {
         case TAG_BOOLEAN:
@@ -274,15 +274,18 @@ eval(struct environment_t *environment, int num_args, struct object_t *args)
                 struct object_t *wrapper_body;
                 struct object_t fn;
 
+                /*
+                 * TODO: This needs to use object handles instead.
+                 */
                 wrapper_args = gc_alloc(environment->heap, TAG_PAIR, 0);
                 wrapper_body = gc_alloc(environment->heap, TAG_PAIR, 0);
 
                 *RAW_CAR(wrapper_args) = make_empty_ref();
                 *RAW_CDR(wrapper_args) = make_ref(wrapper_body);
-                *RAW_CAR(wrapper_body) = *args;
+                *RAW_CAR(wrapper_body) = make_ref(object);
                 *RAW_CDR(wrapper_body) = make_empty_ref();
 
-                fn = lambda(environment, 1, wrapper_body);
+                fn = lambda(environment, 1, wrapper_args);
                 return vm_run(environment, &fn, 0, empty_pair);
             }
             break;
@@ -297,8 +300,8 @@ eval(struct environment_t *environment, int num_args, struct object_t *args)
 /*
  * print
  */
-struct object_t
-print(struct environment_t *environment, int num_args, struct object_t *args)
+static void
+print_impl(struct environment_t *environment, int num_args, struct object_t *args)
 {
     struct object_t *object;
 
@@ -310,8 +313,8 @@ print(struct environment_t *environment, int num_args, struct object_t *args)
 
     if (object == empty_pair)
     {
-        evil_print("'()\n");
-        return make_empty_ref();
+        evil_print("'()");
+        return;
     }
 
     switch (object->tag_count.tag)
@@ -321,20 +324,20 @@ print(struct environment_t *environment, int num_args, struct object_t *args)
             break;
         case TAG_CHAR:
             evil_print("%c", (char)object->value.fixnum_value);
-            break; 
+            break;
         case TAG_VECTOR:
             {
                 int i;
                 int count;
                 struct object_t *base;
-                
+
                 base = VECTOR_BASE(object);
                 count = object->tag_count.count;
 
                 evil_print("#(");
                 for (i = 0; i < count; ++i)
                 {
-                    print(environment, 1, base + i);
+                    print_impl(environment, 1, base + i);
 
                     if (i < (count - 1))
                     {
@@ -363,9 +366,22 @@ print(struct environment_t *environment, int num_args, struct object_t *args)
                 break;
             }
         case TAG_PAIR:
-            print(environment, 1, CAR(object));
-            evil_print(" ");
-            print(environment, 1, CDR(object));
+            if (CAR(object)->tag_count.tag == TAG_PAIR)
+            {
+                evil_print("(");
+            }
+
+            print_impl(environment, 1, CAR(object));
+
+            if (CDR(object) != empty_pair)
+            {
+                evil_print(" ");
+                print_impl(environment, 1, CDR(object));
+            }
+            else
+            {
+                evil_print(")");
+            }
             break;
         case TAG_SPECIAL_FUNCTION:
             evil_print("<special function>");
@@ -374,7 +390,12 @@ print(struct environment_t *environment, int num_args, struct object_t *args)
             assert(0);
             break;
     }
+}
 
+struct object_t
+print(struct environment_t *environment, int num_args, struct object_t *args)
+{
+    print_impl(environment, num_args, args);
     evil_print("\n");
 
     return make_empty_ref();

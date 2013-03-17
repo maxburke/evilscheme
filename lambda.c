@@ -1880,7 +1880,7 @@ disassemble(struct environment_t *environment, int num_args, struct object_t *ar
     return make_empty_ref();
 }
 
-struct object_t
+static struct object_t
 compile_form_to_bytecode(struct compiler_context_t *previous_context, struct environment_t *environment, struct object_t *lambda_body)
 {
     struct object_t *args;
@@ -1888,9 +1888,8 @@ compile_form_to_bytecode(struct compiler_context_t *previous_context, struct env
     struct object_t *procedure;
     struct instruction_t *root;
     struct compiler_context_t context;
-    
+
     args = CAR(lambda_body);
-    body = CAR(CDR(lambda_body));
     root = NULL;
 
     initialize_compiler_context(&context, environment, args, previous_context);
