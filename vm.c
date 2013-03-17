@@ -872,6 +872,10 @@ vm_run(struct environment_t *environment, struct object_t *initial_function, int
                     int num_args;
                     int arg_diff;
                     union convert_two_t c2;
+                    struct object_t *prev_program_area_ref;
+                    struct object_t *return_address;
+                    struct object_t *moved_prev_program_area_ref;
+                    struct object_t *moved_return_address;
 
                     memcpy(c2.bytes, pc, 2);
                     pc += 2;
@@ -882,7 +886,6 @@ vm_run(struct environment_t *environment, struct object_t *initial_function, int
 
                     num_args = vm_extract_num_args(fn);
                     assert(num_args == (int)c2.u2);
-
                     /*
                      * This code erases the current frame replacing it with the new call.
                      * At this point the stack, pre-call, where function b is performing
@@ -893,21 +896,31 @@ vm_run(struct environment_t *environment, struct object_t *initial_function, int
                      * change, they can just remain the same.
                      */
 
-/*
- * TODO: This is quite broken currently. If we tail-call from the top frame
- * we overwrite our arguments with the top-level return address/program area
- * chain.
- *
- * Also, tailcalling to a C-function from the top level is going to cause some
- * interesting problems when it comes to deciding how/when we return. 
- *
- * Thought needed!
- */
+                    /*
+                     * First, save the program area chain and the return
+                     * address to the bottom of the stack as we may clobber
+                     * these values when we juggle the arguments below.
+                     */
+                    prev_program_area_ref = program_area - 1;
+                    return_address = program_area - 2;
+
+                    *(sp) = *prev_program_area_ref;
+                    *(sp - 1) = *return_address;
+
+                    moved_prev_program_area_ref = sp;
+                    moved_return_address = sp - 1;
+
+                    /*
+                     * Second, calculate where we need to displace the program
+                     * area in order to land our new arguments.
+                     */
                     current_fn_num_args = vm_extract_num_args(procedure);
                     arg_diff = current_fn_num_args - num_args;
-
                     arg_slot = program_area + arg_diff;
-                    memmove(arg_slot - 2, program_area - 2, 2 * sizeof(struct object_t));
+
+                    /*
+                     * Move our arguments.
+                     */
                     memmove(arg_slot, sp + 1, num_args * sizeof(struct object_t));
 
                     /*
@@ -922,6 +935,12 @@ vm_run(struct environment_t *environment, struct object_t *initial_function, int
                      */
                     program_area = arg_slot;
 
+                    /*
+                     * Restore the saved program area chain and return address.
+                     */
+                    *(program_area - 1) = *moved_prev_program_area_ref;
+                    *(program_area - 2) = *moved_return_address;
+
                     if (tag == TAG_SPECIAL_FUNCTION)
                     {
                         struct object_t *procedure_base;
@@ -931,7 +950,7 @@ vm_run(struct environment_t *environment, struct object_t *initial_function, int
                         procedure_base = VECTOR_BASE(fn);
                         function_pointer = procedure_base[FIELD_CODE].value.special_function_value;
 
-                        result = function_pointer(environment, num_args, sp + 1);
+                        result = function_pointer(environment, num_args, program_area);
                         sp += num_args;
                         *(sp + 1) = result;
                     }
