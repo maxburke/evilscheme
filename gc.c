@@ -14,7 +14,7 @@
 #include "gc.h"
 #include "vm.h"
 
-#define DEFAULT_ALIGN sizeof(void *)
+#define DEFAULT_ALIGN 8
 #define DEFAULT_ALIGN_MASK (DEFAULT_ALIGN - 1)
 
 static void *
@@ -48,7 +48,7 @@ gc_create(void *heap_mem, size_t heap_size)
     heap->tag_count.count = 1;
     heap->base = heap_mem;
     heap->top = (char *)heap_mem + heap_size;
-    heap->ptr = (char *)heap_mem + sizeof(struct heap_t);
+    heap->ptr = (char *)heap_mem + ((sizeof(struct heap_t) + DEFAULT_ALIGN_MASK) & ~(DEFAULT_ALIGN_MASK));
     heap->size = heap_size;
 
     return heap;
