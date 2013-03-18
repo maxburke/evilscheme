@@ -17,17 +17,6 @@
 #include "vm.h"
 
 struct object_t
-quote(struct environment_t *environment, int num_args, struct object_t *args)
-{
-    UNUSED(environment);
-    UNUSED(num_args);
-
-    assert(num_args == 1);
-
-    return *args;
-}
-
-struct object_t
 cons(struct environment_t *environment, int num_args, struct object_t *args)
 {
     struct object_t *object;
@@ -43,92 +32,6 @@ cons(struct environment_t *environment, int num_args, struct object_t *args)
     *RAW_CDR(object) = args[1];
 
     return make_ref(object);
-}
-
-struct object_t
-car(struct environment_t *environment, int num_args, struct object_t *args)
-{
-    struct object_t *object;
-
-    UNUSED(environment);
-    UNUSED(num_args);
-
-    assert(num_args == 1);
-
-    object = deref(args);
-    assert(object->tag_count.tag == TAG_PAIR);
-
-    return *CAR(object);
-}
-
-struct object_t
-cdr(struct environment_t *environment, int num_args, struct object_t *args)
-{
-    struct object_t *object;
-
-    UNUSED(environment);
-    UNUSED(num_args);
-
-    assert(num_args == 1);
-
-    object = deref(args);
-    assert(object->tag_count.tag == TAG_PAIR);
-
-    return *CDR(object);
-}
-
-
-struct object_t
-set(struct environment_t *environment, int num_args, struct object_t *args)
-{
-    struct object_t *object;
-    struct object_t *reference;
-    struct object_t *target;
-    unsigned char ref_type;
-
-    UNUSED(environment);
-    UNUSED(num_args);
-
-    assert(num_args == 2);
-
-    reference = args + 0;
-    ref_type = reference->tag_count.tag;
-    target = reference->value.ref;
-
-    object = args + 1;
-    
-    if (ref_type == TAG_INNER_REFERENCE)
-    {
-        unsigned char target_type;
-        unsigned short offset;
-
-        target_type = target->tag_count.tag;
-        offset = reference->tag_count.count;
-
-        if (target_type == TAG_STRING)
-        {
-            char *ptr;
-
-            assert(object->tag_count.tag == TAG_CHAR);
-            ptr = target->value.string_value + offset;
-            *ptr = (char)object->value.fixnum_value;
-        }
-        else
-        {
-            struct object_t *resolved_reference;
-            assert(target_type == TAG_VECTOR);
-            resolved_reference = &VECTOR_BASE(object)[offset];
-            *resolved_reference = *object;
-        }
-    }
-    else
-    {
-        assert(ref_type == TAG_REFERENCE);
-
-        *target = *object;
-    }
-
-    return make_empty_ref();
 }
 
 struct object_t

@@ -58,16 +58,13 @@ environment_initialize(struct environment_t *environment)
 
     static struct special_function_initializer_t initializers[] = 
     {
-        { "quote", quote, 1 },
         { "read", read, 1 },
         { "eval", eval, 1 },
         { "print", print, 1 },
-        { "set!", set, 2 },
         { "cons", cons, 2 },
-        { "car", car, 1 },
-        { "cdr", cdr, 1 },
         { "define", define, 2 },
         { "lambda", lambda, 1 },
+        { "apply", apply, VARIADIC },
         { "vector", vector, VARIADIC },
         { "disassemble", disassemble, 1 },
     };
