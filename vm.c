@@ -838,7 +838,7 @@ vm_run(struct environment_t *environment, struct object_t *initial_function, int
                     sp -= vm_extract_num_locals(fn);
 
                     num_args = vm_extract_num_args(fn);
-                    assert(num_args == (int)c2.u2);
+                    assert(num_args == (int)c2.u2 || num_args == VARIADIC);
 
                     if (tag == TAG_PROCEDURE)
                     {
@@ -890,7 +890,7 @@ vm_run(struct environment_t *environment, struct object_t *initial_function, int
                     tag = fn->tag_count.tag;
 
                     num_args = vm_extract_num_args(fn);
-                    assert(num_args == (int)c2.u2);
+                    assert(num_args == (int)c2.u2 || num_args == VARIADIC);
                     /*
                      * This code erases the current frame replacing it with the new call.
                      * At this point the stack, pre-call, where function b is performing
