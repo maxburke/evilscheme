@@ -49,6 +49,7 @@
 #define SYMBOL_LETREC   0x4c663d13ff171fa
 #define SYMBOL_DEFINE   0xf418d40f59d3f9a4
 #define SYMBOL_QUOTE    0xf6be341a7b50a73
+#define SYMBOL_BEGIN    0x8facd8be36ce1840
 
 struct memory_pool_chunk_t
 {
@@ -1000,6 +1001,22 @@ compile_quote(struct compiler_context_t *context, struct instruction_t *next, st
 }
 
 static struct instruction_t *
+compile_begin(struct compiler_context_t *context, struct instruction_t *next, struct object_t *args)
+{
+    struct object_t *body;
+    struct instruction_t *root;
+
+    root = next;
+
+    for (body = args; body != empty_pair; body = CDR(body))
+    {
+        root = compile_form(context, root, CAR(body));
+    }
+
+    return root;
+}
+
+static struct instruction_t *
 compile_set(struct compiler_context_t *context, struct instruction_t *next, struct object_t *args)
 {
     struct object_t *place_form;
@@ -1157,6 +1174,8 @@ compile_form(struct compiler_context_t *context, struct instruction_t *next, str
                 return compile_define(context, next, function_args);
             case SYMBOL_QUOTE:
                 return compile_quote(context, next, function_args);
+            case SYMBOL_BEGIN:
+                return compile_begin(context, next, function_args);
             default:
                 /*
                  * The function/procedure isn't one that is handled by the
