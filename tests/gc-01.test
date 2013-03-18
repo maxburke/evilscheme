@@ -1,2 +1,2 @@
-(begin (define gc-test (lambda (count param) (if (< count 1048576) (gc-test (+ 1 count) #(1 2 3 4 5)) "done"))) (gc-test))
+(begin (define gc-test (lambda (count param) (if (< count 1048576) (gc-test (+ 1 count) #(1 2 3 4 5)) "done"))) (gc-test 0 0))
 >done
