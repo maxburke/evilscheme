@@ -817,7 +817,6 @@ vm_run(struct environment_t *environment, struct object_t *initial_function, int
                     unsigned char tag;
                     union convert_two_t c2;
                     ptrdiff_t return_offset;
-
                     memcpy(c2.bytes, pc, 2);
                     pc += 2;
 
@@ -828,7 +827,6 @@ vm_run(struct environment_t *environment, struct object_t *initial_function, int
                     VM_ASSERT(tag == TAG_PROCEDURE || tag == TAG_SPECIAL_FUNCTION);
 
                     return_offset = pc - pc_base;
-                    VM_ASSERT(return_offset >= 0 && return_offset < fn->tag_count.count);
                     old_program_area = program_area;
                     program_area = sp + 1;
 
@@ -839,7 +837,8 @@ vm_run(struct environment_t *environment, struct object_t *initial_function, int
                     sp = vm_push_return_address(sp, fn, (unsigned short)return_offset);
                     sp -= vm_extract_num_locals(fn);
 
-                    assert((int)c2.u2 == vm_extract_num_args(fn));
+                    num_args = vm_extract_num_args(fn);
+                    assert(num_args == (int)c2.u2);
 
                     if (tag == TAG_PROCEDURE)
                     {

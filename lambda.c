@@ -48,6 +48,7 @@
 #define SYMBOL_LETSTAR  0xd07b707ec653a7da
 #define SYMBOL_LETREC   0x4c663d13ff171fa
 #define SYMBOL_DEFINE   0xf418d40f59d3f9a4
+#define SYMBOL_QUOTE    0xf6be341a7b50a73
 
 struct memory_pool_chunk_t
 {
@@ -123,7 +124,11 @@ struct stack_slot_t
 struct function_local_t
 {
     struct slist_t link;
-    struct evil_object_handle_t fn;
+
+    /*
+     * TODO: Should this be an object handle instead of a pointer?
+     */
+    struct object_t *object;
 };
 
 struct compiler_context_t
@@ -251,6 +256,9 @@ compile_load(struct compiler_context_t *context, struct instruction_t *next);
 
 static struct instruction_t *
 compile_lambda(struct compiler_context_t *incoming_context, struct instruction_t *next, struct object_t *lambda_body);
+
+static struct instruction_t *
+compile_load_function_local(struct compiler_context_t *context, struct instruction_t *next, struct object_t *object);
 
 static struct instruction_t *
 find_before(struct instruction_t *start, struct instruction_t *target)
@@ -982,6 +990,16 @@ compile_define(struct compiler_context_t *context, struct instruction_t *next, s
 }
 
 static struct instruction_t *
+compile_quote(struct compiler_context_t *context, struct instruction_t *next, struct object_t *args)
+{
+    struct object_t *quote_form;
+
+    quote_form = CAR(args);
+
+    return compile_load_function_local(context, next, quote_form); 
+}
+
+static struct instruction_t *
 compile_set(struct compiler_context_t *context, struct instruction_t *next, struct object_t *args)
 {
     struct object_t *place_form;
@@ -1137,6 +1155,8 @@ compile_form(struct compiler_context_t *context, struct instruction_t *next, str
                 return compile_let(context, next, function_args);
             case SYMBOL_DEFINE:
                 return compile_define(context, next, function_args);
+            case SYMBOL_QUOTE:
+                return compile_quote(context, next, function_args);
             default:
                 /*
                  * The function/procedure isn't one that is handled by the
@@ -1353,8 +1373,7 @@ assemble(struct environment_t *environment, struct compiler_context_t *context, 
         
         local = (struct function_local_t *)local_slots;
 
-        procedure_base[FIELD_LOCALS + fn_local_idx] = make_ref(local->fn.object);
-        evil_destroy_object_handle(environment->heap, local->fn);
+        procedure_base[FIELD_LOCALS + fn_local_idx] = make_ref(local->object);
     }
     
     /*
@@ -1973,13 +1992,6 @@ static struct instruction_t *
 compile_lambda(struct compiler_context_t *context, struct instruction_t *next, struct object_t *lambda_body)
 {
     struct object_t procedure;
-    struct evil_object_handle_t procedure_handle;
-    int local_idx;
-    struct function_local_t *function_local;
-    struct instruction_t *load_this_fn;
-    struct instruction_t *index;
-    struct instruction_t *make_ref;
-    struct instruction_t *load;
     struct environment_t *environment;
 
     /*
@@ -2013,10 +2025,23 @@ compile_lambda(struct compiler_context_t *context, struct instruction_t *next, s
     environment = context->environment;
 
     procedure = compile_form_to_bytecode(context, environment, lambda_body);
-    procedure_handle = evil_create_object_handle(environment->heap, procedure.value.ref);
+    assert(procedure.tag_count.tag == TAG_REFERENCE);
+
+    return compile_load_function_local(context, next, procedure.value.ref);
+}
+
+static struct instruction_t *
+compile_load_function_local(struct compiler_context_t *context, struct instruction_t *next, struct object_t *object)
+{
+    int local_idx;
+    struct function_local_t *function_local;
+    struct instruction_t *load_this_fn;
+    struct instruction_t *index;
+    struct instruction_t *make_ref;
+    struct instruction_t *load;
 
     function_local = pool_alloc(&context->pool, sizeof(struct function_local_t));
-    function_local->fn = procedure_handle;
+    function_local->object = object;
     function_local->link.next = &context->locals->link;
     context->locals = function_local;
     local_idx = context->num_fn_locals++;

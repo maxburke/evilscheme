@@ -99,6 +99,8 @@ environment_initialize(struct environment_t *environment)
 
         procedure_base[FIELD_ENVIRONMENT] = make_ref((struct object_t *)environment);
         procedure_base[FIELD_NUM_ARGS] = make_fixnum_object(initializers[i].num_args);
+        procedure_base[FIELD_NUM_LOCALS] = make_fixnum_object(0);
+        procedure_base[FIELD_NUM_FN_LOCALS] = make_fixnum_object(0);
         procedure_base[FIELD_CODE] = function;
 
         place = bind(environment, symbol);
