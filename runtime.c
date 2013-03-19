@@ -108,7 +108,7 @@ environment_initialize(struct environment_t *environment)
 struct environment_t *
 evil_environment_create(void *stack, size_t stack_size, void *heap_mem, size_t heap_size)
 {
-    struct heap_t *heap;
+    struct evil_heap_t *heap;
 
     /*
      * This bit of casting magic is to make the error "initialization from

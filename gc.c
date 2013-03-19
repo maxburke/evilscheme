@@ -17,8 +17,17 @@
 #define DEFAULT_ALIGN 8
 #define DEFAULT_ALIGN_MASK (DEFAULT_ALIGN - 1)
 
+struct evil_heap_t
+{
+    struct tag_count_t tag_count;
+    void *base;
+    void *top;
+    void *ptr;
+    size_t size;
+};
+
 static void *
-gc_perform_alloc(struct heap_t *heap, size_t size)
+gc_perform_alloc(struct evil_heap_t *heap, size_t size)
 {
     void *mem;
     size_t aligned_size;
@@ -36,26 +45,26 @@ gc_perform_alloc(struct heap_t *heap, size_t size)
     return mem;
 }
 
-struct heap_t *
+struct evil_heap_t *
 gc_create(void *heap_mem, size_t heap_size)
 {
-    struct heap_t *heap;
+    struct evil_heap_t *heap;
     
     heap = heap_mem;
-    memset(heap, 0, sizeof(struct heap_t));
+    memset(heap, 0, sizeof(struct evil_heap_t));
 
     heap->tag_count.tag = TAG_HEAP;
     heap->tag_count.count = 1;
     heap->base = heap_mem;
     heap->top = (char *)heap_mem + heap_size;
-    heap->ptr = (char *)heap_mem + ((sizeof(struct heap_t) + DEFAULT_ALIGN_MASK) & ~(DEFAULT_ALIGN_MASK));
+    heap->ptr = (char *)heap_mem + ((sizeof(struct evil_heap_t) + DEFAULT_ALIGN_MASK) & ~(DEFAULT_ALIGN_MASK));
     heap->size = heap_size;
 
     return heap;
 }
 
 struct object_t *
-gc_alloc(struct heap_t *heap, enum tag_t type, size_t extra_bytes)
+gc_alloc(struct evil_heap_t *heap, enum tag_t type, size_t extra_bytes)
 {
     size_t size;
     struct object_t *object;
@@ -103,7 +112,7 @@ gc_alloc(struct heap_t *heap, enum tag_t type, size_t extra_bytes)
 }
 
 struct object_t *
-gc_alloc_vector(struct heap_t *heap, size_t count)
+gc_alloc_vector(struct evil_heap_t *heap, size_t count)
 {
     /*
      * A vector is similar to an object but doesn't have the same contained data. It 
@@ -123,14 +132,14 @@ gc_alloc_vector(struct heap_t *heap, size_t count)
 }
 
 void
-gc_collect(struct heap_t *env)
+gc_collect(struct evil_heap_t *env)
 {
     UNUSED(env);
     BREAK();
 }
 
 struct evil_object_handle_t
-evil_create_object_handle(struct heap_t *heap, struct object_t *object)
+evil_create_object_handle(struct evil_heap_t *heap, struct object_t *object)
 {
     struct evil_object_handle_t handle;
 
@@ -149,7 +158,7 @@ evil_create_object_handle(struct heap_t *heap, struct object_t *object)
 }
 
 struct evil_object_handle_t
-evil_create_object_handle_from_value(struct heap_t *heap, struct object_t object)
+evil_create_object_handle_from_value(struct evil_heap_t *heap, struct object_t object)
 {
     unsigned char tag;
 
@@ -185,7 +194,7 @@ evil_create_object_handle_from_value(struct heap_t *heap, struct object_t object
 }
 
 void
-evil_destroy_object_handle(struct heap_t *heap, struct evil_object_handle_t handle)
+evil_destroy_object_handle(struct evil_heap_t *heap, struct evil_object_handle_t handle)
 {
     /*
      * TODO: This needs to un-link object handles from the master list.
