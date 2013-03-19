@@ -36,8 +36,6 @@ type_name(enum tag_t tag)
             return "special_function";
         case TAG_ENVIRONMENT:
             return "environment";
-        case TAG_HEAP:
-            return "heap";
         case TAG_REFERENCE:
             return "reference";
         case TAG_INNER_REFERENCE:

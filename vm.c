@@ -317,8 +317,6 @@ vm_compare_equal_reference_type(const struct object_t *a, const struct object_t 
             return a->value.special_function_value == b->value.special_function_value;
         case TAG_ENVIRONMENT:
             return 0;
-        case TAG_HEAP:
-            return 0;
         case TAG_PAIR:
             return vm_compare_equal(CAR(a), CAR(b)) && vm_compare_equal(CDR(a), CDR(b));
         case TAG_PROCEDURE:

@@ -37,7 +37,6 @@ enum tag_t
      * be traversed during garbage collection.
      */
     TAG_ENVIRONMENT,        /* c */
-    TAG_HEAP,               /* d */
 
     /*
      * References are how aggregate objects are handled within the system
@@ -45,7 +44,7 @@ enum tag_t
      * it is a reference to it that will be stored in a pair, or on the stack,
      * or within another vector.
      */
-    TAG_REFERENCE,          /* e */
+    TAG_REFERENCE,          /* d */
 
     /*
      * Inner references are a type of reference to the inside of an aggregate
@@ -53,7 +52,7 @@ enum tag_t
      * pointers. Typically these are created with functions like vector-ref,
      * string-ref, vector-set!, string-set!
      */
-    TAG_INNER_REFERENCE     /* f */
+    TAG_INNER_REFERENCE     /* e */
 };
 
 struct tag_count_t

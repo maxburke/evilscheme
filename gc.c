@@ -10,55 +10,163 @@
 #include <string.h>
 
 #include "base.h"
-#include "runtime.h"
 #include "gc.h"
+#include "runtime.h"
+#include "slist.h"
 #include "vm.h"
 
-#define DEFAULT_ALIGN 8
-#define DEFAULT_ALIGN_MASK (DEFAULT_ALIGN - 1)
+#define EVIL_DEFAULT_ALIGN 8
+#define EVIL_DEFAULT_ALIGN_MASK (EVIL_DEFAULT_ALIGN - 1)
+
+#ifndef EVIL_PAGE_SIZE
+#define EVIL_PAGE_SIZE 4096
+#endif
+
+struct evil_heap_bucket_t
+{
+    struct slist_t link;
+    char *base;
+    char *ptr;
+    char *top;
+};
 
 struct evil_heap_t
 {
-    struct tag_count_t tag_count;
-    void *base;
-    void *top;
-    void *ptr;
+    char *base;
     size_t size;
+
+    unsigned char *card_base;
+    size_t num_buckets;
+    struct evil_heap_bucket_t *bucket_base;
+    struct evil_heap_bucket_t *current_bucket;
+    struct evil_heap_bucket_t *free_list;
+    struct evil_heap_bucket_t *used_list;
 };
 
-static void *
-gc_perform_alloc(struct evil_heap_t *heap, size_t size)
+static struct evil_heap_bucket_t *
+evil_gc_acquire_bucket(struct evil_heap_t *heap)
 {
-    void *mem;
-    size_t aligned_size;
+    struct evil_heap_bucket_t *new_bucket;
+    struct evil_heap_bucket_t *current_bucket;
 
-    mem = heap->ptr;
-    aligned_size = (size + DEFAULT_ALIGN_MASK) & ~(DEFAULT_ALIGN_MASK);
+    new_bucket = heap->free_list;
+    if (new_bucket == NULL)
+    {
+        return NULL;
+    }
 
-    if ((char *)heap->ptr + size >= (char *)heap->top)
-        gc_collect(heap);
+    heap->free_list = (struct evil_heap_bucket_t *)new_bucket->link.next;
 
-    assert((char *)heap->ptr + size < (char *)heap->top);
-    heap->ptr = (char *)mem + aligned_size;
-    memset(mem, 0, aligned_size);
+    current_bucket = heap->current_bucket;
+    if (current_bucket != NULL)
+    {
+        current_bucket->link.next = &heap->used_list->link;
+        heap->used_list = current_bucket;
+    }
 
-    return mem;
+    heap->current_bucket = new_bucket;
+    
+    return new_bucket;
+}
+
+static void *
+evil_gc_perform_alloc(struct evil_heap_t *heap, size_t size)
+{
+    struct evil_heap_bucket_t *bucket;
+    int i;
+
+    bucket = heap->current_bucket;
+    for (i = 0; i < 2; ++i)
+    {
+        ptrdiff_t rounded_size;
+        char *mem;
+
+        /*
+         * TODO: We need to support large (>4kb) allocations sometime.
+         */
+        assert(size < EVIL_PAGE_SIZE);
+        rounded_size = (ptrdiff_t)((size + EVIL_DEFAULT_ALIGN_MASK) & (~EVIL_DEFAULT_ALIGN_MASK));
+        mem = bucket->ptr;
+
+        if (bucket->top - mem >= rounded_size)
+        {
+            bucket->ptr = mem + rounded_size;
+            return mem;
+        }
+
+        bucket = evil_gc_acquire_bucket(heap);
+
+        if (bucket == NULL)
+        {
+            gc_collect(heap);
+        }
+    }
+   
+    /*
+     * If we're at this point then a garbage collection could not solve our
+     * woes. Perhaps we need a bigger heap? Perhaps we need to collect
+     * again? (probably not, there are no finalizers to run so it's not like
+     * collecting again will rid the heap of newly dead refs.) Who knows!
+     *
+     * Woe :(
+     */
+    BREAK();
+
+    return NULL;
+}
+
+static void
+evil_gc_create_buckets(struct evil_heap_t *heap)
+{
+    size_t i;
+    size_t num_buckets;
+    struct evil_heap_bucket_t *buckets;
+    struct evil_heap_bucket_t *current_bucket;
+    char *heap_base;
+
+    buckets = heap->bucket_base;
+    heap_base = heap->base;
+    for (i = 0, num_buckets = heap->num_buckets; i < num_buckets; ++i)
+    {
+        char *bucket_base;
+
+        bucket_base = heap_base + i * EVIL_PAGE_SIZE;
+        buckets[i].base = bucket_base;
+        buckets[i].ptr = bucket_base;
+        buckets[i].top = bucket_base + EVIL_PAGE_SIZE;
+
+        buckets[i].link.next = &heap->free_list->link;
+        heap->free_list = &buckets[i];
+    }
+
+    current_bucket = evil_gc_acquire_bucket(heap);
+    assert(current_bucket != NULL);
 }
 
 struct evil_heap_t *
 gc_create(void *heap_mem, size_t heap_size)
 {
     struct evil_heap_t *heap;
+    size_t num_cards;
     
-    heap = heap_mem;
+    heap = evil_aligned_alloc(sizeof(void *), sizeof(struct evil_heap_t));
     memset(heap, 0, sizeof(struct evil_heap_t));
 
-    heap->tag_count.tag = TAG_HEAP;
-    heap->tag_count.count = 1;
     heap->base = heap_mem;
-    heap->top = (char *)heap_mem + heap_size;
-    heap->ptr = (char *)heap_mem + ((sizeof(struct evil_heap_t) + DEFAULT_ALIGN_MASK) & ~(DEFAULT_ALIGN_MASK));
     heap->size = heap_size;
+
+    num_cards = heap_size / (8 * EVIL_DEFAULT_ALIGN);
+    heap->card_base = evil_aligned_alloc(sizeof(void *), num_cards);
+
+    heap->num_buckets = heap_size / EVIL_PAGE_SIZE;
+    assert(heap_size % EVIL_PAGE_SIZE == 0);
+    heap->bucket_base = evil_aligned_alloc(sizeof(void *), heap->num_buckets);
+
+    heap->free_list = NULL;
+    heap->used_list = NULL;
+    heap->current_bucket = NULL;
+
+    evil_gc_create_buckets(heap);
 
     return heap;
 }
@@ -82,7 +190,7 @@ gc_alloc(struct evil_heap_t *heap, enum tag_t type, size_t extra_bytes)
         size = sizeof(struct object_t) + extra_bytes;
     }
 
-    object = gc_perform_alloc(heap, size);
+    object = evil_gc_perform_alloc(heap, size);
 
     /*
      * Vectors (and procedures) need to be allocated through gc_alloc_vector
@@ -123,7 +231,7 @@ gc_alloc_vector(struct evil_heap_t *heap, size_t count)
     struct object_t *object;
 
     total_alloc_size = (count * sizeof(struct object_t)) + offsetof(struct object_t, value);
-    object = gc_perform_alloc(heap, total_alloc_size);
+    object = evil_gc_perform_alloc(heap, total_alloc_size);
 
     object->tag_count.tag = TAG_VECTOR;
     object->tag_count.count = (unsigned short)count;
@@ -170,7 +278,6 @@ evil_create_object_handle_from_value(struct evil_heap_t *heap, struct object_t o
         case TAG_STRING:
         case TAG_PAIR:
         case TAG_ENVIRONMENT:
-        case TAG_HEAP:
             /*
              * We shouldn't see reference types here directly.
              */
