@@ -2091,15 +2091,9 @@ compile_load_function_local(struct compiler_context_t *context, struct instructi
 struct object_t
 lambda(struct environment_t *environment, int num_args, struct object_t *lambda_body)
 {
-    struct object_t procedure;
-
     UNUSED(num_args);
     assert(num_args == 1);
 
-    procedure = compile_form_to_bytecode(NULL, environment, lambda_body);
-disassemble_procedure(environment, deref(&procedure), "unnamed procedure");
-
-    return procedure;
-    //return compile_form_to_bytecode(NULL, environment, lambda_body);
+    return compile_form_to_bytecode(NULL, environment, lambda_body);
 }
 
