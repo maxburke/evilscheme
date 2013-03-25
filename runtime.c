@@ -222,7 +222,7 @@ intern_string(struct environment_t *environment, const char *bytes, size_t num_b
         return string;
     }
 
-    i = calloc(1, DEFAULT_SYMBOL_INTERNMENT_PAGE_SIZE);
+    i = calloc(DEFAULT_SYMBOL_INTERNMENT_PAGE_SIZE, 1);
     i->next = environment->symbol_names.string_internment_page_base;
     environment->symbol_names.string_internment_page_base = i;
     i->top = i->data;
@@ -263,7 +263,7 @@ intern_hash(struct environment_t *environment, uint64_t hash, const char *string
         return;
     }
 
-    i = calloc(1, DEFAULT_SYMBOL_INTERNMENT_PAGE_SIZE);
+    i = calloc(DEFAULT_SYMBOL_INTERNMENT_PAGE_SIZE, 1);
     i->next = environment->symbol_names.hash_internment_page_base;
     environment->symbol_names.hash_internment_page_base = i;
     i->num_entries = 0;
