@@ -415,7 +415,7 @@ vm_trace_stack(struct environment_t *environment, struct object_t *sp, struct ob
             fprintf(stderr, "[vm]      ");
         }
 
-        fprintf(stderr, "0x%p ", (void *)stack_top);
+        fprintf(stderr, "%p ", (void *)stack_top);
 
         switch (stack_top->tag_count.tag)
         {
@@ -437,17 +437,17 @@ vm_trace_stack(struct environment_t *environment, struct object_t *sp, struct ob
                 fprintf(stderr, "FLONUM           %lf", stack_top->value.flonum_value);
                 break;
             case TAG_REFERENCE:
-                fprintf(stderr, "REFERENCE        0x%p", (void *)stack_top->value.ref);
+                fprintf(stderr, "REFERENCE        %p", (void *)stack_top->value.ref);
                 break;
             case TAG_INNER_REFERENCE:
-                fprintf(stderr, "INNER REFERENCE  0x%p,%d", (void *)stack_top->value.ref, stack_top->tag_count.count);
+                fprintf(stderr, "INNER REFERENCE  %p,%d", (void *)stack_top->value.ref, stack_top->tag_count.count);
                 break;
             case TAG_SPECIAL_FUNCTION:
                 {
                     union function_pointer_cast_t function_pointer_cast;
 
                     function_pointer_cast.special_function = stack_top->value.special_function_value;
-                    fprintf(stderr, "SPECIAL FUNCTION 0x%p", function_pointer_cast.pointer);
+                    fprintf(stderr, "SPECIAL FUNCTION %p", function_pointer_cast.pointer);
                 }
                 break;
                 break;
