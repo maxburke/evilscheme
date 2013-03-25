@@ -1,6 +1,6 @@
 /***********************************************************************
  * evilscheme, Copyright (c) 2012-2013, Maximilian Burke
- * This file is distributed under the FreeBSD license. 
+ * This file is distributed under the FreeBSD license.
  * See LICENSE.TXT for details.
  ***********************************************************************/
 
@@ -38,7 +38,7 @@ DISABLE_WARNING(4996)
 #   define VM_ASSERT(x)
 #endif
 
-#define ENABLE_VM_TRACING 1
+#define ENABLE_VM_TRACING 0
 
 #if ENABLE_VM_TRACING
 #   define VM_TRACE_OP(x) do { fprintf(stderr, "[vm] %32s program_area begin: %p sp begin: %p", #x, (void *)program_area, (void *)sp); } while (0)
@@ -104,7 +104,7 @@ vm_compare_equal(const struct object_t *a, const struct object_t *b);
 #define LDIMM_8_SYMBOL() LDIMM_8_IMPL(TAG_SYMBOL, symbol_hash, u8)
 
 #if ENABLE_VM_ASSERTS
-    #define ENSURE_NUMERIC(X) VM_ASSERT(X == TAG_FIXNUM || X == TAG_FLONUM) 
+    #define ENSURE_NUMERIC(X) VM_ASSERT(X == TAG_FIXNUM || X == TAG_FLONUM)
 #else
     #define ENSURE_NUMERIC(X)
 #endif
@@ -252,7 +252,7 @@ vm_reference_type(struct object_t *ref)
 #if ENABLE_VM_ASSERTS
     const unsigned char ref_type = ref->tag_count.tag;
 #endif
-    
+
     referenced_object = ref->value.ref;
 
 #if ENABLE_VM_ASSERTS
@@ -276,7 +276,7 @@ vm_vector_index(struct object_t *vector, int64_t index)
 {
     struct tag_count_t *header;
     void *vector_element_base;
-    
+
     header = &vector->tag_count;
     vector_element_base = header + 1;
 
@@ -423,8 +423,8 @@ vm_trace_stack(struct environment_t *environment, struct object_t *sp, struct ob
                 fprintf(stderr, "BOOLEAN          %s", stack_top->value.fixnum_value ? "#t" : "#f");
                 break;
             case TAG_SYMBOL:
-                fprintf(stderr, "SYMBOL           %" PRIx64 " %s", 
-                        stack_top->value.symbol_hash, 
+                fprintf(stderr, "SYMBOL           %" PRIx64 " %s",
+                        stack_top->value.symbol_hash,
                         find_symbol_name(environment, stack_top->value.symbol_hash));
                 break;
             case TAG_CHAR:
@@ -509,7 +509,7 @@ vm_run(struct environment_t *environment, struct object_t *initial_function, int
     /*
      * This is going to get really ugly if the GC moves our procedure object
      * while we are executing something. Maybe we should pin the procedures
-     * while we are executing? Refresh after every function call and/or 
+     * while we are executing? Refresh after every function call and/or
      * object creation?
      */
 
@@ -541,10 +541,10 @@ vm_run(struct environment_t *environment, struct object_t *initial_function, int
      */
     program_area = sp + 1;
 
-    sp = vm_push_ref(sp, NULL);                 /* program area chain */  
+    sp = vm_push_ref(sp, NULL);                 /* program area chain */
     sp = vm_push_return_address(sp, NULL, 0);   /* return address */
     sp -= vm_extract_num_locals(procedure);
-   
+
     for (;;)
     {
         unsigned byte = *pc++;
@@ -657,7 +657,7 @@ vm_run(struct environment_t *environment, struct object_t *initial_function, int
 
                         object = ref->value.ref;
                         object_tag = object->tag_count.tag;
-                        
+
                         if (object_tag == TAG_VECTOR || object_tag == TAG_PROCEDURE || object_tag == TAG_SPECIAL_FUNCTION)
                         {
                             unsigned short index;
@@ -697,7 +697,7 @@ vm_run(struct environment_t *environment, struct object_t *initial_function, int
                     struct object_t *ref_obj = ref->value.ref;
                     unsigned short ref_index = ref->tag_count.count;
 
-                    const unsigned char target_type = ref_obj->tag_count.tag; 
+                    const unsigned char target_type = ref_obj->tag_count.tag;
 
                     VM_ASSERT(target_type == TAG_STRING || target_type == TAG_VECTOR);
 
@@ -705,7 +705,7 @@ vm_run(struct environment_t *environment, struct object_t *initial_function, int
                     {
                         char *target;
                         char source_value;
-                        
+
                         VM_ASSERT(source->tag_count.tag == TAG_CHAR);
                         target = &ref_obj->value.string_value[ref_index];
                         source_value = (char)source->value.fixnum_value;
@@ -737,7 +737,7 @@ vm_run(struct environment_t *environment, struct object_t *initial_function, int
                     struct object_t *b = sp + 2;
                     struct object_t *a = sp + 1;
                     int is_equal;
-                    
+
                     is_equal = vm_compare_equal(a, b);
                     sp = vm_push_bool(sp + 2, is_equal);
                 }
@@ -864,7 +864,10 @@ vm_run(struct environment_t *environment, struct object_t *initial_function, int
                         function_pointer = procedure_base[FIELD_CODE].value.special_function_value;
 
                         result = function_pointer(fn_environment, args_passed, program_area);
-                        *sp-- = result;
+
+                        sp += args_passed + 1;
+                        *(sp + 1) = result;
+                        program_area = old_program_area;
                     }
                 }
                 VM_CONTINUE();
@@ -895,13 +898,14 @@ vm_run(struct environment_t *environment, struct object_t *initial_function, int
                     num_args = vm_extract_num_args(fn);
                     assert(num_args == (int)args_passed || num_args == VARIADIC);
                     /*
-                     * This code erases the current frame replacing it with the new call.
-                     * At this point the stack, pre-call, where function b is performing
-                     * a tail call to function a, looks like this:
+                     * This code erases the current frame replacing it with the
+                     * new call. At this point the stack, pre-call, where
+                     * function b is performing a tail call to function a, looks
+                     * like this:
                      * [arg a0][arg a1]...[arg an]...[stuff]...[return][PA chain][arg b0][arg b1]...[arg bk]
-                     * And we need to move the args a0-an on top of args b0-bk. The 
-                     * great thing is the return slot and the PA chain don't need to
-                     * change, they can just remain the same.
+                     * And we need to move the args a0-an on top of args b0-bk.
+                     * The great thing is the return slot and the PA chain don't
+                     * need to change, they can just remain the same.
                      */
 
                     /*
@@ -964,6 +968,13 @@ vm_run(struct environment_t *environment, struct object_t *initial_function, int
 
                         result = function_pointer(fn_environment, args_passed, program_area);
                         *sp-- = result;
+
+                        /*
+                         * Although OPCODE_CALL's C-function code path does
+                         * an implicit return, it is not necessary here as
+                         * the TAILCALL will be followed right after with a
+                         * proper RETURN instruction.
+                         */
                     }
                     else
                     {
