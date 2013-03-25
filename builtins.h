@@ -4,8 +4,8 @@
  * See LICENSE.TXT for details.
  ***********************************************************************/
 
-#ifndef BUILTINS_H
-#define BUILTINS_H
+#ifndef EVIL_BUILTINS_H
+#define EVIL_BUILTINS_H
 
 struct object_t;
 struct environment_t;

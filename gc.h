@@ -4,8 +4,8 @@
  * See LICENSE.TXT for details.
  ***********************************************************************/
 
-#ifndef GC_H
-#define GC_H
+#ifndef EVIL_GC_H
+#define EVIL_GC_H
 
 #include "object.h"
 

@@ -4,8 +4,8 @@
  * See LICENSE.TXT for details.
  ***********************************************************************/
 
-#ifndef READ_H
-#define READ_H
+#ifndef EVIL_READ_H
+#define EVIL_READ_H
 
 struct object_t;
 struct environment_t;

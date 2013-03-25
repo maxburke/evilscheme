@@ -4,8 +4,8 @@
  * See LICENSE.TXT for details.
  ***********************************************************************/
 
-#ifndef ENVIRONMENT_H
-#define ENVIRONMENT_H
+#ifndef EVIL_ENVIRONMENT_H
+#define EVIL_ENVIRONMENT_H
 
 #include "object.h"
 

@@ -4,8 +4,8 @@
  * See LICENSE.TXT for details.
  ***********************************************************************/
 
-#ifndef BASE_H
-#define BASE_H
+#ifndef EVIL_BASE_H
+#define EVIL_BASE_H
 
 /*
  * Pragma wrappers.

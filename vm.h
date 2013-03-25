@@ -4,8 +4,8 @@
  * See LICENSE.TXT for details.
  ***********************************************************************/
 
-#ifndef VM_H
-#define VM_H
+#ifndef EVIL_VM_H
+#define EVIL_VM_H
 
 /*
  * VM design:

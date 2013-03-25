@@ -4,8 +4,8 @@
  * See LICENSE.TXT for details.
  ***********************************************************************/
 
-#ifndef TEST_H
-#define TEST_H
+#ifndef EVIL_TEST_H
+#define EVIL_TEST_H
 
 int
 evil_run_tests(void);

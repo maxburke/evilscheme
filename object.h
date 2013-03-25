@@ -4,8 +4,8 @@
  * See LICENSE.TXT for details.
  ***********************************************************************/
 
-#ifndef OBJECT_H
-#define OBJECT_H
+#ifndef EVIL_OBJECT_H
+#define EVIL_OBJECT_H
 
 #include <stddef.h>
 #include <stdint.h>

@@ -4,8 +4,8 @@
  * See LICENSE.TXT for details.
  ***********************************************************************/
 
-#ifndef SLIST_H
-#define SLIST_H
+#ifndef EVIL_SLIST_H
+#define EVIL_SLIST_H
 
 /*
  * Singly linked list used for storage of the intermediate tokens.
