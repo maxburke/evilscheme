@@ -1,6 +1,6 @@
 /***********************************************************************
  * evilscheme, Copyright (c) 2012-2013, Maximilian Burke
- * This file is distributed under the FreeBSD license. 
+ * This file is distributed under the FreeBSD license.
  * See LICENSE.TXT for details.
  ***********************************************************************/
 
@@ -56,7 +56,7 @@ environment_initialize(struct environment_t *environment)
         int num_args;
     };
 
-    static struct special_function_initializer_t initializers[] = 
+    static struct special_function_initializer_t initializers[] =
     {
         { "read", read, 1 },
         { "eval", eval, 1 },
@@ -186,10 +186,10 @@ find_symbol_name(struct environment_t *environment, uint64_t key)
     for (i = environment->symbol_names.hash_internment_page_base; i != NULL; i = i->next)
     {
         struct interned_hash_entry_t *entry;
-        
-        entry = bsearch(&key, 
-                i->data, 
-                i->num_entries, 
+
+        entry = bsearch(&key,
+                i->data,
+                i->num_entries,
                 sizeof(struct interned_hash_entry_t),
                 interned_hash_entry_comparer);
 
@@ -226,13 +226,13 @@ intern_string(struct environment_t *environment, const char *bytes, size_t num_b
     i->next = environment->symbol_names.string_internment_page_base;
     environment->symbol_names.string_internment_page_base = i;
     i->top = i->data;
-    i->available_bytes = DEFAULT_SYMBOL_INTERNMENT_PAGE_SIZE 
+    i->available_bytes = DEFAULT_SYMBOL_INTERNMENT_PAGE_SIZE
         - offsetof(struct symbol_string_internment_page_t, data);
 
     return intern_string(environment, bytes, num_bytes);
 }
 
-static void 
+static void
 intern_hash(struct environment_t *environment, uint64_t hash, const char *string)
 {
     struct symbol_hash_internment_page_t *i;
@@ -267,7 +267,7 @@ intern_hash(struct environment_t *environment, uint64_t hash, const char *string
     i->next = environment->symbol_names.hash_internment_page_base;
     environment->symbol_names.hash_internment_page_base = i;
     i->num_entries = 0;
-    i->available_slots = (DEFAULT_SYMBOL_INTERNMENT_PAGE_SIZE 
+    i->available_slots = (DEFAULT_SYMBOL_INTERNMENT_PAGE_SIZE
         - offsetof(struct symbol_string_internment_page_t, data)) / sizeof(struct interned_hash_entry_t);
 
     intern_hash(environment, hash, string);

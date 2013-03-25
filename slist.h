@@ -1,6 +1,6 @@
 /***********************************************************************
  * evilscheme, Copyright (c) 2012-2013, Maximilian Burke
- * This file is distributed under the FreeBSD license. 
+ * This file is distributed under the FreeBSD license.
  * See LICENSE.TXT for details.
  ***********************************************************************/
 
@@ -15,7 +15,7 @@ struct slist_t
     struct slist_t *next;
 };
 
-void 
+void
 slist_link(struct slist_t *from, struct slist_t *to);
 
 struct slist_t *

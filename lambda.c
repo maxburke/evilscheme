@@ -1,6 +1,6 @@
 /***********************************************************************
  * evilscheme, Copyright (c) 2012-2013, Maximilian Burke
- * This file is distributed under the FreeBSD license. 
+ * This file is distributed under the FreeBSD license.
  * See LICENSE.TXT for details.
  ***********************************************************************/
 
@@ -88,7 +88,7 @@ pool_alloc(struct memory_pool_t *pool, size_t size)
             return mem;
         }
     }
-        
+
     i = calloc(1, DEFAULT_POOL_CHUNK_SIZE);
     i->top = &i->mem[0];
     i->end = i->top + max_alloc_size;
@@ -268,7 +268,7 @@ find_before(struct instruction_t *start, struct instruction_t *target)
     struct slist_t *i;
 
     end = &target->link;
-    
+
     for (i = &start->link; i->next != end; i = i->next)
         ;
 
@@ -408,8 +408,8 @@ compile_sub(struct compiler_context_t *context, struct instruction_t *next, stru
     if (num_parameters == 1)
     {
         /*
-         * (- x) should return x negated. This pushes a zero onto the 
-         * operation stack and calls sub as normal, effectively translating 
+         * (- x) should return x negated. This pushes a zero onto the
+         * operation stack and calls sub as normal, effectively translating
          * this operation to (- 0 x).
          */
         struct instruction_t *zero;
@@ -612,7 +612,7 @@ compile_call(struct compiler_context_t *context, struct instruction_t *next, str
     int num_args;
 
     /*
-     * Optimization opportunity -- tail calls to self can be replaced with 
+     * Optimization opportunity -- tail calls to self can be replaced with
      * branch to beginning of function. The difficulty will be detecting if
      * we are branching to ourself. This will not be possible if we're compiling
      * the form (define foo (lambda (x) ...))) because the slot foo can later be
@@ -783,7 +783,7 @@ compile_get_bound_location(struct compiler_context_t *context, struct instructio
 
     assert(symbol->tag_count.tag == TAG_SYMBOL);
 
-    get_bound_location = allocate_instruction(context); 
+    get_bound_location = allocate_instruction(context);
     get_bound_location->opcode = OPCODE_GET_BOUND_LOCATION;
     get_bound_location->size = 8;
     get_bound_location->data.u8 = symbol->value.symbol_hash;
@@ -883,7 +883,7 @@ compile_let(struct compiler_context_t *context, struct instruction_t *next, stru
             /*
              * If the code provides an initializer this code compiles the
              * initialization form and pushes the result to the stack. The
-             * resulting stack value is used as the slot for the newly 
+             * resulting stack value is used as the slot for the newly
              * created "variable".
              */
 
@@ -930,7 +930,7 @@ compile_let(struct compiler_context_t *context, struct instruction_t *next, stru
      * Compile body of let here.
      */
     next = compile_form(context, next, body);
-    
+
     /*
      * Collapse scopes so that the symbols are no longer visible after control
      * leaves this let block.
@@ -997,7 +997,7 @@ compile_quote(struct compiler_context_t *context, struct instruction_t *next, st
 
     quote_form = CAR(args);
 
-    return compile_load_function_local(context, next, quote_form); 
+    return compile_load_function_local(context, next, quote_form);
 }
 
 static struct instruction_t *
@@ -1034,7 +1034,7 @@ compile_set(struct compiler_context_t *context, struct instruction_t *next, stru
         struct instruction_t *set;
 
         /*
-         * Evaluate the place. This should always evaluate to an inner 
+         * Evaluate the place. This should always evaluate to an inner
          * reference. I think. I hope.
          */
         place = compile_form(context, value, place_form);
@@ -1072,7 +1072,7 @@ compile_set(struct compiler_context_t *context, struct instruction_t *next, stru
 
     /*
      * The place must either be an expression that evaluates to an
-     * inner reference, or it must be a variable. If we're here, 
+     * inner reference, or it must be a variable. If we're here,
      * something has gone terribly wrong.
      */
     BREAK();
@@ -1181,7 +1181,7 @@ compile_form(struct compiler_context_t *context, struct instruction_t *next, str
                  * The function/procedure isn't one that is handled by the
                  * compiler so we need to emit a call to it.
                  */
-                evil_debug_print("** %s (0x%" PRIx64 ") **\n", 
+                evil_debug_print("** %s (0x%" PRIx64 ") **\n",
                     find_symbol_name(context->environment, function_hash),
                     function_hash);
                 return compile_call(context, next, function_symbol, function_args);
@@ -1304,7 +1304,7 @@ assemble(struct environment_t *environment, struct compiler_context_t *context, 
                     union convert_two_t c2;
 
                     /*
-                     * We add 1 to the offset of the current instruction 
+                     * We add 1 to the offset of the current instruction
                      * because this one accounts for the PC's offset after
                      * it has decoded the opcode.
                      */
@@ -1389,12 +1389,12 @@ assemble(struct environment_t *environment, struct compiler_context_t *context, 
     for (fn_local_idx = 0; local_slots != NULL; local_slots = local_slots->next, ++fn_local_idx)
     {
         struct function_local_t *local;
-        
+
         local = (struct function_local_t *)local_slots;
 
         procedure_base[FIELD_LOCALS + fn_local_idx] = make_ref(local->object);
     }
-    
+
     /*
      * The object handle is no longer needed at this point.
      */
@@ -1426,7 +1426,7 @@ is_branch(struct instruction_t *insn)
 }
 
 static void
-eradicate_nop(struct instruction_t *root, 
+eradicate_nop(struct instruction_t *root,
         struct instruction_t *nop,
         struct instruction_t *prev)
 {
@@ -1626,7 +1626,7 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
             case OPCODE_LDIMM_1_BOOL:
                 {
                     unsigned char value;
-                    
+
                     value = ptr[i + 1];
                     print_hex_bytes(ptr + i, 2);
 
@@ -1638,7 +1638,7 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
             case OPCODE_LDIMM_1_CHAR:
                 {
                     unsigned char value;
-                    
+
                     value = ptr[i + 1];
                     print_hex_bytes(ptr + i, 2);
 
@@ -1650,7 +1650,7 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
             case OPCODE_LDIMM_1_FIXNUM:
                 {
                     unsigned char value;
-                    
+
                     value = ptr[i + 1];
                     print_hex_bytes(ptr + i, 2);
 
@@ -1662,7 +1662,7 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
             case OPCODE_LDIMM_1_FLONUM:
                 {
                     unsigned char value;
-                    
+
                     value = ptr[i + 1];
                     print_hex_bytes(ptr + i, 2);
 

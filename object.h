@@ -1,6 +1,6 @@
 /***********************************************************************
  * evilscheme, Copyright (c) 2012-2013, Maximilian Burke
- * This file is distributed under the FreeBSD license. 
+ * This file is distributed under the FreeBSD license.
  * See LICENSE.TXT for details.
  ***********************************************************************/
 
@@ -25,7 +25,7 @@ enum tag_t
     TAG_PROCEDURE,          /* 9 */
 
     /*
-     * Special functions include read, eval, print, define. These functions 
+     * Special functions include read, eval, print, define. These functions
      * are part of the core but must also be accessible and usable from within
      * the script.
      */
@@ -40,7 +40,7 @@ enum tag_t
 
     /*
      * References are how aggregate objects are handled within the system
-     * in most cases. For example, a vector will exist on the heap but 
+     * in most cases. For example, a vector will exist on the heap but
      * it is a reference to it that will be stored in a pair, or on the stack,
      * or within another vector.
      */
@@ -126,7 +126,7 @@ make_ref(struct object_t *ptr)
 {
     struct object_t ref;
 
-    if (is_reference_type(ptr)) 
+    if (is_reference_type(ptr))
     {
         ref.tag_count.tag = TAG_REFERENCE;
         ref.tag_count.flag = 0;
@@ -175,7 +175,7 @@ deref(struct object_t *ptr)
 }
 
 /*
- * Like deref but takes a pointer-to-const-object and returns a 
+ * Like deref but takes a pointer-to-const-object and returns a
  * pointer-to-const-object.
  */
 static inline const struct object_t *

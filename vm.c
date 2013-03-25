@@ -51,7 +51,7 @@ DISABLE_WARNING(4996)
 #endif
 
 #define STACK_PUSH(stack, x) do { *(stack--) = x; } while (0)
-#define STACK_POP(stack) *(++stack) 
+#define STACK_POP(stack) *(++stack)
 #ifndef NDEBUG
 #   define VALIDATE_STACK(env) do { \
         assert(env->stack_ptr >= env->stack_bottom && env->stack_ptr < env->stack_top); } while(0)

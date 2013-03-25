@@ -1,6 +1,6 @@
 /***********************************************************************
  * evilscheme, Copyright (c) 2012-2013, Maximilian Burke
- * This file is distributed under the FreeBSD license. 
+ * This file is distributed under the FreeBSD license.
  * See LICENSE.TXT for details.
  ***********************************************************************/
 
@@ -141,7 +141,7 @@ remove_character(char *buffer, const char * const end, char character)
     return write;
 }
 
-static char * 
+static char *
 remove_comments(char *buffer, const char * const end)
 {
     /*
@@ -185,7 +185,7 @@ read_test_file(const char *filename)
     FILE *fp;
     size_t size;
     char *buffer;
-    
+
     fp = fopen(filename, "rb");
     fseek(fp, 0, SEEK_END);
     size = (size_t)ftell(fp);
@@ -311,7 +311,7 @@ run_test(struct environment_t *environment, const char *test, const char *expect
             traversal_done = 1;
         }
 
-        return 0; 
+        return 0;
     }
 
     static void
@@ -480,7 +480,7 @@ evil_run_tests(void)
         test_end = remove_comments(test_file, test_end);
 
         test = test_file;
-      
+
         expected = test_file;
 
         /*
@@ -503,7 +503,7 @@ evil_run_tests(void)
             {
                 break;
             }
-            
+
             ++expected;
         }
 

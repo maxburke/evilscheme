@@ -1,6 +1,6 @@
 /***********************************************************************
  * evilscheme, Copyright (c) 2012-2013, Maximilian Burke
- * This file is distributed under the FreeBSD license. 
+ * This file is distributed under the FreeBSD license.
  * See LICENSE.TXT for details.
  ***********************************************************************/
 
@@ -25,7 +25,7 @@ cons(struct environment_t *environment, int num_args, struct object_t *args)
     UNUSED(num_args);
 
     assert(num_args == 2);
-    
+
     object = gc_alloc(environment->heap, TAG_PAIR, 0);
 
     *RAW_CAR(object) = args[0];

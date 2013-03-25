@@ -1,6 +1,6 @@
 /***********************************************************************
  * evilscheme, Copyright (c) 2012-2013, Maximilian Burke
- * This file is distributed under the FreeBSD license. 
+ * This file is distributed under the FreeBSD license.
  * See LICENSE.TXT for details.
  ***********************************************************************/
 
@@ -24,7 +24,7 @@ struct interned_symbol_names_table_t
 struct environment_t
 {
     struct tag_count_t tag_count;
-    
+
     /*
      * These fields hold the saved VM state in case execution is interrupted
      * or postponed.

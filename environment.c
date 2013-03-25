@@ -1,6 +1,6 @@
 /***********************************************************************
  * evilscheme, Copyright (c) 2012-2013, Maximilian Burke
- * This file is distributed under the FreeBSD license. 
+ * This file is distributed under the FreeBSD license.
  * See LICENSE.TXT for details.
  ***********************************************************************/
 
@@ -23,8 +23,8 @@ get_bound_location(struct environment_t *environment, uint64_t symbol_hash, int 
     struct symbol_table_fragment_t *fragment;
     int i;
 
-    for (current_environment = environment; 
-            current_environment != NULL; 
+    for (current_environment = environment;
+            current_environment != NULL;
             current_environment = current_environment->parent_environment)
     {
         for (fragment = current_environment->symbol_table_fragment;

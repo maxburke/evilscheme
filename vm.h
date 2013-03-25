@@ -1,6 +1,6 @@
 /***********************************************************************
  * evilscheme, Copyright (c) 2012-2013, Maximilian Burke
- * This file is distributed under the FreeBSD license. 
+ * This file is distributed under the FreeBSD license.
  * See LICENSE.TXT for details.
  ***********************************************************************/
 
@@ -10,7 +10,7 @@
 /*
  * VM design:
  * Stack based in lieu of data registers. VM contains a condition register
- * that is used for the results of test conditions. 
+ * that is used for the results of test conditions.
  */
 
 enum opcode_t
@@ -26,7 +26,7 @@ enum opcode_t
     /*
      * OPCODE_LDIMM_1_type [byte 0] | -> [value]
      * Create an object of the specified type on the top of the stack with its
-     * value initialized to the byte parameter. Fixnum types will be 
+     * value initialized to the byte parameter. Fixnum types will be
      * sign-extended as necessary.
      */
     OPCODE_LDIMM_1_BOOL,
@@ -48,8 +48,8 @@ enum opcode_t
 
     /*
      * OPCODE_LDIMM_8_type [byte 0..7] | -> [value]
-     * Same as LDIMM_4 but for 8 bytes. For flonum types the value is IEEE 
-     * double precision floating point representation of the object, or 
+     * Same as LDIMM_4 but for 8 bytes. For flonum types the value is IEEE
+     * double precision floating point representation of the object, or
      * as near as can be represented on the executing platform. For symbols,
      * the bytes represent the hashed value of the symbol (see object.c for
      * details on the hashing algorithm used.)
@@ -60,7 +60,7 @@ enum opcode_t
 
     /*
      * OPCODE_LDSTR [string][0] | -> [reference]
-     * Create a string object and push a reference of it to the top of the 
+     * Create a string object and push a reference of it to the top of the
      * stack. The string that follows the opcode is null-terminated.
      */
     OPCODE_LDSTR,
@@ -83,7 +83,7 @@ enum opcode_t
     OPCODE_LOAD,
 
     /*
-     * OPCODE_STORE | [reference|value] [reference] -> 
+     * OPCODE_STORE | [reference|value] [reference] ->
      */
     OPCODE_STORE,
 
@@ -100,7 +100,7 @@ enum opcode_t
     OPCODE_STSLOT_X,
 
     /*
-     * OPCODE_SET | [reference|value] [slot reference] -> 
+     * OPCODE_SET | [reference|value] [slot reference] ->
      * Set the slot reference to the reference provided. This is for aggregate
      * types like strings and vectors only.
      */
@@ -127,7 +127,7 @@ enum opcode_t
 
     /*
      * OPCODE_CMPN_<condition> | [value b] [value a] -> boolean
-     * Performs a numeric comparison of the two values on the stack. 
+     * Performs a numeric comparison of the two values on the stack.
      * Raises an error if non-numeric types are involved.
      */
     OPCODE_CMPN_EQ,
@@ -153,7 +153,7 @@ enum opcode_t
 
     /*
      * OPCODE_CALL [num args bytes 0..1]
-     * Pops the target function from the stack. Pushes the return address, 
+     * Pops the target function from the stack. Pushes the return address,
      * program area chain, and stack chain. Jumps to the specified method.
      */
     OPCODE_CALL,
@@ -174,14 +174,14 @@ enum opcode_t
      *
      * Executing a normal CALL instruction would result in this stack layout:
      *    x | [foo's return] | [program area chain] | [stack chain] | x | [bar's return] | [program area chain] | [stack chain]
-     * But a TAILCALL instruction would result in: 
-     *    x | [foo's return] | [program area chain] | [stack chain] 
+     * But a TAILCALL instruction would result in:
+     *    x | [foo's return] | [program area chain] | [stack chain]
      */
     OPCODE_TAILCALL,
 
     /*
      * OPCODE_RETURN
-     * Erases the current frame from the stack and jumps back to the saved 
+     * Erases the current frame from the stack and jumps back to the saved
      * return address.
      */
     OPCODE_RETURN,
@@ -195,7 +195,7 @@ enum opcode_t
 
     /*
      * OPCODE_binop | [a] [b] -> [a OP b]
-     * Perform arithmetic on the values on the top of the stack. The type of 
+     * Perform arithmetic on the values on the top of the stack. The type of
      * the expression [a OP b] is the less precise of the types of a and b.
      * For example, adding the fixnum 3 and flonum 1.0 gives the flonum 4.0.
      * This signals an error if the types are not fixnum or flonum.

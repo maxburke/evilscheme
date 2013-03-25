@@ -1,6 +1,6 @@
 /***********************************************************************
  * evilscheme, Copyright (c) 2012-2013, Maximilian Burke
- * This file is distributed under the FreeBSD license. 
+ * This file is distributed under the FreeBSD license.
  * See LICENSE.TXT for details.
  ***********************************************************************/
 
@@ -65,7 +65,7 @@ evil_gc_acquire_bucket(struct evil_heap_t *heap)
     }
 
     heap->current_bucket = new_bucket;
-    
+
     return new_bucket;
 }
 
@@ -101,7 +101,7 @@ evil_gc_perform_alloc(struct evil_heap_t *heap, size_t size)
             gc_collect(heap);
         }
     }
-   
+
     /*
      * If we're at this point then a garbage collection could not solve our
      * woes. Perhaps we need a bigger heap? Perhaps we need to collect
@@ -148,7 +148,7 @@ gc_create(void *heap_mem, size_t heap_size)
 {
     struct evil_heap_t *heap;
     size_t num_cards;
-    
+
     heap = evil_aligned_alloc(sizeof(void *), sizeof(struct evil_heap_t));
     memset(heap, 0, sizeof(struct evil_heap_t));
 
@@ -223,11 +223,11 @@ struct object_t *
 gc_alloc_vector(struct evil_heap_t *heap, size_t count)
 {
     /*
-     * A vector is similar to an object but doesn't have the same contained data. It 
+     * A vector is similar to an object but doesn't have the same contained data. It
      * has the tag_count header but following that the vector contains an array of simple
      * objects or references to complex objects (strings/symbols/functions/etc.)
      */
-    size_t total_alloc_size; 
+    size_t total_alloc_size;
     struct object_t *object;
 
     total_alloc_size = (count * sizeof(struct object_t)) + offsetof(struct object_t, value);

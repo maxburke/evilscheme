@@ -1,6 +1,6 @@
 /***********************************************************************
  * evilscheme, Copyright (c) 2012-2013, Maximilian Burke
- * This file is distributed under the FreeBSD license. 
+ * This file is distributed under the FreeBSD license.
  * See LICENSE.TXT for details.
  ***********************************************************************/
 
@@ -36,7 +36,7 @@ enum token_type_t
     TOKEN_STRING
 };
 
-struct token_t 
+struct token_t
 {
     struct slist_t link;
     enum token_type_t type;
@@ -56,7 +56,7 @@ static const char *
 find_current_token_end(const char **input_ptr, enum token_type_t *token_type)
 {
     const char *input;
-    
+
     input = *input_ptr;
 
     if (*input == '(' || *input == '[' || *input == '{')
@@ -92,7 +92,7 @@ find_current_token_end(const char **input_ptr, enum token_type_t *token_type)
  * When parsing numbers only the first one or two characters are examined,
  * as that is enough to determine whether or not the token is a number.
  */
-static int 
+static int
 is_number(const struct token_t *input)
 {
     if (input->text[0] >= '0' && input->text[0] <= '9')
@@ -115,12 +115,12 @@ object_from_symbol(struct environment_t *environment, const struct token_t *inpu
 {
     size_t string_length;
 
-    if (input->text[0] == '#') 
+    if (input->text[0] == '#')
     {
         struct object_t object;
         const char *char_ptr;
 
-        /* 
+        /*
          * #t/#f -> boolean
          */
         char next_char = (char)tolower(input->text[1]);
@@ -145,7 +145,7 @@ object_from_symbol(struct environment_t *environment, const struct token_t *inpu
         object.value.fixnum_value = strstr(input->text, "newline") != NULL ? '\n' : *char_ptr;
         return object;
     }
-    else if (is_number(input)) 
+    else if (is_number(input))
     {
         struct object_t object;
 
@@ -168,7 +168,7 @@ object_from_symbol(struct environment_t *environment, const struct token_t *inpu
     }
 
     /*
-     * If it's not a boolean, char, or number that we've parsed then it must 
+     * If it's not a boolean, char, or number that we've parsed then it must
      * be a symbol or a string. Vectors, pairs, and procedures are allocated
      * at runtime.
      */
@@ -192,8 +192,8 @@ object_from_symbol(struct environment_t *environment, const struct token_t *inpu
         object.tag_count.flag = 0;
         object.tag_count.count = 1;
         object.value.symbol_hash = register_symbol_from_bytes(
-                environment, 
-                input->text, 
+                environment,
+                input->text,
                 string_length);
         return object;
     }
@@ -249,7 +249,7 @@ create_object_from_token_stream(struct environment_t *environment, const struct 
  * Given a token in the stream, expand it to the specified expansion and
  * add the appropriate matching parentheses.
  */
-static void 
+static void
 expand_to(struct token_t *input, const char *expansion)
 {
     struct token_t *expansion_token;
@@ -257,7 +257,7 @@ expand_to(struct token_t *input, const char *expansion)
     struct token_t *current;
     size_t expansion_string_length;
     size_t paren_level;
-    
+
     expansion_string_length = strlen(expansion);
     paren_level = 0;
 
@@ -296,7 +296,7 @@ expand_to(struct token_t *input, const char *expansion)
     if (current->type == TOKEN_LPAREN)
         for (;;)
         {
-            if (current->type == TOKEN_LPAREN) 
+            if (current->type == TOKEN_LPAREN)
                 ++paren_level;
 
             if (current->type == TOKEN_RPAREN)
@@ -322,12 +322,12 @@ split_symbol_token(struct token_t *input, int text_index)
 {
     struct token_t *new_token;
     size_t token_text_length;
-    
+
     token_text_length = strlen(input->text);
 
     if (input->text[text_index] == '\0')
         return;
-    
+
     assert(input->type == TOKEN_SYMBOL);
 
     new_token = calloc(sizeof(struct token_t) + token_text_length - text_index, 1);
@@ -347,7 +347,7 @@ static struct token_t *
 apply_expansions(struct token_t *input)
 {
     struct token_t *iter;
-    
+
     iter = input;
 
     while (iter)
@@ -387,7 +387,7 @@ apply_expansions(struct token_t *input)
             memmove((void *)(vector_token->text), "vector", 7);
             iter->link.next = (struct slist_t *)vector_token;
         }
-        else if (iter->text[0] == ',') 
+        else if (iter->text[0] == ',')
         {
             if (iter->text[1] == '@')
             {
@@ -403,7 +403,7 @@ apply_expansions(struct token_t *input)
 
         iter = (struct token_t *)iter->link.next;
     }
-     
+
     return input;
 }
 
@@ -434,10 +434,10 @@ static struct token_t *
 tokenize(const char *input)
 {
     struct token_t *head;
-    
+
     head = NULL;
 
-    while (*input) 
+    while (*input)
     {
         enum token_type_t token_type;
         const char *current_token_end = find_current_token_end(&input, &token_type);
@@ -445,7 +445,7 @@ tokenize(const char *input)
         memmove((void *)(&token->text), input, current_token_end - input);
         token->type = token_type;
 
-        if (token_type == TOKEN_STRING) 
+        if (token_type == TOKEN_STRING)
             ++current_token_end;
 
         input = consume_whitespace(current_token_end);
@@ -464,7 +464,7 @@ read(struct environment_t *environment, int num_args, struct object_t *args)
 
     UNUSED(environment);
     assert(num_args == 1);
-    
+
     arg = deref(args);
     assert(arg->tag_count.tag == TAG_STRING);
 

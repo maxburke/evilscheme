@@ -1,6 +1,6 @@
 /***********************************************************************
  * evilscheme, Copyright (c) 2012-2013, Maximilian Burke
- * This file is distributed under the FreeBSD license. 
+ * This file is distributed under the FreeBSD license.
  * See LICENSE.TXT for details.
  ***********************************************************************/
 
@@ -74,8 +74,8 @@ evil_print(const char *format, ...)
 /*
  * main!
  */
-int 
-main(void) 
+int
+main(void)
 {
     const char *inputs[] = {
         "(define closure-test (lambda (foo) (lambda () (set! foo (+ 1 foo)) foo)))",
@@ -104,7 +104,7 @@ main(void)
         struct object_t object;
         struct object_t result;
         size_t input_length = strlen(inputs[i]);
-    
+
         args = gc_alloc(environment->heap, TAG_PAIR, 0);
         input_object = gc_alloc(environment->heap, TAG_STRING, input_length);
         memmove(input_object->value.string_value, inputs[i], input_length);
