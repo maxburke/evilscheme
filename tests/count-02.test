@@ -17,7 +17,7 @@
        27: 01 00 00                      LDSLOT 0
        30: 1F E2 90 4C A6 B3 EF 84 01    GET_BOUND_LOCATION count
        39: 0D                            LOAD
-       40: 1C                            CALL
-       41: 20                            ADD
-       42: 1E                            RETURN
+       40: 1C 02 00                      CALL 2
+       43: 20                            ADD
+       44: 1E                            RETURN
 '()

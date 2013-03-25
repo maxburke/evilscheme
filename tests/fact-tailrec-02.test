@@ -3,7 +3,7 @@
         0: 01 02 00                      LDSLOT 2
         3: 01 01 00                      LDSLOT 1
         6: 17                            CMPN_GT
-        7: 1B 1B 00                      COND_BRANCH 37
+        7: 1B 1E 00                      COND_BRANCH 40
        10: 01 02 00                      LDSLOT 2
        13: 01 01 00                      LDSLOT 1
        16: 04 01                         LDIMM_1_FIXNUM 1
@@ -13,7 +13,8 @@
        25: 22                            MUL
        26: 1F 40 A6 3B 8F A6 E7 26 71    GET_BOUND_LOCATION fact-tailrec
        35: 0D                            LOAD
-       36: 1D                            TAILCALL
-       37: 01 00 00                      LDSLOT 0
-       40: 1E                            RETURN
+       36: 1D 03 00                      TAILCALL 3
+       39: 1E                            RETURN
+       40: 01 00 00                      LDSLOT 0
+       43: 1E                            RETURN
 '()

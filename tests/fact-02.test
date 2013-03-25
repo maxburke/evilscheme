@@ -3,16 +3,16 @@
         0: 04 01                         LDIMM_1_FIXNUM 1
         2: 01 00 00                      LDSLOT 0
         5: 18                            CMPN_LE
-        6: 1B 16 00                      COND_BRANCH 31
+        6: 1B 18 00                      COND_BRANCH 33
         9: 01 00 00                      LDSLOT 0
        12: 01 00 00                      LDSLOT 0
        15: 04 01                         LDIMM_1_FIXNUM 1
        17: 21                            SUB
        18: 1F C3 9F FF E2 7E 6D 8D 03    GET_BOUND_LOCATION fact
        27: 0D                            LOAD
-       28: 1C                            CALL
-       29: 22                            MUL
-       30: 1E                            RETURN
-       31: 04 01                         LDIMM_1_FIXNUM 1
-       33: 1E                            RETURN
+       28: 1C 01 00                      CALL 1
+       31: 22                            MUL
+       32: 1E                            RETURN
+       33: 04 01                         LDIMM_1_FIXNUM 1
+       35: 1E                            RETURN
 '()
