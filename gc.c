@@ -160,7 +160,7 @@ gc_create(void *heap_mem, size_t heap_size)
 
     heap->num_buckets = heap_size / EVIL_PAGE_SIZE;
     assert(heap_size % EVIL_PAGE_SIZE == 0);
-    heap->bucket_base = evil_aligned_alloc(sizeof(void *), heap->num_buckets);
+    heap->bucket_base = evil_aligned_alloc(sizeof(void *), heap->num_buckets * sizeof(struct evil_heap_bucket_t));
 
     heap->free_list = NULL;
     heap->used_list = NULL;
