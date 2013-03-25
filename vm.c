@@ -814,8 +814,11 @@ vm_run(struct environment_t *environment, struct object_t *initial_function, int
                     struct object_t *fn;
                     unsigned char tag;
                     union convert_two_t c2;
+                    unsigned short args_passed;
                     ptrdiff_t return_offset;
+
                     memcpy(c2.bytes, pc, 2);
+                    args_passed = c2.u2;
                     pc += 2;
 
                     fn = deref(sp + 1);
@@ -836,7 +839,7 @@ vm_run(struct environment_t *environment, struct object_t *initial_function, int
                     sp -= vm_extract_num_locals(fn);
 
                     num_args = vm_extract_num_args(fn);
-                    assert(num_args == (int)c2.u2 || num_args == VARIADIC);
+                    assert(num_args == (int)args_passed || num_args == VARIADIC);
 
                     if (tag == TAG_PROCEDURE)
                     {
@@ -860,7 +863,7 @@ vm_run(struct environment_t *environment, struct object_t *initial_function, int
                         fn_environment = environment_address;
                         function_pointer = procedure_base[FIELD_CODE].value.special_function_value;
 
-                        result = function_pointer(fn_environment, num_args, program_area);
+                        result = function_pointer(fn_environment, args_passed, program_area);
                         *sp-- = result;
                     }
                 }
@@ -875,12 +878,14 @@ vm_run(struct environment_t *environment, struct object_t *initial_function, int
                     int num_args;
                     int arg_diff;
                     union convert_two_t c2;
+                    unsigned short args_passed;
                     struct object_t *prev_program_area_ref;
                     struct object_t *return_address;
                     struct object_t *moved_prev_program_area_ref;
                     struct object_t *moved_return_address;
 
                     memcpy(c2.bytes, pc, 2);
+                    args_passed = c2.u2;
                     pc += 2;
 
                     fn = deref(sp + 1);
@@ -888,7 +893,7 @@ vm_run(struct environment_t *environment, struct object_t *initial_function, int
                     tag = fn->tag_count.tag;
 
                     num_args = vm_extract_num_args(fn);
-                    assert(num_args == (int)c2.u2 || num_args == VARIADIC);
+                    assert(num_args == (int)args_passed || num_args == VARIADIC);
                     /*
                      * This code erases the current frame replacing it with the new call.
                      * At this point the stack, pre-call, where function b is performing
@@ -957,7 +962,7 @@ vm_run(struct environment_t *environment, struct object_t *initial_function, int
                         fn_environment = environment_address;
                         function_pointer = procedure_base[FIELD_CODE].value.special_function_value;
 
-                        result = function_pointer(fn_environment, num_args, program_area);
+                        result = function_pointer(fn_environment, args_passed, program_area);
                         *sp-- = result;
                     }
                     else
