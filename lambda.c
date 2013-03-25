@@ -1736,7 +1736,7 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
                     const char *str;
                     size_t length;
 
-                    str = (const char *)ptr + 1;
+                    str = (const char *)ptr + i + 1;
                     length = strlen(str);
                     print_hex_bytes(ptr + i, length + 1);
 
