@@ -446,6 +446,8 @@ scan_object(struct evil_heap_t *heap, struct object_t *object)
                     scan_object(heap, base + object->tag_count.count);
                 }
             }
+            return 0;
+
         default:
             /*
              * Unhandled object type?
