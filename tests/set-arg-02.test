@@ -1,7 +1,7 @@
 (disassemble 'set-arg-test)
 >set-arg-test:
         0: 04 03                         LDIMM_1_FIXNUM 3
-        2: 10 00 00                      STSLOT 0
+        2: 11 00 00                      STSLOT 0
         5: 01 00 00                      LDSLOT 0
-        8: 1E                            RETURN
+        8: 1F                            RETURN
 '()

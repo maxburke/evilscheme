@@ -1,10 +1,11 @@
 (disassemble 'hello-world)
 >hello-world:
         0: 0B 68 65 6C 6C 6F 20 77 6F 72 6C 64 21 LDSTR hello world!
-       14: 1F 5D 73 72 9C 38 EB 0F A1    GET_BOUND_LOCATION display
-       23: 0D                            LOAD
-       24: 1C                            CALL
-       25: 1F 0F 01 74 51 D3 17 33 19    GET_BOUND_LOCATION newline
-       34: 0D                            LOAD
-       35: 1D                            TAILCALL
+       14: 20 5D 73 72 9C 38 EB 0F A1    GET_BOUND_LOCATION display
+       23: 0E                            LOAD
+       24: 1D 01 00                      CALL 1
+       27: 20 0F 01 74 51 D3 17 33 19    GET_BOUND_LOCATION newline
+       36: 0E                            LOAD
+       37: 1E 00 00                      TAILCALL 0
+       40: 1F                            RETURN
 '()

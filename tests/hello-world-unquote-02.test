@@ -3,21 +3,22 @@
         0: 04 03                         LDIMM_1_FIXNUM 3
         2: 04 02                         LDIMM_1_FIXNUM 2
         4: 04 01                         LDIMM_1_FIXNUM 1
-        6: 1F 5D A1 30 C6 7E 6F 52 D0    GET_BOUND_LOCATION list
-       15: 0D                            LOAD
-       16: 1C                            CALL
-       17: 1F 8C 62 10 5D 51 60 85 22    GET_BOUND_LOCATION unquote-splicing
-       26: 0D                            LOAD
-       27: 1C                            CALL
-       28: 1F 80 38 AD 6B 18 A5 D9 D8    GET_BOUND_LOCATION bar
-       37: 0D                            LOAD
-       38: 1F 2C 8C A1 5A 89 A7 EC 9E    GET_BOUND_LOCATION unquote
-       47: 0D                            LOAD
-       48: 1C                            CALL
-       49: 1F 33 35 A1 6B 18 C7 CB D8    GET_BOUND_LOCATION foo
-       58: 0D                            LOAD
-       59: 1C                            CALL
-       60: 1F B0 23 91 BA AD D4 72 98    GET_BOUND_LOCATION quasiquote
-       69: 0D                            LOAD
-       70: 1D                            TAILCALL
+        6: 20 5D A1 30 C6 7E 6F 52 D0    GET_BOUND_LOCATION list
+       15: 0E                            LOAD
+       16: 1D 03 00                      CALL 3
+       19: 20 8C 62 10 5D 51 60 85 22    GET_BOUND_LOCATION unquote-splicing
+       28: 0E                            LOAD
+       29: 1D 01 00                      CALL 1
+       32: 20 80 38 AD 6B 18 A5 D9 D8    GET_BOUND_LOCATION bar
+       41: 0E                            LOAD
+       42: 20 2C 8C A1 5A 89 A7 EC 9E    GET_BOUND_LOCATION unquote
+       51: 0E                            LOAD
+       52: 1D 01 00                      CALL 1
+       55: 20 33 35 A1 6B 18 C7 CB D8    GET_BOUND_LOCATION foo
+       64: 0E                            LOAD
+       65: 1D 02 00                      CALL 2
+       68: 20 B0 23 91 BA AD D4 72 98    GET_BOUND_LOCATION quasiquote
+       77: 0E                            LOAD
+       78: 1E 01 00                      TAILCALL 1
+       81: 1F                            RETURN
 '()

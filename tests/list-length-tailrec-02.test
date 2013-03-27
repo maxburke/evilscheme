@@ -2,18 +2,19 @@
 >list-length-tailrec:
         0: 01 00 00                      LDSLOT 0
         3: 0C                            LDEMPTY
-        4: 14                            CMP_EQUAL
-        5: 1B 18 00                      COND_BRANCH 32
+        4: 15                            CMP_EQUAL
+        5: 1C 1B 00                      COND_BRANCH 35
         8: 04 01                         LDIMM_1_FIXNUM 1
        10: 01 01 00                      LDSLOT 1
-       13: 20                            ADD
+       13: 21                            ADD
        14: 01 00 00                      LDSLOT 0
        17: 04 01                         LDIMM_1_FIXNUM 1
-       19: 0F                            MAKE_REF
-       20: 0D                            LOAD
-       21: 1F 81 89 9C 64 21 D8 F0 29    GET_BOUND_LOCATION list-length-tailrec
-       30: 0D                            LOAD
-       31: 1D                            TAILCALL
-       32: 01 01 00                      LDSLOT 1
-       35: 1E                            RETURN
+       19: 10                            MAKE_REF
+       20: 0E                            LOAD
+       21: 20 81 89 9C 64 21 D8 F0 29    GET_BOUND_LOCATION list-length-tailrec
+       30: 0E                            LOAD
+       31: 1E 02 00                      TAILCALL 2
+       34: 1F                            RETURN
+       35: 01 01 00                      LDSLOT 1
+       38: 1F                            RETURN
 '()

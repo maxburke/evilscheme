@@ -1,2 +1,24 @@
-(begin (define gc-test (lambda (count param) (if (< count 1048576) (gc-test (+ 1 count) #(1 2 3 4 5)) "done"))) (gc-test 0 0))
->done
+(begin (define gc-test (lambda (count param) (if (< count 1048576) (gc-test (+ 1 count) #(1 2 3 4 5)) "done"))) (disassemble 'gc-test) (gc-test 0 0))
+>gc-test:
+        0: 06 00 00 10 00                LDIMM_4_FIXNUM 1048576
+        5: 01 00 00                      LDSLOT 0
+        8: 17                            CMPN_LT
+        9: 1C 07 00                      COND_BRANCH 19
+       12: 0B 64 6F 6E 65                LDSTR done
+       18: 1F                            RETURN
+       19: 04 05                         LDIMM_1_FIXNUM 5
+       21: 04 04                         LDIMM_1_FIXNUM 4
+       23: 04 03                         LDIMM_1_FIXNUM 3
+       25: 04 02                         LDIMM_1_FIXNUM 2
+       27: 04 01                         LDIMM_1_FIXNUM 1
+       29: 20 54 FD 71 55 29 09 29 40    GET_BOUND_LOCATION vector
+       38: 0E                            LOAD
+       39: 1D 05 00                      CALL 5
+       42: 04 01                         LDIMM_1_FIXNUM 1
+       44: 01 00 00                      LDSLOT 0
+       47: 21                            ADD
+       48: 20 90 0D FE 85 71 17 58 B5    GET_BOUND_LOCATION gc-test
+       57: 0E                            LOAD
+       58: 1E 02 00                      TAILCALL 2
+       61: 1F                            RETURN
+"done"
