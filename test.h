@@ -8,6 +8,6 @@
 #define EVIL_TEST_H
 
 int
-evil_run_tests(void);
+evil_run_tests(int argc, char *argv[]);
 
 #endif

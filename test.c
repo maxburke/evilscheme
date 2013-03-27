@@ -48,15 +48,7 @@ int print_buffer_size;
 void
 evil_debug_print(const char *format, ...)
 {
-    va_list args;
-
-    /*
-     * Spew all debug output to stderr for the tests, but don't track it below.
-     */
-
-    va_start(args, format);
-    vfprintf(stderr, format, args);
-    va_end(args);
+    UNUSED(format);
 }
 
 void
@@ -471,8 +463,29 @@ report_test_result(const char *test_name, int result, const char *expected)
     }
 }
 
+static int
+should_run_test(const char *test, int num_filters, char **filters)
+{
+    int i;
+
+    if (num_filters == 0)
+    {
+        return 1;
+    }
+
+    for (i = 0; i < num_filters; ++i)
+    {
+        if (strstr(test, filters[i]) != NULL)
+        {
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
 int
-evil_run_tests(void)
+evil_run_tests(int argc, char *argv[])
 {
     directory_t dir;
     int result;
@@ -514,6 +527,11 @@ evil_run_tests(void)
         test_end = remove_comments(test_file, test_end);
 
         test = test_file;
+
+        if (!should_run_test(filename, argc - 1, argv + 1))
+        {
+            goto next_test;
+        }
 
         expected = test_file;
 

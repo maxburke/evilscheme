@@ -55,9 +55,9 @@
 #include "test.h"
 
 int
-main(void)
+main(int argc, char *argv[])
 {
-    return evil_run_tests();
+    return evil_run_tests(argc, argv);
 }
 
 #else
