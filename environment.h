@@ -10,6 +10,7 @@
 #include "object.h"
 
 #define NUM_ENTRIES_PER_FRAGMENT 16
+#define INVALID_HASH 0
 
 struct symbol_table_entry_t
 {
@@ -21,7 +22,6 @@ struct symbol_table_fragment_t
 {
     struct symbol_table_entry_t entries[NUM_ENTRIES_PER_FRAGMENT];
     struct symbol_table_fragment_t *next_fragment;
-    size_t num_entries_in_fragment;
 };
 
 struct environment_t;

@@ -101,13 +101,27 @@ type_name(enum tag_t tag);
 #define CDR(x) deref((VECTOR_BASE(x) + 1))
 
 static inline int
+is_reference_tag(unsigned char tag)
+{
+    return (tag == TAG_PAIR || tag == TAG_VECTOR || tag == TAG_PROCEDURE || tag == TAG_STRING || tag == TAG_SPECIAL_FUNCTION || tag == TAG_ENVIRONMENT);
+}
+
+static inline int
+is_value_tag(unsigned char tag)
+{
+    return !is_reference_tag(tag);
+}
+
+static inline int
 is_reference_type(struct object_t *ptr)
 {
-    unsigned char tag;
+    return is_reference_tag(ptr->tag_count.tag);
+}
 
-    tag = ptr->tag_count.tag;
-
-    return (tag == TAG_PAIR || tag == TAG_VECTOR || tag == TAG_PROCEDURE || tag == TAG_STRING || tag == TAG_SPECIAL_FUNCTION || tag == TAG_ENVIRONMENT);
+static inline int
+is_value_type(struct object_t *ptr)
+{
+    return !is_reference_type(ptr);
 }
 
 /*

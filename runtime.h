@@ -42,6 +42,9 @@ struct environment_t
 struct environment_t *
 evil_environment_create(void *stack, size_t stack_size, void *heap, size_t heap_size);
 
+void
+evil_environment_destroy(struct environment_t *environment);
+
 const char *
 find_symbol_name(struct environment_t *environment, uint64_t key);
 

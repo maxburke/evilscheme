@@ -13,24 +13,25 @@ struct evil_heap_t;
 
 struct evil_heap_parameters_t;
 
-struct evil_object_handle_t
-{
-    struct object_t * volatile object;
-    struct evil_object_handle_t *prev;
-    struct evil_object_handle_t *next;
-};
+struct evil_object_handle_t;
 
-struct evil_object_handle_t
+struct evil_object_handle_t *
 evil_create_object_handle(struct evil_heap_t *heap, struct object_t *object);
 
-struct evil_object_handle_t
+struct evil_object_handle_t *
 evil_create_object_handle_from_value(struct evil_heap_t *heap, struct object_t object);
 
 void
-evil_destroy_object_handle(struct evil_heap_t *heap, struct evil_object_handle_t handle);
+evil_destroy_object_handle(struct evil_heap_t *heap, struct evil_object_handle_t *handle);
+
+struct object_t *
+evil_resolve_object_handle(struct evil_object_handle_t *handle);
 
 struct evil_heap_t *
 gc_create(void *heap_mem, size_t heap_size);
+
+void
+gc_set_environment(struct evil_heap_t *heap, struct environment_t *environment);
 
 struct object_t *
 gc_alloc(struct evil_heap_t *heap, enum tag_t type, size_t extra_bytes);

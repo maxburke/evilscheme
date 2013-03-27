@@ -14,8 +14,6 @@
 #include "read.h"
 #include "runtime.h"
 
-#define INVALID_HASH 0
-
 struct object_t *
 get_bound_location(struct environment_t *environment, uint64_t symbol_hash, int recurse)
 {

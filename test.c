@@ -51,11 +51,11 @@ evil_debug_print(const char *format, ...)
     va_list args;
 
     /*
-     * Spew all debug output to stdout for the tests, but don't track it below.
+     * Spew all debug output to stderr for the tests, but don't track it below.
      */
 
     va_start(args, format);
-    vprintf(format, args);
+    vfprintf(stderr, format, args);
     va_end(args);
 }
 
@@ -215,26 +215,60 @@ create_test_environment(void)
     return evil_environment_create(stack, stack_size, heap, heap_size);
 }
 
-static int
-run_test(struct environment_t *environment, const char *test, const char *expected)
+static struct evil_object_handle_t *
+create_string_object(struct environment_t *environment, const char *test)
 {
-    struct evil_object_handle_t string_handle;
-    struct evil_object_handle_t ast_handle;
-    struct evil_object_handle_t result_handle;
-
-    struct object_t *string;
     size_t test_length;
+    struct object_t *string;
+    struct evil_object_handle_t *string_handle;
 
-    reset_print_buffer();
     test_length = strlen(test);
 
     string = gc_alloc(environment->heap, TAG_STRING, test_length);
     memmove(string->value.string_value, test, test_length);
     string_handle = evil_create_object_handle(environment->heap, string);
 
-    ast_handle = evil_create_object_handle_from_value(environment->heap, read(environment, 1, string_handle.object));
-    result_handle = evil_create_object_handle_from_value(environment->heap, eval(environment, 1, ast_handle.object));
-    print(environment, 1, result_handle.object);
+    return string_handle;
+}
+
+static struct evil_object_handle_t *
+create_test_ast(struct environment_t *environment, struct evil_object_handle_t *string_handle)
+{
+    struct object_t *string_object;
+    struct object_t ast;
+
+    string_object = evil_resolve_object_handle(string_handle);
+    ast = read(environment, 1, string_object);
+    
+    return evil_create_object_handle_from_value(environment->heap, ast);
+}
+
+static struct evil_object_handle_t *
+evaluate_test_result(struct environment_t *environment, struct evil_object_handle_t *ast_handle)
+{
+    struct object_t *ast_object;
+    struct object_t result;
+
+    ast_object = evil_resolve_object_handle(ast_handle);
+    result = eval(environment, 1, ast_object);
+
+    return evil_create_object_handle_from_value(environment->heap, result);
+}
+
+static int
+run_test(struct environment_t *environment, const char *test, const char *expected)
+{
+    struct evil_object_handle_t *string_handle;
+    struct evil_object_handle_t *ast_handle;
+    struct evil_object_handle_t *result_handle;
+
+    reset_print_buffer();
+
+    string_handle = create_string_object(environment, test);
+    ast_handle = create_test_ast(environment, string_handle);
+    result_handle = evaluate_test_result(environment, ast_handle);
+
+    print(environment, 1, evil_resolve_object_handle(result_handle));
 
     return strcmp(expected, print_buffer) == 0;
 }
@@ -522,6 +556,7 @@ evil_run_tests(void)
 
     end_directory_traversal(dir);
     free_print_buffer();
+    evil_environment_destroy(environment);
 
     printf("\n========================================\n");
     printf("%d/%d tests passed\n", num_passed, num_tests);

@@ -8,7 +8,7 @@
 #define EVIL_SLIST_H
 
 /*
- * Singly linked list used for storage of the intermediate tokens.
+ * Singly linked list.
  */
 struct slist_t
 {

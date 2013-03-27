@@ -38,7 +38,7 @@ DISABLE_WARNING(4996)
 #   define VM_ASSERT(x)
 #endif
 
-#define ENABLE_VM_TRACING 0
+#define ENABLE_VM_TRACING 1
 
 #if ENABLE_VM_TRACING
 #   define VM_TRACE_OP(x) do { fprintf(stderr, "[vm] %32s program_area begin: %p sp begin: %p", #x, (void *)program_area, (void *)sp); } while (0)
@@ -315,8 +315,6 @@ vm_compare_equal_reference_type(const struct object_t *a, const struct object_t 
     {
         case TAG_SPECIAL_FUNCTION:
             return a->value.special_function_value == b->value.special_function_value;
-        case TAG_ENVIRONMENT:
-            return 0;
         case TAG_PAIR:
             return vm_compare_equal(CAR(a), CAR(b)) && vm_compare_equal(CDR(a), CDR(b));
         case TAG_PROCEDURE:
@@ -392,7 +390,7 @@ union function_pointer_cast_t
     void *pointer;
 };
 
-static void
+void
 vm_trace_stack(struct environment_t *environment, struct object_t *sp, struct object_t *program_area)
 {
     struct object_t *stack_top;
@@ -725,10 +723,17 @@ vm_run(struct environment_t *environment, struct object_t *initial_function, int
                 VM_CONTINUE();
             case OPCODE_NEW:
                 VM_TRACE_OP(OPCODE_NEW);
+                /*
+                 * TODO: This code needs to save the stack pointer before
+                 * perfoming any allocation in case a GC is triggered.
+                 */
                 BREAK();
                 VM_CONTINUE();
             case OPCODE_NEW_VECTOR:
                 VM_TRACE_OP(OPCODE_NEW_VECTOR);
+                /*
+                 * TODO: See above todo.
+                 */
                 BREAK();
                 VM_CONTINUE();
             case OPCODE_CMP_EQUAL:
@@ -831,18 +836,18 @@ vm_run(struct environment_t *environment, struct object_t *initial_function, int
                     old_program_area = program_area;
                     program_area = sp + 1;
 
-                    /*
-                     * Save the return address and create space for the local slots.
-                     */
-                    sp = vm_push_ref(sp, old_program_area);
-                    sp = vm_push_return_address(sp, fn, (unsigned short)return_offset);
-                    sp -= vm_extract_num_locals(fn);
-
                     num_args = vm_extract_num_args(fn);
                     assert(num_args == (int)args_passed || num_args == VARIADIC);
 
                     if (tag == TAG_PROCEDURE)
                     {
+                        /*
+                         * Save the return address and create space for the local slots.
+                         */
+                        sp = vm_push_ref(sp, old_program_area);
+                        sp = vm_push_return_address(sp, fn, (unsigned short)return_offset);
+                        sp -= vm_extract_num_locals(fn);
+
                         /*
                          * call the function!
                          */
@@ -857,6 +862,12 @@ vm_run(struct environment_t *environment, struct object_t *initial_function, int
                         struct environment_t *fn_environment;
                         special_function_t function_pointer;
                         struct object_t result;
+
+                        /*
+                         * The stack pointer is saved here in case the call to
+                         * the C function ends up in the garbage collector.
+                         */
+                        environment->stack_ptr = sp;
 
                         procedure_base = VECTOR_BASE(fn);
                         environment_address = deref(&procedure_base[FIELD_ENVIRONMENT]);
@@ -960,6 +971,12 @@ vm_run(struct environment_t *environment, struct object_t *initial_function, int
                         struct environment_t *fn_environment;
                         special_function_t function_pointer;
                         struct object_t result;
+
+                        /*
+                         * The stack pointer is saved here in case the call to
+                         * the C function ends up in the garbage collector.
+                         */
+                        environment->stack_ptr = sp;
 
                         procedure_base = VECTOR_BASE(fn);
                         environment_address = deref(&procedure_base[FIELD_ENVIRONMENT]);

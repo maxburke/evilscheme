@@ -1231,7 +1231,7 @@ assemble(struct environment_t *environment, struct compiler_context_t *context, 
     struct slist_t *local_slots;
     struct slist_t *insns;
     struct slist_t *i;
-    struct evil_object_handle_t byte_code_ptr;
+    struct evil_object_handle_t *byte_code_ptr;
     struct object_t *procedure;
     struct object_t *byte_code;
     unsigned char *bytes;
@@ -1261,10 +1261,11 @@ assemble(struct environment_t *environment, struct compiler_context_t *context, 
     procedure = gc_alloc_vector(environment->heap, FIELD_LOCALS + context->num_fn_locals);
     procedure->tag_count.tag = TAG_PROCEDURE;
 
-    byte_code = byte_code_ptr.object;
+    byte_code = evil_resolve_object_handle(byte_code_ptr);
 
     bytes = (unsigned char *)byte_code->value.string_value;
     procedure_base = VECTOR_BASE(procedure);
+    procedure_base[FIELD_ENVIRONMENT] = make_ref((struct object_t *)environment);
     procedure_base[FIELD_NUM_ARGS] = make_fixnum_object(context->num_args);
     procedure_base[FIELD_NUM_LOCALS] = make_fixnum_object(context->max_stack_slots);
     procedure_base[FIELD_NUM_FN_LOCALS] = make_fixnum_object(context->num_fn_locals);

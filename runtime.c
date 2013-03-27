@@ -118,13 +118,20 @@ evil_environment_create(void *stack, size_t stack_size, void *heap_mem, size_t h
      * return void* but this should help prevent unintended auto-casts of
      * newly allocated values.
      */
-    void *env_mem;
     struct environment_t *env;
 
     heap = gc_create(heap_mem, heap_size);
-    env_mem = gc_alloc(heap, TAG_ENVIRONMENT, 0);
-    env = env_mem;
 
+    /*
+     * Originally the top level environment was created in the GC heap but I
+     * think this is probably not the best idea because if this object were to
+     * be moved it would cause a lot of pain.
+     */
+    env = evil_aligned_alloc(sizeof(void *), sizeof(struct environment_t));
+    memset(env, 0, sizeof(struct environment_t));
+
+    env->tag_count.tag = TAG_ENVIRONMENT;
+    env->tag_count.count = 1;
     env->stack_bottom = stack;
     env->stack_top = (struct object_t *)((char *)stack + stack_size) - 1;
     env->stack_ptr = env->stack_top;
@@ -134,7 +141,17 @@ evil_environment_create(void *stack, size_t stack_size, void *heap_mem, size_t h
     env->symbol_table_fragment = NULL;
 
     environment_initialize(env);
+    gc_set_environment(heap, env);
+
     return env;
+}
+
+void
+evil_environment_destroy(struct environment_t *environment)
+{
+    UNUSED(environment);
+
+    BREAK();
 }
 
 /*
