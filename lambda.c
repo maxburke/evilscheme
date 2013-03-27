@@ -1250,13 +1250,6 @@ assemble(struct environment_t *environment, struct compiler_context_t *context, 
     num_bytes = calculate_bytecode_size_and_offsets(insns);
 
     byte_code = gc_alloc(environment->heap, TAG_STRING, num_bytes);
-
-    /*
-     * If this gc_alloc call triggers a gc we can lose the byte_code reference
-     * above which would be bad (or entertaining) and cause many problems.
-     *
-     * GC TODO: Add the pointer referenced above to a managed pointer structure.
-     */
     byte_code_ptr = evil_create_object_handle(environment->heap, byte_code);
     procedure = gc_alloc_vector(environment->heap, FIELD_LOCALS + context->num_fn_locals);
     procedure->tag_count.tag = TAG_PROCEDURE;
