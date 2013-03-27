@@ -1383,7 +1383,7 @@ assemble(struct environment_t *environment, struct compiler_context_t *context, 
     assert(idx == num_bytes);
 
     /*
-     * Insert the function local objects into the slotsin the function object.
+     * Insert the function local objects into the slots in the function object.
      */
     local_slots = slist_reverse(&context->locals->link);
 
