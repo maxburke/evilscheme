@@ -951,7 +951,7 @@ vm_run(struct environment_t *environment, struct object_t *initial_function, int
                      * below where the locals go.
                      */
                     sp = arg_slot - 3;
-                    sp -= vm_extract_num_locals(procedure);
+                    sp -= vm_extract_num_locals(fn);
 
                     /*
                      * Set the new program area.
