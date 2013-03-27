@@ -38,7 +38,7 @@ DISABLE_WARNING(4996)
 #   define VM_ASSERT(x)
 #endif
 
-#define ENABLE_VM_TRACING 1
+#define ENABLE_VM_TRACING 0
 
 #if ENABLE_VM_TRACING
 #   define VM_TRACE_OP(x) do { fprintf(stderr, "[vm] %32s program_area begin: %p sp begin: %p", #x, (void *)program_area, (void *)sp); } while (0)
@@ -876,7 +876,7 @@ vm_run(struct environment_t *environment, struct object_t *initial_function, int
 
                         result = function_pointer(fn_environment, args_passed, program_area);
 
-                        sp += args_passed + 1;
+                        sp += args_passed - 1;
                         *(sp + 1) = result;
                         program_area = old_program_area;
                     }
