@@ -149,9 +149,8 @@ evil_environment_create(void *stack, size_t stack_size, void *heap_mem, size_t h
 void
 evil_environment_destroy(struct environment_t *environment)
 {
-    UNUSED(environment);
-
-    BREAK();
+    gc_destroy(environment->heap);
+    evil_aligned_free(environment);
 }
 
 /*

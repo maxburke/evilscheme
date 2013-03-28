@@ -199,6 +199,38 @@ gc_create(void *heap_mem, size_t heap_size)
 }
 
 void
+gc_destroy(struct evil_heap_t *heap)
+{
+    struct dlist_t *i;
+
+    i = heap->active_object_handles.next;
+    while (i != &heap->active_object_handles)
+    {
+        struct evil_object_handle_t *handle;
+
+        handle = (struct evil_object_handle_t *)i;
+        i = i->next;
+
+        evil_aligned_free(handle);
+    }
+
+    i = heap->free_object_handles.next;
+    while (i != &heap->free_object_handles)
+    {
+        struct evil_object_handle_t *handle;
+
+        handle = (struct evil_object_handle_t *)i;
+        i = i->next;
+        evil_aligned_free(handle);
+    }
+
+    evil_aligned_free(heap->bucket_costs);
+    evil_aligned_free(heap->bucket_base);
+    evil_aligned_free(heap->card_base);
+    evil_aligned_free(heap);
+}
+
+void
 gc_set_environment(struct evil_heap_t *heap, struct environment_t *env)
 {
     heap->environment = env;

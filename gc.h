@@ -31,6 +31,9 @@ struct evil_heap_t *
 gc_create(void *heap_mem, size_t heap_size);
 
 void
+gc_destroy(struct evil_heap_t *heap);
+
+void
 gc_set_environment(struct evil_heap_t *heap, struct environment_t *environment);
 
 struct object_t *
