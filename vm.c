@@ -265,7 +265,9 @@ vm_reference_type(struct object_t *ref)
 static inline void
 vm_demote_numeric(struct object_t *object)
 {
+#if ENABLE_VM_ASSERTS
     VM_ASSERT_NOTRACE(object->tag_count.tag == TAG_FLONUM);
+#endif
 
     object->tag_count.tag = TAG_FLONUM;
     object->value.flonum_value = (double)(object->value.fixnum_value);
@@ -289,7 +291,9 @@ vm_compare_equal_reference_type(const struct object_t *a, const struct object_t 
     const unsigned char a_tag = a->tag_count.tag;
     const unsigned char b_tag = b->tag_count.tag;
 
+#if ENABLE_VM_ASSERTS
     VM_ASSERT_NOTRACE(a_tag != TAG_REFERENCE && b_tag != TAG_REFERENCE);
+#endif
 
     /*
      * If the references point to the same object, they are equal.
