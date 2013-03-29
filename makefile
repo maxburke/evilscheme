@@ -19,6 +19,10 @@ else
     LD = gcc
 endif
 
+ifdef OPT
+    CFLAGS := $(CFLAGS) -O$(OPT) -DNDEBUG
+endif
+
 %.o : %.c $(HEADERS)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
