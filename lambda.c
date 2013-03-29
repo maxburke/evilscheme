@@ -1497,9 +1497,6 @@ static struct instruction_t *
 promote_tailcalls(struct instruction_t *root)
 {
     struct slist_t *i;
-    struct instruction_t *prev;
-
-    prev = NULL;
 
     for (i = &root->link; i != NULL; i = i->next)
     {
@@ -1515,27 +1512,8 @@ promote_tailcalls(struct instruction_t *root)
             if (next->opcode == OPCODE_CALL)
             {
                 next->opcode = OPCODE_TAILCALL;
-
-                /*
-                 * This used to eliminate the return instruction that occurred
-                 * after a tailcall but I think it needs to be here still. For
-                 * VM bytecode functions this is an unreachable instruction
-                 * but it will be necessary for non-bytecode (ie, external C)
-                 * functions.
-
-                if (prev != NULL)
-                {
-                    prev->link.next = &next->link;
-                }
-                else
-                {
-                    root = next;
-                }
-                */
             }
         }
-
-        prev = insn;
     }
 
     return root;
