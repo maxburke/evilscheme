@@ -62,6 +62,12 @@
 
 #define UNUSED(x) (void)x
 
+#include <assert.h>
+#ifdef NDEBUG
+#   undef assert
+#   define assert(x) ((void)(sizeof(x)))
+#endif
+
 #include "user.h"
 
 #endif
