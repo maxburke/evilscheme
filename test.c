@@ -82,6 +82,8 @@ evil_print(const char *format, ...)
 
     print_buffer_offset += required_length;
 
+    va_end(args);
+    va_start(args, format);
     vprintf(format, args);
 }
 
@@ -488,14 +490,12 @@ int
 evil_run_tests(int argc, char *argv[])
 {
     directory_t dir;
-    int result;
     struct environment_t *environment;
     int num_tests;
     int num_passed;
 
     #define TEST_DIR "tests"
 
-    result = 0;
     num_tests = 0;
     num_passed = 0;
     environment = create_test_environment();
