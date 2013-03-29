@@ -68,7 +68,6 @@ static struct evil_heap_bucket_t *
 acquire_bucket(struct evil_heap_t *heap)
 {
     struct evil_heap_bucket_t *new_bucket;
-    struct evil_heap_bucket_t *current_bucket;
 
     new_bucket = heap->free_list;
     if (new_bucket == NULL)
@@ -77,8 +76,6 @@ acquire_bucket(struct evil_heap_t *heap)
     }
 
     heap->free_list = (struct evil_heap_bucket_t *)new_bucket->link.next;
-
-    current_bucket = heap->current_bucket;
     heap->current_bucket = new_bucket;
 
     return new_bucket;
@@ -602,11 +599,9 @@ reclaim_empty_buckets(struct evil_heap_t *heap)
     size_t num_buckets;
     size_t num_reclaimed;
     struct evil_bucket_cost_t *costs;
-    struct evil_heap_bucket_t *current_bucket;
 
     num_reclaimed = 0;
     costs = heap->bucket_costs;
-    current_bucket = heap->current_bucket;
     for (i = 0, num_buckets = heap->num_buckets; i < num_buckets; ++i)
     {
         struct evil_heap_bucket_t *bucket;
