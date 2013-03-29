@@ -38,7 +38,10 @@
     {
         void *mem;
 
-        posix_memalign(&mem, alignment, size);
+        if (posix_memalign(&mem, alignment, size) != 0)
+        {
+            return NULL;
+        }
 
         return mem;
     }
