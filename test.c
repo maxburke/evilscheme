@@ -77,6 +77,8 @@ evil_print(const char *format, ...)
         memset(print_buffer + print_buffer_size, 0, reallocation_delta);
         print_buffer_size = size;
 
+        va_end(args);
+        va_start(args, format);
         vsnprintf(print_buffer + print_buffer_offset, print_buffer_size - print_buffer_offset, format, args);
     }
 
@@ -178,6 +180,7 @@ read_test_file(const char *filename)
 {
     FILE *fp;
     size_t size;
+    size_t bytes_read;
     char *buffer;
 
     fp = fopen(filename, "rb");
@@ -186,7 +189,8 @@ read_test_file(const char *filename)
     fseek(fp, 0, SEEK_SET);
 
     buffer = calloc(size + 1, 1);
-    fread(buffer, 1, size, fp);
+    bytes_read = fread(buffer, 1, size, fp);
+    assert(bytes_read == size);
 
     fclose(fp);
 
