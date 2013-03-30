@@ -1519,7 +1519,7 @@ promote_tailcalls(struct instruction_t *root)
     return root;
 }
 
-static inline void
+static void
 print_hex_bytes(const unsigned char *c, size_t size)
 {
     size_t i;
