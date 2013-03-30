@@ -11,7 +11,6 @@
 #include <string.h>
 
 #include "base.h"
-#include "builtins.h"
 #include "environment.h"
 #include "gc.h"
 #include "object.h"
@@ -129,7 +128,7 @@ struct function_local_t
     /*
      * TODO: Should this be an object handle instead of a pointer?
      */
-    struct object_t *object;
+    struct evil_object_t *object;
 };
 
 struct compiler_context_t
@@ -138,7 +137,7 @@ struct compiler_context_t
     jmp_buf context_state;
     struct memory_pool_t pool;
     int num_args;
-    struct environment_t *environment;
+    struct evil_environment_t *environment;
     struct stack_slot_t *stack_slots;
     int max_stack_slots;
     int num_fn_locals;
@@ -148,7 +147,7 @@ struct compiler_context_t
 static void
 create_slots_for_args(
         struct compiler_context_t *context,
-        struct object_t *args,
+        struct evil_object_t *args,
         int slot_index)
 {
     /*
@@ -158,7 +157,7 @@ create_slots_for_args(
      */
 
     struct stack_slot_t *stack_slot;
-    struct object_t *arg_symbol;
+    struct evil_object_t *arg_symbol;
 
     if (args == empty_pair)
         return;
@@ -180,11 +179,11 @@ create_slots_for_args(
 static void
 initialize_compiler_context(
         struct compiler_context_t *context,
-        struct environment_t *environment,
-        struct object_t *args,
+        struct evil_environment_t *environment,
+        struct evil_object_t *args,
         struct compiler_context_t *previous_context)
 {
-    struct object_t *i;
+    struct evil_object_t *i;
     int num_args;
 
     num_args = 0;
@@ -247,19 +246,19 @@ struct instruction_t
 };
 
 static struct instruction_t *
-compile_form(struct compiler_context_t *context, struct instruction_t *next, struct object_t *body);
+compile_form(struct compiler_context_t *context, struct instruction_t *next, struct evil_object_t *body);
 
 static struct instruction_t *
-compile_get_bound_location(struct compiler_context_t *context, struct instruction_t *next, struct object_t *symbol);
+compile_get_bound_location(struct compiler_context_t *context, struct instruction_t *next, struct evil_object_t *symbol);
 
 static struct instruction_t *
 compile_load(struct compiler_context_t *context, struct instruction_t *next);
 
 static struct instruction_t *
-compile_lambda(struct compiler_context_t *incoming_context, struct instruction_t *next, struct object_t *lambda_body);
+compile_lambda(struct compiler_context_t *incoming_context, struct instruction_t *next, struct evil_object_t *lambda_body);
 
 static struct instruction_t *
-compile_load_function_local(struct compiler_context_t *context, struct instruction_t *next, struct object_t *object);
+compile_load_function_local(struct compiler_context_t *context, struct instruction_t *next, struct evil_object_t *object);
 
 static struct instruction_t *
 find_before(struct instruction_t *start, struct instruction_t *target)
@@ -276,12 +275,12 @@ find_before(struct instruction_t *start, struct instruction_t *target)
 }
 
 static struct instruction_t *
-compile_if(struct compiler_context_t *context, struct instruction_t *next, struct object_t *body)
+compile_if(struct compiler_context_t *context, struct instruction_t *next, struct evil_object_t *body)
 {
-    struct object_t *test_form;
-    struct object_t *consequent_form;
-    struct object_t *alternate_form;
-    struct object_t *temp;
+    struct evil_object_t *test_form;
+    struct evil_object_t *consequent_form;
+    struct evil_object_t *alternate_form;
+    struct evil_object_t *temp;
 
     struct instruction_t *test_code;
     struct instruction_t *consequent_code;
@@ -349,10 +348,10 @@ compile_if(struct compiler_context_t *context, struct instruction_t *next, struc
 }
 
 static struct instruction_t *
-compile_add(struct compiler_context_t *context, struct instruction_t *next, struct object_t *args)
+compile_add(struct compiler_context_t *context, struct instruction_t *next, struct evil_object_t *args)
 {
     struct instruction_t *insn;
-    struct object_t *arg;
+    struct evil_object_t *arg;
     int i;
 
     insn = next;
@@ -378,9 +377,9 @@ compile_add(struct compiler_context_t *context, struct instruction_t *next, stru
 }
 
 static inline int
-count_parameters(struct object_t *args)
+count_parameters(struct evil_object_t *args)
 {
-    struct object_t *arg;
+    struct evil_object_t *arg;
     int i;
 
     i = 0;
@@ -391,10 +390,10 @@ count_parameters(struct object_t *args)
 }
 
 static struct instruction_t *
-compile_sub(struct compiler_context_t *context, struct instruction_t *next, struct object_t *args)
+compile_sub(struct compiler_context_t *context, struct instruction_t *next, struct evil_object_t *args)
 {
     struct instruction_t *insn;
-    struct object_t *arg;
+    struct evil_object_t *arg;
     int i;
     int num_parameters;
 
@@ -447,10 +446,10 @@ compile_sub(struct compiler_context_t *context, struct instruction_t *next, stru
 }
 
 static struct instruction_t *
-compile_mul(struct compiler_context_t *context, struct instruction_t *next, struct object_t *args)
+compile_mul(struct compiler_context_t *context, struct instruction_t *next, struct evil_object_t *args)
 {
     struct instruction_t *insn;
-    struct object_t *arg;
+    struct evil_object_t *arg;
     int i;
     int num_parameters;
 
@@ -503,10 +502,10 @@ compile_mul(struct compiler_context_t *context, struct instruction_t *next, stru
 }
 
 static struct instruction_t *
-compile_div(struct compiler_context_t *context, struct instruction_t *next, struct object_t *args)
+compile_div(struct compiler_context_t *context, struct instruction_t *next, struct evil_object_t *args)
 {
     struct instruction_t *insn;
-    struct object_t *arg;
+    struct evil_object_t *arg;
     int i;
     int num_parameters;
 
@@ -560,13 +559,13 @@ compile_div(struct compiler_context_t *context, struct instruction_t *next, stru
 
 #define COMPILE_COMPARE(COMPARE, OPCODE) \
     static struct instruction_t *                                                                               \
-    compile_ ## COMPARE(struct compiler_context_t *context, struct instruction_t *next, struct object_t *args)  \
+    compile_ ## COMPARE(struct compiler_context_t *context, struct instruction_t *next, struct evil_object_t *args)  \
     {                                                                                                           \
         struct instruction_t *insn;                                                                             \
         struct instruction_t *lhs;                                                                              \
         struct instruction_t *rhs;                                                                              \
-        struct object_t *lhs_form;                                                                              \
-        struct object_t *rhs_form;                                                                              \
+        struct evil_object_t *lhs_form;                                                                              \
+        struct evil_object_t *rhs_form;                                                                              \
                                                                                                                 \
         lhs_form = args;                                                                                        \
         rhs_form = CDR(args);                                                                                   \
@@ -589,7 +588,7 @@ COMPILE_COMPARE(le, OPCODE_CMPN_LE)
 COMPILE_COMPARE(ge, OPCODE_CMPN_GE)
 
 static struct instruction_t *
-compile_arg_eval(struct compiler_context_t *context, struct instruction_t *next, struct object_t *args, int *num_args)
+compile_arg_eval(struct compiler_context_t *context, struct instruction_t *next, struct evil_object_t *args, int *num_args)
 {
     struct instruction_t *evaluated_args;
 
@@ -603,7 +602,7 @@ compile_arg_eval(struct compiler_context_t *context, struct instruction_t *next,
 }
 
 static struct instruction_t *
-compile_call(struct compiler_context_t *context, struct instruction_t *next, struct object_t *function, struct object_t *args)
+compile_call(struct compiler_context_t *context, struct instruction_t *next, struct evil_object_t *function, struct evil_object_t *args)
 {
     struct instruction_t *evaluated_args;
     struct instruction_t *function_symbol;
@@ -647,9 +646,9 @@ compile_call(struct compiler_context_t *context, struct instruction_t *next, str
 }
 
 static struct instruction_t *
-compile_nullp(struct compiler_context_t *context, struct instruction_t *next, struct object_t *args)
+compile_nullp(struct compiler_context_t *context, struct instruction_t *next, struct evil_object_t *args)
 {
-    struct object_t *expression_form;
+    struct evil_object_t *expression_form;
     struct instruction_t *expression;
     struct instruction_t *ldempty;
     struct instruction_t *cmp_eq;
@@ -668,7 +667,7 @@ compile_nullp(struct compiler_context_t *context, struct instruction_t *next, st
 }
 
 static struct instruction_t *
-compile_literal(struct compiler_context_t *context, struct instruction_t *next, struct object_t *literal)
+compile_literal(struct compiler_context_t *context, struct instruction_t *next, struct evil_object_t *literal)
 {
     struct instruction_t *instruction;
     size_t extra_size;
@@ -777,7 +776,7 @@ compile_load_slot(struct compiler_context_t *context, struct instruction_t *next
 }
 
 static struct instruction_t *
-compile_get_bound_location(struct compiler_context_t *context, struct instruction_t *next, struct object_t *symbol)
+compile_get_bound_location(struct compiler_context_t *context, struct instruction_t *next, struct evil_object_t *symbol)
 {
     struct instruction_t *get_bound_location;
 
@@ -844,13 +843,13 @@ count_active_stack_slots(struct stack_slot_t *slots)
 }
 
 static struct instruction_t *
-compile_let(struct compiler_context_t *context, struct instruction_t *next, struct object_t *args)
+compile_let(struct compiler_context_t *context, struct instruction_t *next, struct evil_object_t *args)
 {
     int i;
     int num_slots;
     int current_active_stack_slots;
-    struct object_t *binding_list;
-    struct object_t *body;
+    struct evil_object_t *binding_list;
+    struct evil_object_t *body;
     struct stack_slot_t *slot;
 
     /*
@@ -864,8 +863,8 @@ compile_let(struct compiler_context_t *context, struct instruction_t *next, stru
 
     for (binding_list = CAR(args); binding_list != empty_pair; binding_list = CDR(binding_list), ++num_slots)
     {
-        struct object_t *binding_pair;
-        struct object_t *symbol;
+        struct evil_object_t *binding_pair;
+        struct evil_object_t *symbol;
         struct stack_slot_t *stack_slot;
         struct instruction_t *initializer;
         struct instruction_t *initializer_store;
@@ -878,7 +877,7 @@ compile_let(struct compiler_context_t *context, struct instruction_t *next, stru
 
         if (CDR(symbol) != empty_pair)
         {
-            struct object_t *initializer_form;
+            struct evil_object_t *initializer_form;
 
             /*
              * If the code provides an initializer this code compiles the
@@ -949,16 +948,16 @@ compile_let(struct compiler_context_t *context, struct instruction_t *next, stru
 }
 
 static struct instruction_t *
-compile_define(struct compiler_context_t *context, struct instruction_t *next, struct object_t *args)
+compile_define(struct compiler_context_t *context, struct instruction_t *next, struct evil_object_t *args)
 {
-    struct object_t *symbol_form;
-    struct object_t *value_form;
+    struct evil_object_t *symbol_form;
+    struct evil_object_t *value_form;
     struct instruction_t *value;
     struct instruction_t *symbol;
     struct instruction_t *define_symbol_location;
     struct instruction_t *define_function;
     struct instruction_t *call;
-    struct object_t define_symbol;
+    struct evil_object_t define_symbol;
 
     symbol_form = CAR(args);
     value_form = CAR(CDR(args));
@@ -991,9 +990,9 @@ compile_define(struct compiler_context_t *context, struct instruction_t *next, s
 }
 
 static struct instruction_t *
-compile_quote(struct compiler_context_t *context, struct instruction_t *next, struct object_t *args)
+compile_quote(struct compiler_context_t *context, struct instruction_t *next, struct evil_object_t *args)
 {
-    struct object_t *quote_form;
+    struct evil_object_t *quote_form;
 
     quote_form = CAR(args);
 
@@ -1001,9 +1000,9 @@ compile_quote(struct compiler_context_t *context, struct instruction_t *next, st
 }
 
 static struct instruction_t *
-compile_begin(struct compiler_context_t *context, struct instruction_t *next, struct object_t *args)
+compile_begin(struct compiler_context_t *context, struct instruction_t *next, struct evil_object_t *args)
 {
-    struct object_t *body;
+    struct evil_object_t *body;
     struct instruction_t *root;
 
     root = next;
@@ -1017,10 +1016,10 @@ compile_begin(struct compiler_context_t *context, struct instruction_t *next, st
 }
 
 static struct instruction_t *
-compile_set(struct compiler_context_t *context, struct instruction_t *next, struct object_t *args)
+compile_set(struct compiler_context_t *context, struct instruction_t *next, struct evil_object_t *args)
 {
-    struct object_t *place_form;
-    struct object_t *value_form;
+    struct evil_object_t *place_form;
+    struct evil_object_t *value_form;
     struct instruction_t *value;
 
     place_form = CAR(args);
@@ -1082,7 +1081,7 @@ compile_set(struct compiler_context_t *context, struct instruction_t *next, stru
 
 #define COMPILE_PAIR_ACCESSOR(ACCESSOR, INDEX)                                                                      \
     static struct instruction_t *                                                                                   \
-    compile_ ## ACCESSOR(struct compiler_context_t *context, struct instruction_t *next, struct object_t *symbol)   \
+    compile_ ## ACCESSOR(struct compiler_context_t *context, struct instruction_t *next, struct evil_object_t *symbol)   \
     {                                                                                                               \
         struct instruction_t *index;                                                                                \
         struct instruction_t *ref;                                                                                  \
@@ -1112,9 +1111,9 @@ COMPILE_PAIR_ACCESSOR(first, 0)
 COMPILE_PAIR_ACCESSOR(rest, 1)
 
 static struct instruction_t *
-compile_form(struct compiler_context_t *context, struct instruction_t *next, struct object_t *body)
+compile_form(struct compiler_context_t *context, struct instruction_t *next, struct evil_object_t *body)
 {
-    struct object_t *symbol_object;
+    struct evil_object_t *symbol_object;
     uint64_t symbol_hash;
     struct stack_slot_t *slot;
     struct instruction_t *bound_location;
@@ -1123,8 +1122,8 @@ compile_form(struct compiler_context_t *context, struct instruction_t *next, str
 
     if (symbol_object->tag_count.tag == TAG_PAIR)
     {
-        struct object_t *function_symbol;
-        struct object_t *function_args;
+        struct evil_object_t *function_symbol;
+        struct evil_object_t *function_args;
         uint64_t function_hash;
 
         function_symbol = CAR(symbol_object);
@@ -1181,7 +1180,7 @@ compile_form(struct compiler_context_t *context, struct instruction_t *next, str
                  * The function/procedure isn't one that is handled by the
                  * compiler so we need to emit a call to it.
                  */
-                evil_debug_print("** %s (0x%" PRIx64 ") **\n",
+                evil_debug_printf("** %s (0x%" PRIx64 ") **\n",
                     find_symbol_name(context->environment, function_hash),
                     function_hash);
                 return compile_call(context, next, function_symbol, function_args);
@@ -1225,20 +1224,20 @@ calculate_bytecode_size_and_offsets(struct slist_t *root)
     return size;
 }
 
-static struct object_t *
-assemble(struct environment_t *environment, struct compiler_context_t *context, struct instruction_t *root)
+static struct evil_object_t *
+assemble(struct evil_environment_t *environment, struct compiler_context_t *context, struct instruction_t *root)
 {
     struct slist_t *local_slots;
     struct slist_t *insns;
     struct slist_t *i;
     struct evil_object_handle_t *byte_code_ptr;
-    struct object_t *procedure;
-    struct object_t *byte_code;
+    struct evil_object_t *procedure;
+    struct evil_object_t *byte_code;
     unsigned char *bytes;
     size_t num_bytes;
     size_t idx;
     size_t fn_local_idx;
-    struct object_t *procedure_base;
+    struct evil_object_t *procedure_base;
 
     /*
      * This must be the last function called as it destructively alters the
@@ -1258,7 +1257,7 @@ assemble(struct environment_t *environment, struct compiler_context_t *context, 
 
     bytes = (unsigned char *)byte_code->value.string_value;
     procedure_base = VECTOR_BASE(procedure);
-    procedure_base[FIELD_ENVIRONMENT] = make_ref((struct object_t *)environment);
+    procedure_base[FIELD_ENVIRONMENT] = make_ref((struct evil_object_t *)environment);
     procedure_base[FIELD_NUM_ARGS] = make_fixnum_object(context->num_args);
     procedure_base[FIELD_NUM_LOCALS] = make_fixnum_object(context->max_stack_slots);
     procedure_base[FIELD_NUM_FN_LOCALS] = make_fixnum_object(context->num_fn_locals);
@@ -1526,20 +1525,20 @@ print_hex_bytes(const unsigned char *c, size_t size)
 
     for (i = 0; i < size; ++i)
     {
-        evil_print("%02X ", c[i]);
+        evil_printf("%02X ", c[i]);
     }
 
     for (; i < 10; ++i)
     {
-        evil_print("   ");
+        evil_printf("   ");
     }
 }
 
 static void
-disassemble_procedure(struct environment_t *environment, struct object_t *args, const char *name)
+disassemble_procedure(struct evil_environment_t *environment, struct evil_object_t *args, const char *name)
 {
-    struct object_t *procedure;
-    struct object_t *byte_code_object;
+    struct evil_object_t *procedure;
+    struct evil_object_t *byte_code_object;
     const unsigned char *ptr;
     size_t i;
     size_t num_bytes;
@@ -1552,19 +1551,19 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
 
     ptr = (unsigned char *)byte_code_object->value.string_value;
 
-    evil_print("%s:\n", name);
+    evil_printf("%s:\n", name);
 
     for (i = 0, num_bytes = byte_code_object->tag_count.count; i < num_bytes;)
     {
         unsigned char c = ptr[i];
 
-        evil_print("    %5d: ", i);
+        evil_printf("    %5d: ", i);
 
         switch (c)
         {
             case OPCODE_INVALID:
                 print_hex_bytes(ptr + i, 1);
-                evil_print("INVALID\n");
+                evil_printf("INVALID\n");
                 ++i;
                 break;
             case OPCODE_LDSLOT_X:
@@ -1576,7 +1575,7 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
                     index = c2.s2;
                     print_hex_bytes(ptr + i, 3);
 
-                    evil_print("LDSLOT %d\n", index);
+                    evil_printf("LDSLOT %d\n", index);
                 }
 
                 i += 3;
@@ -1590,7 +1589,7 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
                     index = c2.s2;
                     print_hex_bytes(ptr + i, 3);
 
-                    evil_print("STSLOT %d\n", index);
+                    evil_printf("STSLOT %d\n", index);
                 }
 
                 i += 3;
@@ -1602,7 +1601,7 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
                     value = ptr[i + 1];
                     print_hex_bytes(ptr + i, 2);
 
-                    evil_print("LDIMM_1_BOOL %s\n", value ? "#t" : "#f");
+                    evil_printf("LDIMM_1_BOOL %s\n", value ? "#t" : "#f");
                 }
 
                 i += 2;
@@ -1614,7 +1613,7 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
                     value = ptr[i + 1];
                     print_hex_bytes(ptr + i, 2);
 
-                    evil_print("LDIMM_1_CHAR #\\%c\n", (char)value);
+                    evil_printf("LDIMM_1_CHAR #\\%c\n", (char)value);
                 }
 
                 i += 2;
@@ -1626,7 +1625,7 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
                     value = ptr[i + 1];
                     print_hex_bytes(ptr + i, 2);
 
-                    evil_print("LDIMM_1_FIXNUM %d\n", (int)value);
+                    evil_printf("LDIMM_1_FIXNUM %d\n", (int)value);
                 }
 
                 i += 2;
@@ -1638,7 +1637,7 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
                     value = ptr[i + 1];
                     print_hex_bytes(ptr + i, 2);
 
-                    evil_print("LDIMM_1_FLONUM %f\n", (double)value);
+                    evil_printf("LDIMM_1_FLONUM %f\n", (double)value);
                 }
 
                 i += 2;
@@ -1650,7 +1649,7 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
                     memcpy(c4.bytes, ptr + i + 1, 4);
                     print_hex_bytes(ptr + i, 5);
 
-                    evil_print("LDIMM_4_FIXNUM %d\n", c4.s4);
+                    evil_printf("LDIMM_4_FIXNUM %d\n", c4.s4);
                 }
 
                 i += 5;
@@ -1662,7 +1661,7 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
                     memcpy(c4.bytes, ptr + i + 1, 4);
                     print_hex_bytes(ptr + i, 5);
 
-                    evil_print("LDIMM_4_FLONUM %f\n", c4.f4);
+                    evil_printf("LDIMM_4_FLONUM %f\n", c4.f4);
                 }
 
                 i += 5;
@@ -1674,7 +1673,7 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
                     memcpy(c8.bytes, ptr + i + 1, 8);
                     print_hex_bytes(ptr + i, 9);
 
-                    evil_print("LDIMM_8_FIXNUM %" PRId64 "\n", c8.s8);
+                    evil_printf("LDIMM_8_FIXNUM %" PRId64 "\n", c8.s8);
                 }
 
                 i += 9;
@@ -1686,7 +1685,7 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
                     memcpy(c8.bytes, ptr + i + 1, 8);
                     print_hex_bytes(ptr + i, 9);
 
-                    evil_print("LDIMM_8_FLONUM %lf\n", c8.f8);
+                    evil_printf("LDIMM_8_FLONUM %lf\n", c8.f8);
                 }
 
                 i += 9;
@@ -1698,7 +1697,7 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
                     memcpy(c8.bytes, ptr + i + 1, 8);
                     print_hex_bytes(ptr + i, 9);
 
-                    evil_print("LDIMM_8_SYMBOL %s\n", find_symbol_name(environment, c8.u8));
+                    evil_printf("LDIMM_8_SYMBOL %s\n", find_symbol_name(environment, c8.u8));
                 }
 
                 i += 9;
@@ -1712,39 +1711,39 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
                     length = strlen(str);
                     print_hex_bytes(ptr + i, length + 1);
 
-                    evil_print("LDSTR %s\n", str);
+                    evil_printf("LDSTR %s\n", str);
                     i += length + 2;
                 }
 
                 break;
             case OPCODE_LDEMPTY:
                 print_hex_bytes(ptr + i, 1);
-                evil_print("LDEMPTY\n");
+                evil_printf("LDEMPTY\n");
                 ++i;
                 break;
             case OPCODE_LDFN:
                 print_hex_bytes(ptr + i, 1);
-                evil_print("LDFN\n");
+                evil_printf("LDFN\n");
                 ++i;
                 break;
             case OPCODE_STORE:
                 print_hex_bytes(ptr + i, 1);
-                evil_print("STORE\n");
+                evil_printf("STORE\n");
                 ++i;
                 break;
             case OPCODE_LOAD:
                 print_hex_bytes(ptr + i, 1);
-                evil_print("LOAD\n");
+                evil_printf("LOAD\n");
                 ++i;
                 break;
             case OPCODE_MAKE_REF:
                 print_hex_bytes(ptr + i, 1);
-                evil_print("MAKE_REF\n");
+                evil_printf("MAKE_REF\n");
                 ++i;
                 break;
             case OPCODE_SET:
                 print_hex_bytes(ptr + i, 1);
-                evil_print("SET\n");
+                evil_printf("SET\n");
                 ++i;
                 break;
             case OPCODE_NEW:
@@ -1754,44 +1753,44 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
                     tag = (enum tag_t)ptr[i + 1];
                     print_hex_bytes(ptr + i, 2);
 
-                    evil_print("NEW %s\n", type_name(tag));
+                    evil_printf("NEW %s\n", type_name(tag));
                 }
 
                 i += 2;
                 break;
             case OPCODE_NEW_VECTOR:
                 print_hex_bytes(ptr + i, 1);
-                evil_print("NEW_VECTOR\n");
+                evil_printf("NEW_VECTOR\n");
                 ++i;
                 break;
             case OPCODE_CMP_EQUAL:
                 print_hex_bytes(ptr + i, 1);
-                evil_print("CMP_EQUAL\n");
+                evil_printf("CMP_EQUAL\n");
                 ++i;
                 break;
             case OPCODE_CMPN_EQ:
                 print_hex_bytes(ptr + i, 1);
-                evil_print("CMPN_EQ\n");
+                evil_printf("CMPN_EQ\n");
                 ++i;
                 break;
             case OPCODE_CMPN_LT:
                 print_hex_bytes(ptr + i, 1);
-                evil_print("CMPN_LT\n");
+                evil_printf("CMPN_LT\n");
                 ++i;
                 break;
             case OPCODE_CMPN_GT:
                 print_hex_bytes(ptr + i, 1);
-                evil_print("CMPN_GT\n");
+                evil_printf("CMPN_GT\n");
                 ++i;
                 break;
             case OPCODE_CMPN_LE:
                 print_hex_bytes(ptr + i, 1);
-                evil_print("CMPN_LE\n");
+                evil_printf("CMPN_LE\n");
                 ++i;
                 break;
             case OPCODE_CMPN_GE:
                 print_hex_bytes(ptr + i, 1);
-                evil_print("CMPN_GE\n");
+                evil_printf("CMPN_GE\n");
                 ++i;
                 break;
             case OPCODE_BRANCH:
@@ -1801,7 +1800,7 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
                     memcpy(c2.bytes, ptr + i + 1, 2);
                     print_hex_bytes(ptr + i, 3);
 
-                    evil_print("BRANCH %d\n", c2.s2 + i + 1);
+                    evil_printf("BRANCH %d\n", c2.s2 + i + 1);
                 }
 
                 i += 3;
@@ -1813,7 +1812,7 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
                     memcpy(c2.bytes, ptr + i + 1, 2);
                     print_hex_bytes(ptr + i, 3);
 
-                    evil_print("COND_BRANCH %d\n", c2.s2 + i + 3);
+                    evil_printf("COND_BRANCH %d\n", c2.s2 + i + 3);
                 }
 
                 i += 3;
@@ -1825,7 +1824,7 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
                     memcpy(c2.bytes, ptr + i + 1, 2);
                     print_hex_bytes(ptr + i, 3);
 
-                    evil_print("CALL %d\n", c2.s2);
+                    evil_printf("CALL %d\n", c2.s2);
                 }
 
                 i += 3;
@@ -1837,14 +1836,14 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
                     memcpy(c2.bytes, ptr + i + 1, 2);
                     print_hex_bytes(ptr + i, 3);
 
-                    evil_print("TAILCALL %d\n", c2.s2);
+                    evil_printf("TAILCALL %d\n", c2.s2);
                 }
 
                 i += 3;
                 break;
             case OPCODE_RETURN:
                 print_hex_bytes(ptr + i, 1);
-                evil_print("RETURN\n");
+                evil_printf("RETURN\n");
                 ++i;
                 break;
             case OPCODE_GET_BOUND_LOCATION:
@@ -1854,54 +1853,54 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
                     memcpy(c8.bytes, ptr + i + 1, 8);
                     print_hex_bytes(ptr + i, 9);
 
-                    evil_print("GET_BOUND_LOCATION %s\n", find_symbol_name(environment, c8.u8));
+                    evil_printf("GET_BOUND_LOCATION %s\n", find_symbol_name(environment, c8.u8));
                 }
 
                 i += 9;
                 break;
             case OPCODE_ADD:
                 print_hex_bytes(ptr + i, 1);
-                evil_print("ADD\n");
+                evil_printf("ADD\n");
                 ++i;
                 break;
             case OPCODE_SUB:
                 print_hex_bytes(ptr + i, 1);
-                evil_print("SUB\n");
+                evil_printf("SUB\n");
                 ++i;
                 break;
             case OPCODE_MUL:
                 print_hex_bytes(ptr + i, 1);
-                evil_print("MUL\n");
+                evil_printf("MUL\n");
                 ++i;
                 break;
             case OPCODE_DIV:
                 print_hex_bytes(ptr + i, 1);
-                evil_print("DIV\n");
+                evil_printf("DIV\n");
                 ++i;
                 break;
             case OPCODE_AND:
                 print_hex_bytes(ptr + i, 1);
-                evil_print("AND\n");
+                evil_printf("AND\n");
                 ++i;
                 break;
             case OPCODE_OR:
                 print_hex_bytes(ptr + i, 1);
-                evil_print("OR\n");
+                evil_printf("OR\n");
                 ++i;
                 break;
             case OPCODE_XOR:
                 print_hex_bytes(ptr + i, 1);
-                evil_print("XOR\n");
+                evil_printf("XOR\n");
                 ++i;
                 break;
             case OPCODE_NOT:
                 print_hex_bytes(ptr + i, 1);
-                evil_print("NOT\n");
+                evil_printf("NOT\n");
                 ++i;
                 break;
             case OPCODE_NOP:
                 print_hex_bytes(ptr + i, 1);
-                evil_print("NOP\n");
+                evil_printf("NOP\n");
                 ++i;
                 break;
             default:
@@ -1911,12 +1910,12 @@ disassemble_procedure(struct environment_t *environment, struct object_t *args, 
     }
 }
 
-struct object_t
-disassemble(struct environment_t *environment, int num_args, struct object_t *args)
+struct evil_object_t
+evil_disassemble(struct evil_environment_t *environment, int num_args, struct evil_object_t *args)
 {
-    struct object_t symbol;
-    struct object_t *slot;
-    struct object_t *function;
+    struct evil_object_t symbol;
+    struct evil_object_t *slot;
+    struct evil_object_t *function;
     const char *name;
 
     UNUSED(num_args);
@@ -1935,7 +1934,7 @@ disassemble(struct environment_t *environment, int num_args, struct object_t *ar
     switch (function->tag_count.tag)
     {
         case TAG_SPECIAL_FUNCTION:
-            evil_print("%s: <special function>\n", name);
+            evil_printf("%s: <special function>\n", name);
             break;
         case TAG_PROCEDURE:
             disassemble_procedure(environment, function, name);
@@ -1948,12 +1947,12 @@ disassemble(struct environment_t *environment, int num_args, struct object_t *ar
     return make_empty_ref();
 }
 
-static struct object_t
-compile_form_to_bytecode(struct compiler_context_t *previous_context, struct environment_t *environment, struct object_t *lambda_body)
+static struct evil_object_t
+compile_form_to_bytecode(struct compiler_context_t *previous_context, struct evil_environment_t *environment, struct evil_object_t *lambda_body)
 {
-    struct object_t *args;
-    struct object_t *body;
-    struct object_t *procedure;
+    struct evil_object_t *args;
+    struct evil_object_t *body;
+    struct evil_object_t *procedure;
     struct instruction_t *root;
     struct compiler_context_t context;
 
@@ -1980,10 +1979,10 @@ compile_form_to_bytecode(struct compiler_context_t *previous_context, struct env
 }
 
 static struct instruction_t *
-compile_lambda(struct compiler_context_t *context, struct instruction_t *next, struct object_t *lambda_body)
+compile_lambda(struct compiler_context_t *context, struct instruction_t *next, struct evil_object_t *lambda_body)
 {
-    struct object_t procedure;
-    struct environment_t *environment;
+    struct evil_object_t procedure;
+    struct evil_environment_t *environment;
 
     /*
      * If this function is called then we're compiling a function that, when
@@ -2022,7 +2021,7 @@ compile_lambda(struct compiler_context_t *context, struct instruction_t *next, s
 }
 
 static struct instruction_t *
-compile_load_function_local(struct compiler_context_t *context, struct instruction_t *next, struct object_t *object)
+compile_load_function_local(struct compiler_context_t *context, struct instruction_t *next, struct evil_object_t *object)
 {
     int local_idx;
     struct function_local_t *function_local;
@@ -2060,8 +2059,8 @@ compile_load_function_local(struct compiler_context_t *context, struct instructi
     return load;
 }
 
-struct object_t
-lambda(struct environment_t *environment, int num_args, struct object_t *lambda_body)
+struct evil_object_t
+evil_lambda(struct evil_environment_t *environment, int num_args, struct evil_object_t *lambda_body)
 {
     UNUSED(num_args);
     assert(num_args == 1);

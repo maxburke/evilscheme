@@ -30,7 +30,7 @@
 struct evil_object_handle_t
 {
     struct dlist_t link;
-    struct object_t * volatile object;
+    struct evil_object_t * volatile object;
 };
 
 struct evil_heap_bucket_t
@@ -49,7 +49,7 @@ struct evil_bucket_cost_t
 
 struct evil_heap_t
 {
-    struct environment_t *environment;
+    struct evil_environment_t *environment;
     char *base;
     size_t size;
 
@@ -228,24 +228,24 @@ gc_destroy(struct evil_heap_t *heap)
 }
 
 void
-gc_set_environment(struct evil_heap_t *heap, struct environment_t *env)
+gc_set_environment(struct evil_heap_t *heap, struct evil_environment_t *env)
 {
     heap->environment = env;
 }
 
-struct object_t *
-gc_alloc(struct evil_heap_t *heap, enum tag_t type, size_t extra_bytes)
+struct evil_object_t *
+gc_alloc(struct evil_heap_t *heap, enum evil_tag_t type, size_t extra_bytes)
 {
     size_t size;
-    struct object_t *object;
+    struct evil_object_t *object;
 
     if (type == TAG_PAIR)
     {
-        size = offsetof(struct object_t, value) + 2 * sizeof(struct object_t);
+        size = offsetof(struct evil_object_t, value) + 2 * sizeof(struct evil_object_t);
     }
     else
     {
-        size = sizeof(struct object_t) + extra_bytes;
+        size = sizeof(struct evil_object_t) + extra_bytes;
     }
 
     object = perform_alloc(heap, size);
@@ -277,7 +277,7 @@ gc_alloc(struct evil_heap_t *heap, enum tag_t type, size_t extra_bytes)
     return object;
 }
 
-struct object_t *
+struct evil_object_t *
 gc_alloc_vector(struct evil_heap_t *heap, size_t count)
 {
     /*
@@ -286,9 +286,9 @@ gc_alloc_vector(struct evil_heap_t *heap, size_t count)
      * objects or references to complex objects (strings/symbols/functions/etc.)
      */
     size_t total_alloc_size;
-    struct object_t *object;
+    struct evil_object_t *object;
 
-    total_alloc_size = (count * sizeof(struct object_t)) + offsetof(struct object_t, value);
+    total_alloc_size = (count * sizeof(struct evil_object_t)) + offsetof(struct evil_object_t, value);
     object = perform_alloc(heap, total_alloc_size);
 
     object->tag_count.tag = TAG_VECTOR;
@@ -298,7 +298,7 @@ gc_alloc_vector(struct evil_heap_t *heap, size_t count)
 }
 
 struct evil_object_handle_t *
-evil_create_object_handle(struct evil_heap_t *heap, struct object_t *object)
+evil_create_object_handle(struct evil_heap_t *heap, struct evil_object_t *object)
 {
     struct evil_object_handle_t *handle;
 
@@ -318,7 +318,7 @@ evil_create_object_handle(struct evil_heap_t *heap, struct object_t *object)
 }
 
 struct evil_object_handle_t *
-evil_create_object_handle_from_value(struct evil_heap_t *heap, struct object_t object)
+evil_create_object_handle_from_value(struct evil_heap_t *heap, struct evil_object_t object)
 {
     unsigned char tag;
 
@@ -339,7 +339,7 @@ evil_create_object_handle_from_value(struct evil_heap_t *heap, struct object_t o
             return evil_create_object_handle(heap, object.value.ref);
         default:
             {
-                struct object_t *boxed_object;
+                struct evil_object_t *boxed_object;
 
                 boxed_object = gc_alloc(heap, tag, 0);
                 *boxed_object = object;
@@ -361,7 +361,7 @@ evil_destroy_object_handle(struct evil_heap_t *heap, struct evil_object_handle_t
     dlist_push(&heap->free_object_handles, &handle->link);
 }
 
-struct object_t *
+struct evil_object_t *
 evil_resolve_object_handle(struct evil_object_handle_t *handle)
 {
     return handle->object;
@@ -369,7 +369,7 @@ evil_resolve_object_handle(struct evil_object_handle_t *handle)
 
 
 static void
-mark_object(struct evil_heap_t *heap, struct object_t *object)
+mark_object(struct evil_heap_t *heap, struct evil_object_t *object)
 {
     char *object_address;
     size_t object_offset;
@@ -405,7 +405,7 @@ mark_object(struct evil_heap_t *heap, struct object_t *object)
 }
 
 static inline int
-scan_object(struct evil_heap_t *heap, struct object_t *object)
+scan_object(struct evil_heap_t *heap, struct evil_object_t *object)
 {
     unsigned char tag;
 
@@ -436,7 +436,7 @@ scan_object(struct evil_heap_t *heap, struct object_t *object)
             {
                 unsigned short elements;
                 unsigned short i;
-                struct object_t *base;
+                struct evil_object_t *base;
 
                 elements = object->tag_count.count;
                 base = VECTOR_BASE(object);
@@ -463,13 +463,13 @@ scan_object(struct evil_heap_t *heap, struct object_t *object)
 
         case TAG_INNER_REFERENCE:
             {
-                struct object_t *parent;
+                struct evil_object_t *parent;
 
                 parent = object->value.ref;
 
                 if (scan_object(heap, parent))
                 {
-                    struct object_t *base;
+                    struct evil_object_t *base;
 
                     base = VECTOR_BASE(parent);
                     scan_object(heap, base + object->tag_count.count);
@@ -489,9 +489,9 @@ scan_object(struct evil_heap_t *heap, struct object_t *object)
 }
 
 static void
-mark_evaluation_stack(struct evil_heap_t *heap, struct object_t *stack_ptr, struct object_t *stack_top)
+mark_evaluation_stack(struct evil_heap_t *heap, struct evil_object_t *stack_ptr, struct evil_object_t *stack_top)
 {
-    struct object_t *i;
+    struct evil_object_t *i;
 
     for (i = stack_ptr + 1; i < stack_top; ++i)
     {
@@ -538,7 +538,7 @@ mark_object_handles(struct evil_heap_t *heap)
 }
 
 static void
-mark_roots(struct evil_heap_t *heap, struct environment_t *environment)
+mark_roots(struct evil_heap_t *heap, struct evil_environment_t *environment)
 {
     mark_evaluation_stack(heap, environment->stack_ptr, environment->stack_top);
     mark_symbol_table(heap, environment->symbol_table_fragment);
@@ -620,7 +620,7 @@ reclaim_empty_buckets(struct evil_heap_t *heap)
 void
 gc_collect(struct evil_heap_t *heap)
 {
-    struct environment_t *environment;
+    struct evil_environment_t *environment;
     size_t num_reclaimed;
 
     environment = heap->environment;

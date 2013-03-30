@@ -11,16 +11,15 @@
 #include <string.h>
 
 #include "base.h"
-#include "builtins.h"
+#include "evil_scheme.h"
 #include "environment.h"
 #include "gc.h"
-#include "read.h"
 #include "object.h"
 #include "runtime.h"
 #include "vm.h"
 
-struct object_t empty_pair_storage = { { TAG_PAIR, 0, 0 }, { 0 } };
-struct object_t *empty_pair = &empty_pair_storage;
+struct evil_object_t empty_pair_storage = { { TAG_PAIR, 0, 0 }, { 0 } };
+struct evil_object_t *empty_pair = &empty_pair_storage;
 
 #define DEFAULT_SYMBOL_INTERNMENT_PAGE_SIZE 4096
 
@@ -47,38 +46,38 @@ struct symbol_string_internment_page_t
 };
 
 void
-environment_initialize(struct environment_t *environment)
+environment_initialize(struct evil_environment_t *environment)
 {
     struct special_function_initializer_t
     {
         const char *name;
-        special_function_t function;
+        evil_special_function_t function;
         int num_args;
     };
 
     static struct special_function_initializer_t initializers[] =
     {
-        { "read", read, 1 },
-        { "eval", eval, 1 },
-        { "print", print, 1 },
-        { "cons", cons, 2 },
-        { "define", define, 2 },
-        { "lambda", lambda, 1 },
-        { "apply", apply, VARIADIC },
-        { "vector", vector, VARIADIC },
-        { "disassemble", disassemble, 1 },
+        { "read", evil_read, 1 },
+        { "eval", evil_eval, 1 },
+        { "print", evil_print, 1 },
+        { "cons", evil_cons, 2 },
+        { "define", evil_define, 2 },
+        { "lambda", evil_lambda, 1 },
+        { "apply", evil_apply, VARIADIC },
+        { "vector", evil_vector, VARIADIC },
+        { "disassemble", evil_disassemble, 1 },
     };
     #define NUM_INITIALIZERS (sizeof initializers / sizeof initializers[0])
     size_t i;
 
     for (i = 0; i < NUM_INITIALIZERS; ++i)
     {
-        struct object_t *place;
-        struct object_t symbol;
-        struct object_t *procedure;
-        struct object_t *procedure_base;
+        struct evil_object_t *place;
+        struct evil_object_t symbol;
+        struct evil_object_t *procedure;
+        struct evil_object_t *procedure_base;
 
-        struct object_t function;
+        struct evil_object_t function;
 
         symbol.tag_count.tag = TAG_SYMBOL;
         symbol.tag_count.flag = 0;
@@ -94,7 +93,7 @@ environment_initialize(struct environment_t *environment)
         procedure->tag_count.tag = TAG_SPECIAL_FUNCTION;
         procedure_base = VECTOR_BASE(procedure);
 
-        procedure_base[FIELD_ENVIRONMENT] = make_ref((struct object_t *)environment);
+        procedure_base[FIELD_ENVIRONMENT] = make_ref((struct evil_object_t *)environment);
         procedure_base[FIELD_NUM_ARGS] = make_fixnum_object(initializers[i].num_args);
         procedure_base[FIELD_NUM_LOCALS] = make_fixnum_object(0);
         procedure_base[FIELD_NUM_FN_LOCALS] = make_fixnum_object(0);
@@ -105,7 +104,7 @@ environment_initialize(struct environment_t *environment)
     }
 }
 
-struct environment_t *
+struct evil_environment_t *
 evil_environment_create(void *stack, size_t stack_size, void *heap_mem, size_t heap_size)
 {
     struct evil_heap_t *heap;
@@ -118,7 +117,7 @@ evil_environment_create(void *stack, size_t stack_size, void *heap_mem, size_t h
      * return void* but this should help prevent unintended auto-casts of
      * newly allocated values.
      */
-    struct environment_t *env;
+    struct evil_environment_t *env;
 
     heap = gc_create(heap_mem, heap_size);
 
@@ -127,13 +126,13 @@ evil_environment_create(void *stack, size_t stack_size, void *heap_mem, size_t h
      * think this is probably not the best idea because if this object were to
      * be moved it would cause a lot of pain.
      */
-    env = evil_aligned_alloc(sizeof(void *), sizeof(struct environment_t));
-    memset(env, 0, sizeof(struct environment_t));
+    env = evil_aligned_alloc(sizeof(void *), sizeof(struct evil_environment_t));
+    memset(env, 0, sizeof(struct evil_environment_t));
 
     env->tag_count.tag = TAG_ENVIRONMENT;
     env->tag_count.count = 1;
     env->stack_bottom = stack;
-    env->stack_top = (struct object_t *)((char *)stack + stack_size) - 1;
+    env->stack_top = (struct evil_object_t *)((char *)stack + stack_size) - 1;
     env->stack_ptr = env->stack_top;
     memset(stack, 0, stack_size);
 
@@ -147,7 +146,7 @@ evil_environment_create(void *stack, size_t stack_size, void *heap_mem, size_t h
 }
 
 void
-evil_environment_destroy(struct environment_t *environment)
+evil_environment_destroy(struct evil_environment_t *environment)
 {
     gc_destroy(environment->heap);
     evil_aligned_free(environment);
@@ -195,7 +194,7 @@ interned_hash_entry_comparer(const void *a_ptr, const void *b_ptr)
 }
 
 const char *
-find_symbol_name(struct environment_t *environment, uint64_t key)
+find_symbol_name(struct evil_environment_t *environment, uint64_t key)
 {
     struct symbol_hash_internment_page_t *i;
 
@@ -217,7 +216,7 @@ find_symbol_name(struct environment_t *environment, uint64_t key)
 }
 
 static const char *
-intern_string(struct environment_t *environment, const char *bytes, size_t num_bytes)
+intern_string(struct evil_environment_t *environment, const char *bytes, size_t num_bytes)
 {
     struct symbol_string_internment_page_t *i;
 
@@ -249,7 +248,7 @@ intern_string(struct environment_t *environment, const char *bytes, size_t num_b
 }
 
 static void
-intern_hash(struct environment_t *environment, uint64_t hash, const char *string)
+intern_hash(struct evil_environment_t *environment, uint64_t hash, const char *string)
 {
     struct symbol_hash_internment_page_t *i;
 
@@ -291,7 +290,7 @@ intern_hash(struct environment_t *environment, uint64_t hash, const char *string
 
 
 static uint64_t
-register_symbol_impl(struct environment_t *environment, const char *bytes, size_t num_bytes)
+register_symbol_impl(struct evil_environment_t *environment, const char *bytes, size_t num_bytes)
 {
     uint64_t hash;
     const char *interned_string;
@@ -308,13 +307,13 @@ register_symbol_impl(struct environment_t *environment, const char *bytes, size_
 }
 
 uint64_t
-register_symbol_from_string(struct environment_t *environment, const char *string)
+register_symbol_from_string(struct evil_environment_t *environment, const char *string)
 {
     return register_symbol_impl(environment, string, strlen(string));
 }
 
 uint64_t
-register_symbol_from_bytes(struct environment_t *environment, const void *bytes, size_t num_bytes)
+register_symbol_from_bytes(struct evil_environment_t *environment, const void *bytes, size_t num_bytes)
 {
     return register_symbol_impl(environment, bytes, num_bytes);
 }

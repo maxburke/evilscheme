@@ -14,8 +14,8 @@
 
 struct symbol_table_entry_t
 {
-    struct object_t symbol;
-    struct object_t object;
+    struct evil_object_t symbol;
+    struct evil_object_t object;
 };
 
 struct symbol_table_fragment_t
@@ -24,12 +24,12 @@ struct symbol_table_fragment_t
     struct symbol_table_fragment_t *next_fragment;
 };
 
-struct environment_t;
+struct evil_environment_t;
 
-struct object_t *
-get_bound_location(struct environment_t *environment, uint64_t symbol_hash, int recurse);
+struct evil_object_t *
+get_bound_location(struct evil_environment_t *environment, uint64_t symbol_hash, int recurse);
 
-struct object_t *
-bind(struct environment_t *environment, struct object_t symbol);
+struct evil_object_t *
+bind(struct evil_environment_t *environment, struct evil_object_t symbol);
 
 #endif

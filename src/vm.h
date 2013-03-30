@@ -230,11 +230,11 @@ enum procedure_field_index_t
 
 #define VARIADIC 0xffff
 
-struct object_t
-vm_run(struct environment_t *environment, struct object_t *fn, int num_args, struct object_t *args);
+struct evil_object_t
+vm_run(struct evil_environment_t *environment, struct evil_object_t *fn, int num_args, struct evil_object_t *args);
 
 void
-vm_trace_stack(struct environment_t *environment, struct object_t *sp, struct object_t *program_area);
+vm_trace_stack(struct evil_environment_t *environment, struct evil_object_t *sp, struct evil_object_t *program_area);
 
 union convert_two_t
 {

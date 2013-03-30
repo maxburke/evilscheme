@@ -8,7 +8,7 @@
 #include "object.h"
 
 const char *
-type_name(enum tag_t tag)
+type_name(enum evil_tag_t tag)
 {
     switch (tag)
     {

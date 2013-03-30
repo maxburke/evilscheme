@@ -10,9 +10,9 @@
 #include <stdlib.h>
 
 #include "base.h"
+#include "evil_scheme.h"
 #include "gc.h"
 #include "object.h"
-#include "read.h"
 #include "runtime.h"
 #include "slist.h"
 
@@ -110,14 +110,14 @@ is_number(const struct token_t *input)
  * change strings like "#t" into their equivalent machine representation
  * of a Scheme true value.
  */
-static struct object_t
-object_from_symbol(struct environment_t *environment, const struct token_t *input)
+static struct evil_object_t
+object_from_symbol(struct evil_environment_t *environment, const struct token_t *input)
 {
     size_t string_length;
 
     if (input->text[0] == '#')
     {
-        struct object_t object;
+        struct evil_object_t object;
         const char *char_ptr;
 
         /*
@@ -147,7 +147,7 @@ object_from_symbol(struct environment_t *environment, const struct token_t *inpu
     }
     else if (is_number(input))
     {
-        struct object_t object;
+        struct evil_object_t object;
 
         if (strstr(input->text, ".") == NULL)
         {
@@ -176,7 +176,7 @@ object_from_symbol(struct environment_t *environment, const struct token_t *inpu
 
     if (input->type == TOKEN_STRING)
     {
-        struct object_t *object;
+        struct evil_object_t *object;
 
         object = gc_alloc(environment->heap, TAG_STRING, string_length);
         memmove(object->value.string_value, input->text, string_length);
@@ -185,7 +185,7 @@ object_from_symbol(struct environment_t *environment, const struct token_t *inpu
     }
     else
     {
-        struct object_t object;
+        struct evil_object_t object;
 
         assert(input->type == TOKEN_SYMBOL);
         object.tag_count.tag = TAG_SYMBOL;
@@ -199,15 +199,15 @@ object_from_symbol(struct environment_t *environment, const struct token_t *inpu
     }
 }
 
-static struct object_t
-recursive_create_object_from_token_stream(struct environment_t *environment, const struct token_t **input)
+static struct evil_object_t
+recursive_create_object_from_token_stream(struct evil_environment_t *environment, const struct token_t **input)
 {
     if (*input == NULL)
         return make_empty_ref();
 
     if ((*input)->type == TOKEN_LPAREN)
     {
-        struct object_t *pair = gc_alloc(environment->heap, TAG_PAIR, 0);
+        struct evil_object_t *pair = gc_alloc(environment->heap, TAG_PAIR, 0);
         *input = (const struct token_t *)(*input)->link.next;
 
         *RAW_CAR(pair) = recursive_create_object_from_token_stream(environment, input);
@@ -230,7 +230,7 @@ recursive_create_object_from_token_stream(struct environment_t *environment, con
     }
     else
     {
-        struct object_t *pair = gc_alloc(environment->heap, TAG_PAIR, 0);
+        struct evil_object_t *pair = gc_alloc(environment->heap, TAG_PAIR, 0);
         *RAW_CAR(pair) = object_from_symbol(environment, *input);
 
         *input = (const struct token_t *)(*input)->link.next;
@@ -239,8 +239,8 @@ recursive_create_object_from_token_stream(struct environment_t *environment, con
     }
 }
 
-static struct object_t
-create_object_from_token_stream(struct environment_t *environment, const struct token_t *input)
+static struct evil_object_t
+create_object_from_token_stream(struct evil_environment_t *environment, const struct token_t *input)
 {
     return recursive_create_object_from_token_stream(environment, &input);
 }
@@ -456,10 +456,10 @@ tokenize(const char *input)
     return apply_expansions(validate((struct token_t *)slist_reverse(&head->link)));
 }
 
-struct object_t
-read(struct environment_t *environment, int num_args, struct object_t *args)
+struct evil_object_t
+evil_read(struct evil_environment_t *environment, int num_args, struct evil_object_t *args)
 {
-    struct object_t *arg;
+    struct evil_object_t *arg;
     struct token_t *head;
 
     UNUSED(environment);

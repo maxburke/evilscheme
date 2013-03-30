@@ -10,14 +10,13 @@
 
 #include "environment.h"
 #include "object.h"
-#include "builtins.h"
-#include "read.h"
+#include "evil_scheme.h"
 #include "runtime.h"
 
-struct object_t *
-get_bound_location(struct environment_t *environment, uint64_t symbol_hash, int recurse)
+struct evil_object_t *
+get_bound_location(struct evil_environment_t *environment, uint64_t symbol_hash, int recurse)
 {
-    struct environment_t *current_environment;
+    struct evil_environment_t *current_environment;
     struct symbol_table_fragment_t *fragment;
     int i;
 
@@ -47,10 +46,10 @@ get_bound_location(struct environment_t *environment, uint64_t symbol_hash, int 
     return NULL;
 }
 
-struct object_t *
-bind(struct environment_t *environment, struct object_t symbol)
+struct evil_object_t *
+bind(struct evil_environment_t *environment, struct evil_object_t symbol)
 {
-    struct object_t *location;
+    struct evil_object_t *location;
     struct symbol_table_fragment_t *current_fragment;
     struct symbol_table_fragment_t *new_fragment;
     size_t i;

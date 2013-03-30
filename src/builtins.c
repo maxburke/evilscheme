@@ -9,17 +9,17 @@
 #include <string.h>
 
 #include "base.h"
-#include "builtins.h"
 #include "environment.h"
+#include "evil_scheme.h"
 #include "gc.h"
 #include "object.h"
 #include "runtime.h"
 #include "vm.h"
 
-struct object_t
-cons(struct environment_t *environment, int num_args, struct object_t *args)
+struct evil_object_t
+evil_cons(struct evil_environment_t *environment, int num_args, struct evil_object_t *args)
 {
-    struct object_t *object;
+    struct evil_object_t *object;
 
     UNUSED(environment);
     UNUSED(num_args);
@@ -34,11 +34,11 @@ cons(struct environment_t *environment, int num_args, struct object_t *args)
     return make_ref(object);
 }
 
-struct object_t
-define(struct environment_t *environment, int num_args, struct object_t *args)
+struct evil_object_t
+evil_define(struct evil_environment_t *environment, int num_args, struct evil_object_t *args)
 {
-    struct object_t *place;
-    struct object_t *value;
+    struct evil_object_t *place;
+    struct evil_object_t *value;
     UNUSED(num_args);
 
     assert(num_args == 2);
@@ -48,7 +48,7 @@ define(struct environment_t *environment, int num_args, struct object_t *args)
 
     if (place->tag_count.tag == TAG_SYMBOL)
     {
-        struct object_t *location;
+        struct evil_object_t *location;
 
         location = bind(environment, *place);
         *location = *value;
@@ -70,11 +70,11 @@ define(struct environment_t *environment, int num_args, struct object_t *args)
     return *value;
 }
 
-struct object_t
-vector(struct environment_t *environment, int num_args, struct object_t *args)
+struct evil_object_t
+evil_vector(struct evil_environment_t *environment, int num_args, struct evil_object_t *args)
 {
-    struct object_t *vector;
-    struct object_t *vector_base;
+    struct evil_object_t *vector;
+    struct evil_object_t *vector_base;
     int i;
 
     assert(num_args < 65536);
@@ -90,11 +90,11 @@ vector(struct environment_t *environment, int num_args, struct object_t *args)
     return make_ref(vector);
 }
 
-struct object_t
-apply(struct environment_t *environment, int num_args, struct object_t *args)
+struct evil_object_t
+evil_apply(struct evil_environment_t *environment, int num_args, struct evil_object_t *args)
 {
-    struct object_t *fn;
-    struct object_t *fn_args;
+    struct evil_object_t *fn;
+    struct evil_object_t *fn_args;
     unsigned char fn_tag;
     int num_args_for_fn;
 
@@ -105,7 +105,7 @@ apply(struct environment_t *environment, int num_args, struct object_t *args)
 
     if (fn_tag == TAG_SYMBOL)
     {
-        struct object_t *bound_location;
+        struct evil_object_t *bound_location;
 
         bound_location = get_bound_location(environment, fn->value.symbol_hash, 1);
         assert(bound_location != NULL);
@@ -118,7 +118,7 @@ apply(struct environment_t *environment, int num_args, struct object_t *args)
     {
         case TAG_SPECIAL_FUNCTION:
             {
-                special_function_t special_fn;
+                evil_special_function_t special_fn;
 
                 special_fn = fn->value.special_function_value;
                 return special_fn(environment, num_args_for_fn, fn_args);
@@ -137,10 +137,10 @@ apply(struct environment_t *environment, int num_args, struct object_t *args)
 /*
  * eval
  */
-struct object_t
-eval(struct environment_t *environment, int num_args, struct object_t *args)
+struct evil_object_t
+evil_eval(struct evil_environment_t *environment, int num_args, struct evil_object_t *args)
 {
-    struct object_t *object;
+    struct evil_object_t *object;
 
     assert(num_args == 1);
 
@@ -159,7 +159,7 @@ eval(struct environment_t *environment, int num_args, struct object_t *args)
             return *args;
         case TAG_SYMBOL:
             {
-                struct object_t *bound_location;
+                struct evil_object_t *bound_location;
 
                 bound_location = get_bound_location(environment, object->value.symbol_hash, 1);
                 assert(bound_location != NULL);
@@ -176,9 +176,9 @@ eval(struct environment_t *environment, int num_args, struct object_t *args)
                  * interpreted, for every bit of functionality supported
                  * by the runtime. And that's just not lazy!
                  */
-                struct object_t *wrapper_args;
-                struct object_t *wrapper_body;
-                struct object_t fn;
+                struct evil_object_t *wrapper_args;
+                struct evil_object_t *wrapper_body;
+                struct evil_object_t fn;
 
                 /*
                  * TODO: This needs to use object handles instead.
@@ -191,7 +191,7 @@ eval(struct environment_t *environment, int num_args, struct object_t *args)
                 *RAW_CAR(wrapper_body) = make_ref(object);
                 *RAW_CDR(wrapper_body) = make_empty_ref();
 
-                fn = lambda(environment, 1, wrapper_args);
+                fn = evil_lambda(environment, 1, wrapper_args);
                 return vm_run(environment, &fn, 0, empty_pair);
             }
             break;
@@ -207,9 +207,9 @@ eval(struct environment_t *environment, int num_args, struct object_t *args)
  * print
  */
 static void
-print_impl(struct environment_t *environment, int num_args, struct object_t *args)
+print_impl(struct evil_environment_t *environment, int num_args, struct evil_object_t *args)
 {
-    struct object_t *object;
+    struct evil_object_t *object;
 
     UNUSED(environment);
     UNUSED(num_args);
@@ -219,78 +219,78 @@ print_impl(struct environment_t *environment, int num_args, struct object_t *arg
 
     if (object == empty_pair)
     {
-        evil_print("'()");
+        evil_printf("'()");
         return;
     }
 
     switch (object->tag_count.tag)
     {
         case TAG_BOOLEAN:
-            evil_print("%s", object->value.fixnum_value ? "#t" : "#f");
+            evil_printf("%s", object->value.fixnum_value ? "#t" : "#f");
             break;
         case TAG_CHAR:
-            evil_print("%c", (char)object->value.fixnum_value);
+            evil_printf("%c", (char)object->value.fixnum_value);
             break;
         case TAG_VECTOR:
             {
                 int i;
                 int count;
-                struct object_t *base;
+                struct evil_object_t *base;
 
                 base = VECTOR_BASE(object);
                 count = object->tag_count.count;
 
-                evil_print("#(");
+                evil_printf("#(");
                 for (i = 0; i < count; ++i)
                 {
                     print_impl(environment, 1, base + i);
 
                     if (i < (count - 1))
                     {
-                        evil_print(" ");
+                        evil_printf(" ");
                     }
                 }
-                evil_print(")");
+                evil_printf(")");
                 break;
             }
         case TAG_FIXNUM:
-            evil_print("%" PRId64, object->value.fixnum_value);
+            evil_printf("%" PRId64, object->value.fixnum_value);
             break;
         case TAG_FLONUM:
-            evil_print("%f", object->value.flonum_value);
+            evil_printf("%f", object->value.flonum_value);
             break;
         case TAG_PROCEDURE:
-            evil_print("<procedure>");
+            evil_printf("<procedure>");
             break;
         case TAG_STRING:
-            evil_print("\"%s\"", object->value.string_value);
+            evil_printf("\"%s\"", object->value.string_value);
             break;
         case TAG_SYMBOL:
             {
                 const char *str = find_symbol_name(environment, object->value.symbol_hash);
-                evil_print("%s", str);
+                evil_printf("%s", str);
                 break;
             }
         case TAG_PAIR:
             if (CAR(object)->tag_count.tag == TAG_PAIR)
             {
-                evil_print("(");
+                evil_printf("(");
             }
 
             print_impl(environment, 1, CAR(object));
 
             if (CDR(object) != empty_pair)
             {
-                evil_print(" ");
+                evil_printf(" ");
                 print_impl(environment, 1, CDR(object));
             }
             else
             {
-                evil_print(")");
+                evil_printf(")");
             }
             break;
         case TAG_SPECIAL_FUNCTION:
-            evil_print("<special function>");
+            evil_printf("<special function>");
             break;
         default:
             assert(0);
@@ -298,11 +298,11 @@ print_impl(struct environment_t *environment, int num_args, struct object_t *arg
     }
 }
 
-struct object_t
-print(struct environment_t *environment, int num_args, struct object_t *args)
+struct evil_object_t
+evil_print(struct evil_environment_t *environment, int num_args, struct evil_object_t *args)
 {
     print_impl(environment, num_args, args);
-    evil_print("\n");
+    evil_printf("\n");
 
     return make_empty_ref();
 }

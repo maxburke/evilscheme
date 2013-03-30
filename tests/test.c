@@ -28,14 +28,12 @@
 #endif
 
 #include "base.h"
-#include "builtins.h"
 #include "environment.h"
+#include "evil_scheme.h"
 #include "gc.h"
 #include "object.h"
-#include "read.h"
 #include "runtime.h"
 #include "test.h"
-#include "user.h"
 
 #ifndef MIN
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
@@ -46,13 +44,13 @@ int print_buffer_offset;
 int print_buffer_size;
 
 void
-evil_debug_print(const char *format, ...)
+evil_debug_printf(const char *format, ...)
 {
     UNUSED(format);
 }
 
 void
-evil_print(const char *format, ...)
+evil_printf(const char *format, ...)
 {
     /*
      * This overloads the evil_print function with our own hook to record all
@@ -197,7 +195,7 @@ read_test_file(const char *filename)
     return buffer;
 }
 
-static struct environment_t *
+static struct evil_environment_t *
 create_test_environment(void)
 {
     size_t stack_size;
@@ -205,7 +203,7 @@ create_test_environment(void)
     void *stack;
     void *heap;
 
-    stack_size = 1024 * sizeof(struct object_t);
+    stack_size = 1024 * sizeof(struct evil_object_t);
     heap_size = 1024 * 1024;
     stack = malloc(stack_size);
     heap = evil_aligned_alloc(4096, heap_size);
@@ -214,10 +212,10 @@ create_test_environment(void)
 }
 
 static struct evil_object_handle_t *
-create_string_object(struct environment_t *environment, const char *test)
+create_string_object(struct evil_environment_t *environment, const char *test)
 {
     size_t test_length;
-    struct object_t *string;
+    struct evil_object_t *string;
     struct evil_object_handle_t *string_handle;
 
     test_length = strlen(test);
@@ -230,31 +228,31 @@ create_string_object(struct environment_t *environment, const char *test)
 }
 
 static struct evil_object_handle_t *
-create_test_ast(struct environment_t *environment, struct evil_object_handle_t *string_handle)
+create_test_ast(struct evil_environment_t *environment, struct evil_object_handle_t *string_handle)
 {
-    struct object_t *string_object;
-    struct object_t ast;
+    struct evil_object_t *string_object;
+    struct evil_object_t ast;
 
     string_object = evil_resolve_object_handle(string_handle);
-    ast = read(environment, 1, string_object);
+    ast = evil_read(environment, 1, string_object);
     
     return evil_create_object_handle_from_value(environment->heap, ast);
 }
 
 static struct evil_object_handle_t *
-evaluate_test_result(struct environment_t *environment, struct evil_object_handle_t *ast_handle)
+evaluate_test_result(struct evil_environment_t *environment, struct evil_object_handle_t *ast_handle)
 {
-    struct object_t *ast_object;
-    struct object_t result;
+    struct evil_object_t *ast_object;
+    struct evil_object_t result;
 
     ast_object = evil_resolve_object_handle(ast_handle);
-    result = eval(environment, 1, ast_object);
+    result = evil_eval(environment, 1, ast_object);
 
     return evil_create_object_handle_from_value(environment->heap, result);
 }
 
 static int
-run_test(struct environment_t *environment, const char *test, const char *expected)
+run_test(struct evil_environment_t *environment, const char *test, const char *expected)
 {
     struct evil_object_handle_t *string_handle;
     struct evil_object_handle_t *ast_handle;
@@ -266,7 +264,7 @@ run_test(struct environment_t *environment, const char *test, const char *expect
     ast_handle = create_test_ast(environment, string_handle);
     result_handle = evaluate_test_result(environment, ast_handle);
 
-    print(environment, 1, evil_resolve_object_handle(result_handle));
+    evil_print(environment, 1, evil_resolve_object_handle(result_handle));
 
     return strcmp(expected, print_buffer) == 0;
 }
@@ -494,7 +492,7 @@ int
 evil_run_tests(int argc, char *argv[])
 {
     directory_t dir;
-    struct environment_t *environment;
+    struct evil_environment_t *environment;
     int num_tests;
     int num_passed;
 

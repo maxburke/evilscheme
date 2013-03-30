@@ -16,15 +16,15 @@ struct evil_heap_parameters_t;
 struct evil_object_handle_t;
 
 struct evil_object_handle_t *
-evil_create_object_handle(struct evil_heap_t *heap, struct object_t *object);
+evil_create_object_handle(struct evil_heap_t *heap, struct evil_object_t *object);
 
 struct evil_object_handle_t *
-evil_create_object_handle_from_value(struct evil_heap_t *heap, struct object_t object);
+evil_create_object_handle_from_value(struct evil_heap_t *heap, struct evil_object_t object);
 
 void
 evil_destroy_object_handle(struct evil_heap_t *heap, struct evil_object_handle_t *handle);
 
-struct object_t *
+struct evil_object_t *
 evil_resolve_object_handle(struct evil_object_handle_t *handle);
 
 struct evil_heap_t *
@@ -34,12 +34,12 @@ void
 gc_destroy(struct evil_heap_t *heap);
 
 void
-gc_set_environment(struct evil_heap_t *heap, struct environment_t *environment);
+gc_set_environment(struct evil_heap_t *heap, struct evil_environment_t *environment);
 
-struct object_t *
-gc_alloc(struct evil_heap_t *heap, enum tag_t type, size_t extra_bytes);
+struct evil_object_t *
+gc_alloc(struct evil_heap_t *heap, enum evil_tag_t type, size_t extra_bytes);
 
-struct object_t *
+struct evil_object_t *
 gc_alloc_vector(struct evil_heap_t *heap, size_t count);
 
 void

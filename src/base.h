@@ -68,6 +68,6 @@
 #   define assert(x) ((void)(sizeof(x)))
 #endif
 
-#include "user.h"
+#include "evil_scheme.h"
 
 #endif
