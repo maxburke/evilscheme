@@ -222,7 +222,7 @@ create_string_object(struct evil_environment_t *environment, const char *test)
 
     string = gc_alloc(environment->heap, TAG_STRING, test_length);
     memmove(string->value.string_value, test, test_length);
-    string_handle = evil_create_object_handle(environment->heap, string);
+    string_handle = evil_create_object_handle(environment, string);
 
     return string_handle;
 }
@@ -236,7 +236,7 @@ create_test_ast(struct evil_environment_t *environment, struct evil_object_handl
     string_object = evil_resolve_object_handle(string_handle);
     ast = evil_read(environment, 1, string_object);
     
-    return evil_create_object_handle_from_value(environment->heap, ast);
+    return evil_create_object_handle_from_value(environment, ast);
 }
 
 static struct evil_object_handle_t *
@@ -248,7 +248,7 @@ evaluate_test_result(struct evil_environment_t *environment, struct evil_object_
     ast_object = evil_resolve_object_handle(ast_handle);
     result = evil_eval(environment, 1, ast_object);
 
-    return evil_create_object_handle_from_value(environment->heap, result);
+    return evil_create_object_handle_from_value(environment, result);
 }
 
 static int
@@ -265,6 +265,10 @@ run_test(struct evil_environment_t *environment, const char *test, const char *e
     result_handle = evaluate_test_result(environment, ast_handle);
 
     evil_print(environment, 1, evil_resolve_object_handle(result_handle));
+
+    evil_destroy_object_handle(environment, result_handle);
+    evil_destroy_object_handle(environment, ast_handle);
+    evil_destroy_object_handle(environment, string_handle);
 
     return strcmp(expected, print_buffer) == 0;
 }

@@ -298,10 +298,12 @@ gc_alloc_vector(struct evil_heap_t *heap, size_t count)
 }
 
 struct evil_object_handle_t *
-evil_create_object_handle(struct evil_heap_t *heap, struct evil_object_t *object)
+evil_create_object_handle(struct evil_environment_t *environment, struct evil_object_t *object)
 {
+    struct evil_heap_t *heap;
     struct evil_object_handle_t *handle;
 
+    heap = environment->heap;
     handle = (struct evil_object_handle_t *)dlist_pop(&heap->free_object_handles);
 
     if (handle == NULL)
@@ -318,7 +320,7 @@ evil_create_object_handle(struct evil_heap_t *heap, struct evil_object_t *object
 }
 
 struct evil_object_handle_t *
-evil_create_object_handle_from_value(struct evil_heap_t *heap, struct evil_object_t object)
+evil_create_object_handle_from_value(struct evil_environment_t *environment, struct evil_object_t object)
 {
     unsigned char tag;
 
@@ -336,25 +338,28 @@ evil_create_object_handle_from_value(struct evil_heap_t *heap, struct evil_objec
             BREAK();
             break;
         case TAG_REFERENCE:
-            return evil_create_object_handle(heap, object.value.ref);
+            return evil_create_object_handle(environment, object.value.ref);
         default:
             {
                 struct evil_object_t *boxed_object;
 
-                boxed_object = gc_alloc(heap, tag, 0);
+                boxed_object = gc_alloc(environment->heap, tag, 0);
                 *boxed_object = object;
 
-                return evil_create_object_handle(heap, boxed_object);
+                return evil_create_object_handle(environment, boxed_object);
             }
     }
 
     BREAK();
-    return evil_create_object_handle(heap, NULL);
+    return evil_create_object_handle(environment, NULL);
 }
 
 void
-evil_destroy_object_handle(struct evil_heap_t *heap, struct evil_object_handle_t *handle)
+evil_destroy_object_handle(struct evil_environment_t *environment, struct evil_object_handle_t *handle)
 {
+    struct evil_heap_t *heap;
+
+    heap = environment->heap;
     handle->object = NULL;
 
     dlist_remove(&handle->link);

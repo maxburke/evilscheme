@@ -102,6 +102,25 @@ struct evil_object_t
 };
 
 /*
+ * The garbage collector needs to know about all references to heap objects
+ * and, if they are kept by code outside of the Scheme, must be tracked via 
+ * these object handles.
+ */
+struct evil_object_handle_t;
+
+struct evil_object_handle_t *
+evil_create_object_handle(struct evil_environment_t *environment, struct evil_object_t *object);
+
+struct evil_object_handle_t *
+evil_create_object_handle_from_value(struct evil_environment_t *environment, struct evil_object_t object);
+
+void
+evil_destroy_object_handle(struct evil_environment_t *environment, struct evil_object_handle_t *handle);
+
+struct evil_object_t *
+evil_resolve_object_handle(struct evil_object_handle_t *handle);
+
+/*
  * These functions provide the initial core functions used by evil scheme's 
  * runtime.
  */
