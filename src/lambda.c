@@ -1748,9 +1748,9 @@ disassemble_procedure(struct evil_environment_t *environment, struct evil_object
                 break;
             case OPCODE_NEW:
                 {
-                    enum tag_t tag;
+                    enum evil_tag_t tag;
 
-                    tag = (enum tag_t)ptr[i + 1];
+                    tag = (enum evil_tag_t)ptr[i + 1];
                     print_hex_bytes(ptr + i, 2);
 
                     evil_printf("NEW %s\n", type_name(tag));
