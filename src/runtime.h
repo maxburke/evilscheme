@@ -9,7 +9,7 @@
 
 #include "object.h"
 
-struct evil_heap_t;
+struct heap_t;
 struct symbol_table_fragment_t;
 
 struct symbol_string_internment_page_t;
@@ -33,7 +33,7 @@ struct evil_environment_t
     struct evil_object_t *stack_bottom;
     struct evil_object_t *stack_ptr;
 
-    struct evil_heap_t *heap;
+    struct heap_t *heap;
     struct evil_environment_t *parent_environment;
     struct symbol_table_fragment_t *symbol_table_fragment;
     struct interned_symbol_names_table_t symbol_names;

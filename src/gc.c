@@ -33,7 +33,7 @@ struct evil_object_handle_t
     struct evil_object_t * volatile object;
 };
 
-struct evil_heap_bucket_t
+struct heap_bucket_t
 {
     struct slist_t link;
     char *base;
@@ -41,13 +41,13 @@ struct evil_heap_bucket_t
     char *top;
 };
 
-struct evil_bucket_cost_t
+struct bucket_cost_t
 {
-    struct evil_heap_bucket_t *bucket;
+    struct heap_bucket_t *bucket;
     size_t cost;
 };
 
-struct evil_heap_t
+struct heap_t
 {
     struct evil_environment_t *environment;
     char *base;
@@ -55,19 +55,19 @@ struct evil_heap_t
 
     unsigned char *card_base;
     size_t num_buckets;
-    struct evil_heap_bucket_t *bucket_base;
-    struct evil_heap_bucket_t *current_bucket;
-    struct evil_heap_bucket_t *free_list;
-    struct evil_bucket_cost_t *bucket_costs;
+    struct heap_bucket_t *bucket_base;
+    struct heap_bucket_t *current_bucket;
+    struct heap_bucket_t *free_list;
+    struct bucket_cost_t *bucket_costs;
 
     struct dlist_t active_object_handles;
     struct dlist_t free_object_handles;
 };
 
-static struct evil_heap_bucket_t *
-acquire_bucket(struct evil_heap_t *heap)
+static struct heap_bucket_t *
+acquire_bucket(struct heap_t *heap)
 {
-    struct evil_heap_bucket_t *new_bucket;
+    struct heap_bucket_t *new_bucket;
 
     new_bucket = heap->free_list;
     if (new_bucket == NULL)
@@ -75,16 +75,16 @@ acquire_bucket(struct evil_heap_t *heap)
         return NULL;
     }
 
-    heap->free_list = (struct evil_heap_bucket_t *)new_bucket->link.next;
+    heap->free_list = (struct heap_bucket_t *)new_bucket->link.next;
     heap->current_bucket = new_bucket;
 
     return new_bucket;
 }
 
 static void *
-perform_alloc(struct evil_heap_t *heap, size_t size)
+perform_alloc(struct heap_t *heap, size_t size)
 {
-    struct evil_heap_bucket_t *bucket;
+    struct heap_bucket_t *bucket;
     int i;
     
     for (i = 0; i < 2; ++i)
@@ -129,12 +129,12 @@ perform_alloc(struct evil_heap_t *heap, size_t size)
 }
 
 static void
-create_buckets(struct evil_heap_t *heap)
+create_buckets(struct heap_t *heap)
 {
     size_t i;
     size_t num_buckets;
-    struct evil_heap_bucket_t *buckets;
-    struct evil_heap_bucket_t *current_bucket;
+    struct heap_bucket_t *buckets;
+    struct heap_bucket_t *current_bucket;
     char *heap_base;
 
     buckets = heap->bucket_base;
@@ -156,18 +156,18 @@ create_buckets(struct evil_heap_t *heap)
     assert(current_bucket != NULL);
 }
 
-struct evil_heap_t *
+struct heap_t *
 gc_create(void *heap_mem, size_t heap_size)
 {
-    struct evil_heap_t *heap;
+    struct heap_t *heap;
     size_t num_cards;
     size_t num_buckets;
     size_t bucket_alloc_size;
     void *bucket_base;
     size_t bucket_cost_size;
 
-    heap = evil_aligned_alloc(sizeof(void *), sizeof(struct evil_heap_t));
-    memset(heap, 0, sizeof(struct evil_heap_t));
+    heap = evil_aligned_alloc(sizeof(void *), sizeof(struct heap_t));
+    memset(heap, 0, sizeof(struct heap_t));
 
     heap->base = heap_mem;
     heap->size = heap_size;
@@ -177,14 +177,14 @@ gc_create(void *heap_mem, size_t heap_size)
 
     assert(heap_size % EVIL_PAGE_SIZE == 0);
     num_buckets = heap_size / EVIL_PAGE_SIZE;
-    bucket_alloc_size = num_buckets * sizeof(struct evil_heap_bucket_t);
+    bucket_alloc_size = num_buckets * sizeof(struct heap_bucket_t);
 
     bucket_base = evil_aligned_alloc(sizeof(void *), bucket_alloc_size);
     memset(bucket_base, 0, bucket_alloc_size);
     heap->bucket_base = bucket_base;
     heap->num_buckets = num_buckets;
 
-    bucket_cost_size = sizeof(struct evil_bucket_cost_t) * num_buckets;
+    bucket_cost_size = sizeof(struct bucket_cost_t) * num_buckets;
     heap->bucket_costs = evil_aligned_alloc(sizeof(void *), bucket_cost_size);
 
     dlist_initialize(&heap->active_object_handles);
@@ -196,7 +196,7 @@ gc_create(void *heap_mem, size_t heap_size)
 }
 
 void
-gc_destroy(struct evil_heap_t *heap)
+gc_destroy(struct heap_t *heap)
 {
     struct dlist_t *i;
 
@@ -228,13 +228,13 @@ gc_destroy(struct evil_heap_t *heap)
 }
 
 void
-gc_set_environment(struct evil_heap_t *heap, struct evil_environment_t *env)
+gc_set_environment(struct heap_t *heap, struct evil_environment_t *env)
 {
     heap->environment = env;
 }
 
 struct evil_object_t *
-gc_alloc(struct evil_heap_t *heap, enum evil_tag_t type, size_t extra_bytes)
+gc_alloc(struct heap_t *heap, enum evil_tag_t type, size_t extra_bytes)
 {
     size_t size;
     struct evil_object_t *object;
@@ -278,7 +278,7 @@ gc_alloc(struct evil_heap_t *heap, enum evil_tag_t type, size_t extra_bytes)
 }
 
 struct evil_object_t *
-gc_alloc_vector(struct evil_heap_t *heap, size_t count)
+gc_alloc_vector(struct heap_t *heap, size_t count)
 {
     /*
      * A vector is similar to an object but doesn't have the same contained data. It
@@ -300,7 +300,7 @@ gc_alloc_vector(struct evil_heap_t *heap, size_t count)
 struct evil_object_handle_t *
 evil_create_object_handle(struct evil_environment_t *environment, struct evil_object_t *object)
 {
-    struct evil_heap_t *heap;
+    struct heap_t *heap;
     struct evil_object_handle_t *handle;
 
     heap = environment->heap;
@@ -357,7 +357,7 @@ evil_create_object_handle_from_value(struct evil_environment_t *environment, str
 void
 evil_destroy_object_handle(struct evil_environment_t *environment, struct evil_object_handle_t *handle)
 {
-    struct evil_heap_t *heap;
+    struct heap_t *heap;
 
     heap = environment->heap;
     handle->object = NULL;
@@ -374,12 +374,12 @@ evil_resolve_object_handle(struct evil_object_handle_t *handle)
 
 
 static void
-mark_object(struct evil_heap_t *heap, struct evil_object_t *object)
+mark_object(struct heap_t *heap, struct evil_object_t *object)
 {
     char *object_address;
     size_t object_offset;
     size_t bucket_index;
-    struct evil_bucket_cost_t *costs;
+    struct bucket_cost_t *costs;
 
     object_address = (char *)object;
     object_offset = (size_t)object_address - (size_t)heap->base;
@@ -410,7 +410,7 @@ mark_object(struct evil_heap_t *heap, struct evil_object_t *object)
 }
 
 static inline int
-scan_object(struct evil_heap_t *heap, struct evil_object_t *object)
+scan_object(struct heap_t *heap, struct evil_object_t *object)
 {
     unsigned char tag;
 
@@ -494,7 +494,7 @@ scan_object(struct evil_heap_t *heap, struct evil_object_t *object)
 }
 
 static void
-mark_evaluation_stack(struct evil_heap_t *heap, struct evil_object_t *stack_ptr, struct evil_object_t *stack_top)
+mark_evaluation_stack(struct heap_t *heap, struct evil_object_t *stack_ptr, struct evil_object_t *stack_top)
 {
     struct evil_object_t *i;
 
@@ -505,7 +505,7 @@ mark_evaluation_stack(struct evil_heap_t *heap, struct evil_object_t *stack_ptr,
 }
 
 static void
-mark_symbol_table(struct evil_heap_t *heap, struct symbol_table_fragment_t *symbol_table)
+mark_symbol_table(struct heap_t *heap, struct symbol_table_fragment_t *symbol_table)
 {
     while (symbol_table != NULL)
     {
@@ -529,7 +529,7 @@ mark_symbol_table(struct evil_heap_t *heap, struct symbol_table_fragment_t *symb
 }
 
 static void
-mark_object_handles(struct evil_heap_t *heap)
+mark_object_handles(struct heap_t *heap)
 {
     struct dlist_t *i;
 
@@ -543,7 +543,7 @@ mark_object_handles(struct evil_heap_t *heap)
 }
 
 static void
-mark_roots(struct evil_heap_t *heap, struct evil_environment_t *environment)
+mark_roots(struct heap_t *heap, struct evil_environment_t *environment)
 {
     mark_evaluation_stack(heap, environment->stack_ptr, environment->stack_top);
     mark_symbol_table(heap, environment->symbol_table_fragment);
@@ -551,12 +551,12 @@ mark_roots(struct evil_heap_t *heap, struct evil_environment_t *environment)
 }
 
 static void
-initialize_bucket_costs(struct evil_heap_t *heap)
+initialize_bucket_costs(struct heap_t *heap)
 {
     size_t i;
     size_t num_buckets;
-    struct evil_heap_bucket_t *bucket_base;
-    struct evil_bucket_cost_t *costs;
+    struct heap_bucket_t *bucket_base;
+    struct bucket_cost_t *costs;
 
     /*
      * Bucket costs are determined by the number of in-references to all 
@@ -590,7 +590,7 @@ initialize_bucket_costs(struct evil_heap_t *heap)
 }
 
 static void
-reclaim_bucket(struct evil_heap_t *heap, struct evil_heap_bucket_t *bucket)
+reclaim_bucket(struct heap_t *heap, struct heap_bucket_t *bucket)
 {
     bucket->ptr = bucket->base;
     bucket->link.next = &heap->free_list->link;
@@ -598,18 +598,18 @@ reclaim_bucket(struct evil_heap_t *heap, struct evil_heap_bucket_t *bucket)
 }
 
 static size_t
-reclaim_empty_buckets(struct evil_heap_t *heap)
+reclaim_empty_buckets(struct heap_t *heap)
 {
     size_t i;
     size_t num_buckets;
     size_t num_reclaimed;
-    struct evil_bucket_cost_t *costs;
+    struct bucket_cost_t *costs;
 
     num_reclaimed = 0;
     costs = heap->bucket_costs;
     for (i = 0, num_buckets = heap->num_buckets; i < num_buckets; ++i)
     {
-        struct evil_heap_bucket_t *bucket;
+        struct heap_bucket_t *bucket;
 
         bucket = costs[i].bucket;
         if (costs[i].cost == INITIAL_COST)
@@ -623,7 +623,7 @@ reclaim_empty_buckets(struct evil_heap_t *heap)
 }
 
 void
-gc_collect(struct evil_heap_t *heap)
+gc_collect(struct heap_t *heap)
 {
     struct evil_environment_t *environment;
     size_t num_reclaimed;
