@@ -195,20 +195,29 @@ read_test_file(const char *filename)
     return buffer;
 }
 
+void *stack;
+void *heap;
+
 static struct evil_environment_t *
 create_test_environment(void)
 {
     size_t stack_size;
     size_t heap_size;
-    void *stack;
-    void *heap;
 
     stack_size = 1024 * sizeof(struct evil_object_t);
     heap_size = 1024 * 1024;
-    stack = malloc(stack_size);
+    stack = evil_aligned_alloc(sizeof(void *), stack_size);
     heap = evil_aligned_alloc(4096, heap_size);
 
     return evil_environment_create(stack, stack_size, heap, heap_size);
+}
+
+static void
+destroy_test_environment(struct evil_environment_t *environment)
+{
+    evil_environment_destroy(environment);
+    evil_aligned_free(stack);
+    evil_aligned_free(heap);
 }
 
 static struct evil_object_handle_t *
@@ -580,7 +589,7 @@ evil_run_tests(int argc, char *argv[])
 
     end_directory_traversal(dir);
     free_print_buffer();
-    evil_environment_destroy(environment);
+    destroy_test_environment(environment);
 
     printf("\n========================================\n");
     printf("%d/%d tests passed\n", num_passed, num_tests);
