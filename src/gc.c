@@ -104,6 +104,7 @@ perform_alloc(struct heap_t *heap, size_t size)
         if (bucket->top - mem >= rounded_size)
         {
             bucket->ptr = mem + rounded_size;
+            memset(mem, 0, size);
             return mem;
         }
 
