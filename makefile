@@ -30,7 +30,7 @@ endif
 all: r4rs
 
 src tests:
-	$(MAKE) --directory=$@
+	$(MAKE) --directory=$@ $(MAKEFLAGS)
 
 clean-src clean-tests:
 	$(MAKE) --directory=$(subst clean-,,$@) clean

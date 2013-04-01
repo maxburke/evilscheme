@@ -3,7 +3,7 @@ OS = $(shell uname)
 DEFINES = _POSIX_C_SOURCE=200112L EVIL_RUN_TESTS=1
 INCLUDEDIRS = /usr/local/include ../include
 
-CFLAGS = -g -std=c99 -Wall -Wextra -Werror -pedantic
+CFLAGS = -g -Wall -Wextra -Werror -pedantic
 OBJS = $(patsubst %.c,%.o,$(wildcard *.c))
 HEADERS = $(wildcard *.h)
 
