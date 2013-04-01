@@ -241,7 +241,10 @@ gc_alloc(struct heap_t *heap, enum evil_tag_t type, size_t extra_bytes)
 
     if (type == TAG_PAIR)
     {
-        size = offsetof(struct evil_object_t, value) + 2 * sizeof(struct evil_object_t);
+        object = gc_alloc_vector(heap, 2);
+        object->tag_count.tag = TAG_PAIR;
+
+        return object;
     }
     else
     {
@@ -260,13 +263,6 @@ gc_alloc(struct heap_t *heap, enum evil_tag_t type, size_t extra_bytes)
     {
         assert(extra_bytes < 65536);
         object->tag_count.count = (unsigned short)extra_bytes;
-    }
-    else if (type == TAG_PAIR)
-    {
-        /*
-         * TODO: pairs should probably go through gc_alloc_vector below.
-         */
-        object->tag_count.count = 2;
     }
     else
     {
@@ -372,6 +368,11 @@ evil_resolve_object_handle(struct evil_object_handle_t *handle)
     return handle->object;
 }
 
+void
+evil_retarget_object_handle(struct evil_object_handle_t *handle, struct evil_object_t *object)
+{
+    handle->object = object;
+}
 
 static void
 mark_object(struct heap_t *heap, struct evil_object_t *object)

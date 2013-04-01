@@ -120,6 +120,9 @@ evil_destroy_object_handle(struct evil_environment_t *environment, struct evil_o
 struct evil_object_t *
 evil_resolve_object_handle(struct evil_object_handle_t *handle);
 
+void
+evil_retarget_object_handle(struct evil_object_handle_t *handle, struct evil_object_t *object);
+
 /*
  * These functions provide the initial core functions used by evil scheme's 
  * runtime.
