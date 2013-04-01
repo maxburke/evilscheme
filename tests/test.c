@@ -501,40 +501,99 @@ should_run_test(const char *test, int num_filters, char **filters)
     return 0;
 }
 
-int
-evil_run_tests(int argc, char *argv[])
+struct test_t
 {
-    directory_t dir;
-    struct evil_environment_t *environment;
-    int num_tests;
-    int num_passed;
+    int success;
+    char filename[260];
+};
 
-    #define TEST_DIR "tests"
+static int
+test_comparer(const void *a, const void *b)
+{
+    const struct test_t *test_a;
+    const struct test_t *test_b;
+
+    test_a = a;
+    test_b = b;
+
+    return strcmp(test_a->filename, test_b->filename);
+}
+
+static struct test_t *
+initialize_tests(const char *directory_name, int argc, char *argv[], int *num_tests_ptr)
+{
+    int num_tests;
+    struct test_t *tests;
+    directory_t dir;
 
     num_tests = 0;
-    num_passed = 0;
-    environment = create_test_environment();
-    dir = begin_directory_traversal(TEST_DIR);
+    tests = NULL;
+    dir = begin_directory_traversal(directory_name);
 
     if (!is_valid_directory(dir))
     {
-        return 1;
+        *num_tests_ptr = 0;
+        return NULL;
     }
 
     for (;;)
     {
         char filename[260];
-        char *test_file;
-        char *test_end;
-        char *test;
-        char *expected;
-        int result;
+
+        memset(filename, 0, sizeof filename);
 
         if (get_next_file(dir, filename, sizeof filename))
         {
             break;
         }
 
+        if (!should_run_test(filename, argc - 1, argv + 1))
+        {
+            continue;
+        }
+
+        tests = realloc(tests, (sizeof(struct test_t) * (num_tests + 1)));
+        memmove(tests[num_tests].filename, filename, sizeof filename);
+        tests[num_tests].success = 0;
+
+        ++num_tests;
+    }
+
+    qsort(tests, num_tests, sizeof(struct test_t), test_comparer);
+    *num_tests_ptr = num_tests;
+
+    end_directory_traversal(dir);
+
+    return tests;
+}
+
+int
+evil_run_tests(int argc, char *argv[])
+{
+    struct evil_environment_t *environment;
+    int num_tests;
+    int num_passed;
+    int i;
+    struct test_t *tests;
+
+    #define TEST_DIR "tests"
+
+    num_tests = 0;
+    num_passed = 0;
+    environment = create_test_environment();
+
+    tests = initialize_tests(TEST_DIR, argc, argv, &num_tests);
+
+    for (i = 0; i < num_tests; ++i)
+    {
+        const char *filename;
+        char *test_file;
+        char *test_end;
+        char *test;
+        char *expected;
+        int result;
+
+        filename = tests[i].filename;
         test_file = read_test_file(filename);
         test_end = test_file + strlen(test_file);
 
@@ -542,11 +601,6 @@ evil_run_tests(int argc, char *argv[])
         test_end = remove_comments(test_file, test_end);
 
         test = test_file;
-
-        if (!should_run_test(filename, argc - 1, argv + 1))
-        {
-            goto next_test;
-        }
 
         expected = test_file;
 
@@ -579,20 +633,38 @@ evil_run_tests(int argc, char *argv[])
 
         result = run_test(environment, test, expected);
         report_test_result(filename, result, expected);
+        tests[i].success = result;
 
-        ++num_tests;
         num_passed += result;
 
     next_test:
         free(test);
     }
 
-    end_directory_traversal(dir);
+    printf("\n========================================\n");
+
+    printf("Passed:\n");
+    for (i = 0; i < num_tests; ++i)
+    {
+        if (tests[i].success == 1)
+        {
+            printf("    %s\n", tests[i].filename);
+        }
+    }
+
+    printf("Failed:\n");
+    for (i = 0; i < num_tests; ++i)
+    {
+        if (tests[i].success == 0)
+        {
+            printf("    %s\n", tests[i].filename);
+        }
+    }
+
+    printf("\n%d/%d tests passed\n", num_passed, num_tests);
     free_print_buffer();
     destroy_test_environment(environment);
-
-    printf("\n========================================\n");
-    printf("%d/%d tests passed\n", num_passed, num_tests);
+    free(tests);
 
     return num_tests - num_passed;
 }
