@@ -13,6 +13,7 @@
 #include "base.h"
 #include "environment.h"
 #include "gc.h"
+#include "linear_allocator.h"
 #include "object.h"
 #include "runtime.h"
 #include "slist.h"
@@ -21,7 +22,7 @@
 #define UNKNOWN_ARG -1
 
 #define DEFAULT_POOL_CHUNK_SIZE 4096
-#define allocate_instruction(context) pool_alloc(&context->pool, sizeof(struct instruction_t))
+#define allocate_instruction(context) linear_allocator_alloc(context->pool, sizeof(struct instruction_t))
 
 #ifndef MAX
 #define MAX(a,b) ((a)>(b)?(a):(b))
@@ -50,69 +51,6 @@
 #define SYMBOL_QUOTE    0xf6be341a7b50a73
 #define SYMBOL_BEGIN    0x8facd8be36ce1840
 
-struct memory_pool_chunk_t
-{
-    struct memory_pool_chunk_t *next;
-    char *top;
-    char *end;
-    char mem[1];
-};
-
-struct memory_pool_t
-{
-    struct memory_pool_chunk_t *head;
-};
-
-static void *
-pool_alloc(struct memory_pool_t *pool, size_t size)
-{
-    struct memory_pool_chunk_t *i;
-    size_t max_alloc_size;
-
-    max_alloc_size = DEFAULT_POOL_CHUNK_SIZE - offsetof(struct memory_pool_chunk_t, mem);
-    size = (size + sizeof(void *) - 1) & ~(sizeof(void *) - 1);
-    assert(size <= max_alloc_size);
-
-    for (i = pool->head; i != NULL; i = i->next)
-    {
-        size_t pool_room = i->end - i->top;
-
-        if (pool_room >= size)
-        {
-            void *mem = i->top;
-            i->top += size;
-
-            memset(mem, 0, size);
-
-            return mem;
-        }
-    }
-
-    i = calloc(1, DEFAULT_POOL_CHUNK_SIZE);
-    i->top = &i->mem[0];
-    i->end = i->top + max_alloc_size;
-    i->next = pool->head;
-    pool->head = i;
-
-    return pool_alloc(pool, size);
-}
-
-static void
-discard_pool_chunk(struct memory_pool_chunk_t *chunk)
-{
-    if (chunk != NULL)
-    {
-        discard_pool_chunk(chunk->next);
-        free(chunk);
-    }
-}
-
-static void
-discard_pool(struct memory_pool_t *pool)
-{
-    discard_pool_chunk(pool->head);
-}
-
 struct stack_slot_t
 {
     struct slist_t link;
@@ -135,7 +73,7 @@ struct compiler_context_t
 {
     struct compiler_context_t *previous_context;
     jmp_buf context_state;
-    struct memory_pool_t pool;
+    struct linear_allocator_t *pool;
     int num_args;
     struct evil_environment_t *environment;
     struct stack_slot_t *stack_slots;
@@ -167,7 +105,7 @@ create_slots_for_args(
     arg_symbol = CAR(args);
     assert(arg_symbol->tag_count.tag == TAG_SYMBOL);
 
-    stack_slot = pool_alloc(&context->pool, sizeof(struct stack_slot_t));
+    stack_slot = linear_allocator_alloc(context->pool, sizeof(struct stack_slot_t));
     stack_slot->symbol_hash = arg_symbol->value.symbol_hash;
     stack_slot->index = (short)slot_index;
     stack_slot->link.next = &context->stack_slots->link;
@@ -191,6 +129,8 @@ initialize_compiler_context(
         ;
 
     memset(context, 0, sizeof(struct compiler_context_t));
+    context->pool = linear_allocator_create(0);
+
     create_slots_for_args(context, args, 0);
 
     context->environment = environment;
@@ -201,7 +141,7 @@ initialize_compiler_context(
 static void
 destroy_compiler_context(struct compiler_context_t *context)
 {
-    discard_pool(&context->pool);
+    linear_allocator_destroy(context->pool);
 }
 
 static struct stack_slot_t *
@@ -675,7 +615,7 @@ compile_literal(struct compiler_context_t *context, struct instruction_t *next, 
     assert(literal->tag_count.count >= 1);
 
     extra_size = literal->tag_count.count - 1;
-    instruction = pool_alloc(&context->pool, sizeof(struct instruction_t) + extra_size);
+    instruction = linear_allocator_alloc(context->pool, sizeof(struct instruction_t) + extra_size);
     instruction->link.next = &next->link;
 
     switch (literal->tag_count.tag)
@@ -913,7 +853,7 @@ compile_let(struct compiler_context_t *context, struct instruction_t *next, stru
 
         initializer_store = compile_store_slot(context, initializer, slot_index);
 
-        stack_slot = pool_alloc(&context->pool, sizeof(struct stack_slot_t));
+        stack_slot = linear_allocator_alloc(context->pool, sizeof(struct stack_slot_t));
         stack_slot->symbol_hash = symbol->value.symbol_hash;
         stack_slot->initializer = initializer;
         stack_slot->link.next = &context->stack_slots->link;
@@ -2030,7 +1970,7 @@ compile_load_function_local(struct compiler_context_t *context, struct instructi
     struct instruction_t *make_ref;
     struct instruction_t *load;
 
-    function_local = pool_alloc(&context->pool, sizeof(struct function_local_t));
+    function_local = linear_allocator_alloc(context->pool, sizeof(struct function_local_t));
     function_local->object = object;
     function_local->link.next = &context->locals->link;
     context->locals = function_local;
