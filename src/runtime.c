@@ -223,6 +223,7 @@ intern_string(struct evil_environment_t *environment, const char *bytes, size_t 
     for (i = environment->symbol_names.string_internment_page_base; i != NULL; i = i->next)
     {
         char *string;
+        size_t ii;
 
         if (i->available_bytes < (num_bytes + 1))
             continue;
@@ -231,7 +232,15 @@ intern_string(struct evil_environment_t *environment, const char *bytes, size_t 
         i->top += (num_bytes + 1);
         i->available_bytes -= (num_bytes + 1);
 
-        memmove(string, bytes, num_bytes);
+        /*
+         * All symbols are interned lower-case as the Scheme is case
+         * insensitive.
+         */
+        for (ii = 0; ii < num_bytes; ++ii)
+        {
+            string[ii] = tolower(bytes[ii]);
+        }
+
         string[num_bytes] = 0;
 
         return string;
