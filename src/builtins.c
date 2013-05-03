@@ -268,7 +268,7 @@ print_impl(struct evil_environment_t *environment, int num_args, struct evil_obj
         case TAG_SYMBOL:
             {
                 const char *str = find_symbol_name(environment, object->value.symbol_hash);
-                evil_printf("%s", str);
+                evil_printf("'%s", str);
                 break;
             }
         case TAG_PAIR:
