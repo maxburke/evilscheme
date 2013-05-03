@@ -1,0 +1,2 @@
+(equal? (string->symbol "test-symbol") 'test-symbol)
+>#t
