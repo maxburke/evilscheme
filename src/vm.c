@@ -725,21 +725,6 @@ vm_run(struct evil_environment_t *environment, struct evil_object_t *initial_fun
                     sp += 2;
                 }
                 VM_CONTINUE();
-            case OPCODE_NEW:
-                VM_TRACE_OP(OPCODE_NEW);
-                /*
-                 * TODO: This code needs to save the stack pointer before
-                 * perfoming any allocation in case a GC is triggered.
-                 */
-                BREAK();
-                VM_CONTINUE();
-            case OPCODE_NEW_VECTOR:
-                VM_TRACE_OP(OPCODE_NEW_VECTOR);
-                /*
-                 * TODO: See above todo.
-                 */
-                BREAK();
-                VM_CONTINUE();
             case OPCODE_CMP_EQUAL:
                 VM_TRACE_OP(OPCODE_CMP_EQUAL);
                 {

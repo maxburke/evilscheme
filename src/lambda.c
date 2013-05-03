@@ -1686,23 +1686,6 @@ disassemble_procedure(struct evil_environment_t *environment, struct evil_object
                 evil_printf("SET\n");
                 ++i;
                 break;
-            case OPCODE_NEW:
-                {
-                    enum evil_tag_t tag;
-
-                    tag = (enum evil_tag_t)ptr[i + 1];
-                    print_hex_bytes(ptr + i, 2);
-
-                    evil_printf("NEW %s\n", type_name(tag));
-                }
-
-                i += 2;
-                break;
-            case OPCODE_NEW_VECTOR:
-                print_hex_bytes(ptr + i, 1);
-                evil_printf("NEW_VECTOR\n");
-                ++i;
-                break;
             case OPCODE_CMP_EQUAL:
                 print_hex_bytes(ptr + i, 1);
                 evil_printf("CMP_EQUAL\n");

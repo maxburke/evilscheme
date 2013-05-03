@@ -106,19 +106,8 @@ enum opcode_t
      */
     OPCODE_SET,
 
-    /*
-     * OPCODE_NEW [type] | [reference]
-     * NEW returns a new heap-allocated object.
-     */
-    OPCODE_NEW,
-
-    /*
-     * OPCODE_NEW_VECTOR | [size] -> [reference]
-     * NEW_VECTOR creates a new heap-allocated vector of the specified size
-     * and pushes a reference of it to the stack.
-     */
-    OPCODE_NEW_VECTOR,
-
+    OPCODE_UNUSED,
+    OPCODE_UNUSED2,
     /*
      * OPCODE_CMP_EQUAL | [value/ref b] [value/ref a] -> boolean
      * Compares if two values on the stack are equal? (ie: (equal? a b).
