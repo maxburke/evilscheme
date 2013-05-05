@@ -106,8 +106,14 @@ enum opcode_t
      */
     OPCODE_SET,
 
+    /*
+     * OPCODE_LDTYPE | [reference|value] -> [type fixnum]
+     * Extracts the type from the object on the top of the stack for predicate
+     * testing on the type.
+     */
+    OPCODE_LDTYPE,
+
     OPCODE_UNUSED,
-    OPCODE_UNUSED2,
     /*
      * OPCODE_CMP_EQUAL | [value/ref b] [value/ref a] -> boolean
      * Compares if two values on the stack are equal? (ie: (equal? a b).

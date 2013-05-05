@@ -725,6 +725,24 @@ vm_run(struct evil_environment_t *environment, struct evil_object_t *initial_fun
                     sp += 2;
                 }
                 VM_CONTINUE();
+            case OPCODE_LDTYPE:
+                VM_TRACE_OP(OPCODE_LDTYPE);
+                {
+                    struct evil_object_t *stack_slot = sp + 1;
+                    struct evil_object_t *object = deref(stack_slot);
+
+                    /*
+                     * In the case where stack_slot and object point to the same
+                     * object we need to set the value field with the type tag
+                     * first lest we clobber the type tag with the FIXNUM tag
+                     * below.
+                     */
+                    stack_slot->value.fixnum_value = (int64_t)object->tag_count.tag;
+                    stack_slot->tag_count.tag = TAG_FIXNUM;
+                    stack_slot->tag_count.flag = 0;
+                    stack_slot->tag_count.count = 1;
+                }
+                VM_CONTINUE();
             case OPCODE_CMP_EQUAL:
                 VM_TRACE_OP(OPCODE_CMP_EQUAL);
                 {
