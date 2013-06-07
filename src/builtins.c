@@ -181,9 +181,6 @@ evil_eval(struct evil_environment_t *environment, int num_args, struct evil_obje
                 struct evil_object_handle_t *wrapper_args_handle;
                 struct evil_object_t fn;
 
-                /*
-                 * TODO: This needs to use object handles instead.
-                 */
                 wrapper_args = gc_alloc(environment->heap, TAG_PAIR, 0);
                 wrapper_args_handle = evil_create_object_handle(environment, wrapper_args);
 
