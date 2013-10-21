@@ -80,7 +80,6 @@ struct function_local_t
 struct compiler_context_t
 {
     struct compiler_context_t *previous_context;
-    jmp_buf context_state;
     struct linear_allocator_t *pool;
     int num_args;
     struct evil_environment_t *environment;
@@ -88,6 +87,7 @@ struct compiler_context_t
     int max_stack_slots;
     int num_fn_locals;
     struct function_local_t *locals;
+    jmp_buf context_state;
 };
 
 struct instruction_t
@@ -1217,7 +1217,7 @@ calculate_bytecode_size_and_offsets(struct slist_t *root)
         struct instruction_t *insn;
 
         insn = (struct instruction_t *)i;
-        insn->offset = size;
+        insn->offset = (int)size;
         size += 1 + insn->size;
     }
 
