@@ -945,13 +945,13 @@ vm_run(struct evil_environment_t *environment, struct evil_object_t *initial_fun
                      * area in order to land our new arguments.
                      */
                     current_fn_num_args = vm_extract_num_args(procedure);
-                    arg_diff = current_fn_num_args - num_args;
+                    arg_diff = current_fn_num_args - args_passed;
                     arg_slot = program_area + arg_diff;
 
                     /*
                      * Move our arguments.
                      */
-                    memmove(arg_slot, sp + 1, num_args * sizeof(struct evil_object_t));
+                    memmove(arg_slot, sp + 1, args_passed * sizeof(struct evil_object_t));
 
                     /*
                      * Adjust the stack pointer down below the program area and
