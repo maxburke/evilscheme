@@ -90,6 +90,122 @@ evil_vector(struct evil_environment_t *environment, int num_args, struct evil_ob
     return make_ref(vector);
 }
 
+static int64_t
+evil_coerce_fixnum(struct evil_object_t *arg)
+{
+    unsigned char tag;
+
+    tag = arg->tag_count.tag;
+    assert(tag == TAG_FIXNUM || tag == TAG_FLONUM);
+
+    if (tag == TAG_FLONUM)
+    {
+        return (int64_t)arg->value.flonum_value;
+    }
+
+    return arg->value.fixnum_value;
+}
+
+struct evil_object_t
+evil_make_vector(struct evil_environment_t *environment, int num_args, struct evil_object_t *args)
+{
+    struct evil_object_t *vector;
+    struct evil_object_t *size;
+    struct evil_object_t *fill;
+    size_t fixnum_size;
+    struct evil_object_t vector_fill_args[2];
+
+    assert(num_args == 1 || num_args == 2);
+
+    size = deref(args + 0);
+    fill = deref(args + 1);
+
+    assert(size->tag_count.tag == TAG_FIXNUM);
+    fixnum_size = (size_t)evil_coerce_fixnum(size);
+
+    vector = gc_alloc_vector(environment->heap, fixnum_size);
+    vector_fill_args[0] = make_ref(vector);
+
+    vector_fill_args[1] = (num_args == 2) ? *fill : make_ref(empty_pair);
+
+    return evil_vector_fill(environment, 2, vector_fill_args);
+}
+
+struct evil_object_t
+evil_vector_length(struct evil_environment_t *environment, int num_args, struct evil_object_t *args)
+{
+    struct evil_object_t length;
+    struct evil_object_t *vector;
+
+    UNUSED(environment);
+    UNUSED(num_args);
+
+    vector = deref(args + 0);
+
+    assert(num_args == 1);
+    assert(vector->tag_count.tag == TAG_VECTOR);
+
+    length.tag_count.tag = TAG_FIXNUM;
+    length.tag_count.flag = 0;
+    length.tag_count.count = 1;
+    length.value.fixnum_value = vector->tag_count.count;
+
+    return length;
+}
+
+struct evil_object_t
+evil_vector_ref(struct evil_environment_t *environment, int num_args, struct evil_object_t *args)
+{
+    struct evil_object_t *vector;
+    struct evil_object_t *element;
+    int64_t index;
+
+    UNUSED(environment);
+    UNUSED(num_args);
+
+    assert(num_args == 2);
+
+    index = 0;
+    vector = deref(args + 0);
+    element = deref(args + 1);
+
+    assert(vector->tag_count.tag == TAG_VECTOR);
+
+    index = evil_coerce_fixnum(element);
+    assert(index < 65536);
+
+    return make_ref(VECTOR_BASE(vector) + index);
+}
+
+struct evil_object_t
+evil_vector_fill(struct evil_environment_t *environment, int num_args, struct evil_object_t *args)
+{
+    struct evil_object_t *vector;
+    struct evil_object_t *vector_base;
+    struct evil_object_t fill;
+    int count;
+    int i;
+
+    UNUSED(environment);
+    UNUSED(num_args);
+
+    assert(num_args == 2);
+
+    vector = deref(args + 0);
+    fill = *(args + 1);
+
+    assert(vector->tag_count.tag == TAG_VECTOR);
+    count = vector->tag_count.count;
+    vector_base = VECTOR_BASE(vector);
+
+    for (i = 0; i < count; ++i)
+    {
+        vector_base[i] = fill;
+    }
+
+    return make_ref(vector);
+}
+
 struct evil_object_t
 evil_apply(struct evil_environment_t *environment, int num_args, struct evil_object_t *args)
 {

@@ -155,4 +155,16 @@ evil_apply(struct evil_environment_t *environment, int num_args, struct evil_obj
 struct evil_object_t
 evil_vector(struct evil_environment_t *environment, int num_args, struct evil_object_t *object);
 
+struct evil_object_t
+evil_make_vector(struct evil_environment_t *environment, int num_args, struct evil_object_t *object);
+
+struct evil_object_t
+evil_vector_length(struct evil_environment_t *environment, int num_args, struct evil_object_t *object);
+
+struct evil_object_t
+evil_vector_ref(struct evil_environment_t *environment, int num_args, struct evil_object_t *object);
+
+struct evil_object_t
+evil_vector_fill(struct evil_environment_t *environment, int num_args, struct evil_object_t *object);
+
 #endif
