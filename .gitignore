@@ -3,3 +3,7 @@
 *.swo
 *.obj
 *.a
+*.WEW
+*.exe
+*.ilk
+*.pdb
