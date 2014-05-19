@@ -245,23 +245,6 @@ vm_create_inner_reference(struct evil_object_t *object, int64_t index)
     return inner_reference;
 }
 
-static inline unsigned char
-vm_reference_type(struct evil_object_t *ref)
-{
-    const struct evil_object_t *referenced_object;
-#if ENABLE_VM_ASSERTS
-    const unsigned char ref_type = ref->tag_count.tag;
-#endif
-
-    referenced_object = ref->value.ref;
-
-#if ENABLE_VM_ASSERTS
-    VM_ASSERT_NOTRACE(ref_type == TAG_REFERENCE || ref_type == TAG_INNER_REFERENCE);
-#endif
-
-    return referenced_object->tag_count.tag;
-}
-
 static inline void
 vm_demote_numeric(struct evil_object_t *object)
 {
