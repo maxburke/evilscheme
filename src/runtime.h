@@ -4,7 +4,7 @@
  * See LICENSE.TXT for details.
  ***********************************************************************/
 
-#ifndef EVIL_RUNTUME_H
+#ifndef EVIL_RUNTIME_H
 #define EVIL_RUNTIME_H
 
 #include "object.h"
