@@ -49,8 +49,8 @@
 #define NUM_BENCHMARK_ITERATIONS 30
 
 char *print_buffer;
-int print_buffer_offset;
-int print_buffer_size;
+size_t print_buffer_offset;
+size_t print_buffer_size;
 
 struct test_t;
 
@@ -78,14 +78,16 @@ evil_printf(const char *format, ...)
      */
     va_list args;
     int required_length;
-    int buffer_space;
+    size_t buffer_space;
 
     va_start(args, format);
 
+    assert(print_buffer_size >= print_buffer_offset);
     buffer_space = print_buffer_size - print_buffer_offset;
     required_length = vsnprintf(print_buffer + print_buffer_offset, buffer_space, format, args);
+    assert(required_length >= 0);
 
-    if (buffer_space < required_length)
+    if (buffer_space < (size_t)required_length)
     {
         size_t size;
         const int reallocation_delta = 4096;

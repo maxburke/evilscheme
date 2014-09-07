@@ -1,0 +1,7 @@
+(begin (print (symbol? 'foo)) (print (char? #\c)) (print (boolean? #t)) (print (vector? #(1 2 3))) (print (procedure? (lambda ()))))
+>#t
+#t
+#t
+#t
+#t
+'()

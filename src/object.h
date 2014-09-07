@@ -114,6 +114,8 @@ make_fixnum_object(int64_t value)
 static inline struct evil_object_t *
 deref(struct evil_object_t *ptr)
 {
+    assert(ptr->tag_count.tag != TAG_INNER_REFERENCE);
+
     return (ptr == NULL) ? NULL : ((ptr->tag_count.tag == TAG_REFERENCE) ? ptr->value.ref : ptr);
 }
 

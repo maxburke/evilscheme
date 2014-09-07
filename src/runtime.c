@@ -45,6 +45,12 @@ struct symbol_string_internment_page_t
     char data[1];
 };
 
+static struct evil_object_t
+symbol_to_string(struct evil_environment_t *environment, int num_args, struct evil_object_t *args);
+
+static struct evil_object_t
+string_to_symbol(struct evil_environment_t *environment, int num_args, struct evil_object_t *args);
+
 void
 environment_initialize(struct evil_environment_t *environment)
 {
@@ -65,7 +71,13 @@ environment_initialize(struct evil_environment_t *environment)
         { "lambda", evil_lambda, 1 },
         { "apply", evil_apply, VARIADIC },
         { "vector", evil_vector, VARIADIC },
+        { "make-vector", evil_make_vector, VARIADIC },
+        { "vector-length", evil_vector_ref, 1 },
+        { "vector-ref", evil_vector_ref, 2 },
+        { "vector-fill!", evil_vector_ref, 2 },
         { "disassemble", evil_disassemble, 1 },
+        { "string->symbol", string_to_symbol, 1 },
+        { "symbol->string", symbol_to_string, 1 }
     };
     #define NUM_INITIALIZERS (sizeof initializers / sizeof initializers[0])
     size_t i;
@@ -145,10 +157,37 @@ evil_environment_create(void *stack, size_t stack_size, void *heap_mem, size_t h
     return env;
 }
 
+static void
+evil_destroy_hash_internemnt_pages(struct symbol_hash_internment_page_t *page)
+{
+    if (page == NULL)
+    {
+        return;
+    }
+
+    evil_destroy_hash_internemnt_pages(page->next);
+    free(page);
+}
+
+static void
+evil_destroy_string_internment_pages(struct symbol_string_internment_page_t *page)
+{
+    if (page == NULL)
+    {
+        return;
+    }
+
+    evil_destroy_string_internment_pages(page->next);
+    free(page);
+}
+
 void
 evil_environment_destroy(struct evil_environment_t *environment)
 {
     gc_destroy(environment->heap);
+
+    evil_destroy_hash_internemnt_pages(environment->symbol_names.hash_internment_page_base);
+    evil_destroy_string_internment_pages(environment->symbol_names.string_internment_page_base);
     evil_aligned_free(environment);
 }
 
@@ -223,6 +262,7 @@ intern_string(struct evil_environment_t *environment, const char *bytes, size_t 
     for (i = environment->symbol_names.string_internment_page_base; i != NULL; i = i->next)
     {
         char *string;
+        size_t ii;
 
         if (i->available_bytes < (num_bytes + 1))
             continue;
@@ -231,7 +271,15 @@ intern_string(struct evil_environment_t *environment, const char *bytes, size_t 
         i->top += (num_bytes + 1);
         i->available_bytes -= (num_bytes + 1);
 
-        memmove(string, bytes, num_bytes);
+        /*
+         * All symbols are interned lower-case as the Scheme is case
+         * insensitive.
+         */
+        for (ii = 0; ii < num_bytes; ++ii)
+        {
+            string[ii] = (char)tolower(bytes[ii]);
+        }
+
         string[num_bytes] = 0;
 
         return string;
@@ -288,7 +336,6 @@ intern_hash(struct evil_environment_t *environment, uint64_t hash, const char *s
     intern_hash(environment, hash, string);
 }
 
-
 static uint64_t
 register_symbol_impl(struct evil_environment_t *environment, const char *bytes, size_t num_bytes)
 {
@@ -316,5 +363,54 @@ uint64_t
 register_symbol_from_bytes(struct evil_environment_t *environment, const void *bytes, size_t num_bytes)
 {
     return register_symbol_impl(environment, bytes, num_bytes);
+}
+
+static struct evil_object_t
+symbol_to_string(struct evil_environment_t *environment, int num_args, struct evil_object_t *args)
+{
+    uint64_t hash;
+    const char *symbol_string;
+    struct evil_object_t *string_object;
+    size_t symbol_string_length;
+
+    assert(num_args == 1);
+    assert(args->tag_count.tag == TAG_SYMBOL);
+
+    hash = args->value.symbol_hash;
+    symbol_string = find_symbol_name(environment, hash);
+
+    /*
+     * I don't think this is allowed to return non-null. If we have the symbol
+     * object then at one time the string should have been interned.
+     */
+    assert(symbol_string != NULL);
+    symbol_string_length = strlen(symbol_string);
+
+    string_object = gc_alloc(environment->heap, TAG_STRING, symbol_string_length);
+    memmove(&string_object->value.string_value, symbol_string, symbol_string_length + 1);
+
+    return make_ref(string_object);
+}
+
+static struct evil_object_t
+string_to_symbol(struct evil_environment_t *environment, int num_args, struct evil_object_t *args)
+{
+    struct evil_object_t *string_object;
+    uint64_t hash;
+    struct evil_object_t hash_object;
+
+    assert(num_args == 1);
+    assert(args->tag_count.tag == TAG_REFERENCE);
+
+    string_object = deref(args);
+    assert(string_object->tag_count.tag == TAG_STRING);
+
+    hash = register_symbol_from_string(environment, string_object->value.string_value);
+    hash_object.tag_count.tag = TAG_SYMBOL;
+    hash_object.tag_count.flag = 0;
+    hash_object.tag_count.count = 1;
+    hash_object.value.symbol_hash = hash;
+
+    return hash_object;
 }
 

@@ -28,28 +28,36 @@
 #define MAX(a,b) ((a)>(b)?(a):(b))
 #endif
 
-#define SYMBOL_IF       0x8325f07b4eb2a24
-#define SYMBOL_ADD      0xaf63bd4c8601b7f4
-#define SYMBOL_SUB      0xaf63bd4c8601b7f2
-#define SYMBOL_MUL      0xaf63bd4c8601b7f5
-#define SYMBOL_DIV      0xaf63bd4c8601b7f0
-#define SYMBOL_EQ       0xaf63bd4c8601b7e2
-#define SYMBOL_LT       0xaf63bd4c8601b7e3
-#define SYMBOL_GT       0xaf63bd4c8601b7e1
-#define SYMBOL_LE       0x8328c07b4eb7684
-#define SYMBOL_GE       0x8328a07b4eb736e
-#define SYMBOL_EQUALP   0xeacd8283b4334dba
-#define SYMBOL_NULLP    0xb4d24b59678288cd
-#define SYMBOL_FIRST    0xc0de9a9b8ec0e479
-#define SYMBOL_REST     0x9ab4817ea75b3deb
-#define SYMBOL_LAMBDA   0xdb4485ae65d0c568
-#define SYMBOL_SET      0x92eb577ea331d824
-#define SYMBOL_LET      0xd8b7ad186b906050
-#define SYMBOL_LETSTAR  0xd07b707ec653a7da
-#define SYMBOL_LETREC   0x4c663d13ff171fa
-#define SYMBOL_DEFINE   0xf418d40f59d3f9a4
-#define SYMBOL_QUOTE    0xf6be341a7b50a73
-#define SYMBOL_BEGIN    0x8facd8be36ce1840
+#define SYMBOL_IF           0x8325f07b4eb2a24
+#define SYMBOL_ADD          0xaf63bd4c8601b7f4
+#define SYMBOL_SUB          0xaf63bd4c8601b7f2
+#define SYMBOL_MUL          0xaf63bd4c8601b7f5
+#define SYMBOL_DIV          0xaf63bd4c8601b7f0
+#define SYMBOL_EQ           0xaf63bd4c8601b7e2
+#define SYMBOL_LT           0xaf63bd4c8601b7e3
+#define SYMBOL_GT           0xaf63bd4c8601b7e1
+#define SYMBOL_LE           0x8328c07b4eb7684
+#define SYMBOL_GE           0x8328a07b4eb736e
+#define SYMBOL_EQUALP       0xeacd8283b4334dba
+#define SYMBOL_NULLP        0xb4d24b59678288cd
+#define SYMBOL_FIRST        0xc0de9a9b8ec0e479
+#define SYMBOL_REST         0x9ab4817ea75b3deb
+#define SYMBOL_LAMBDA       0xdb4485ae65d0c568
+#define SYMBOL_SET          0x92eb577ea331d824
+#define SYMBOL_LET          0xd8b7ad186b906050
+#define SYMBOL_LETSTAR      0xd07b707ec653a7da
+#define SYMBOL_LETREC       0x4c663d13ff171fa
+#define SYMBOL_DEFINE       0xf418d40f59d3f9a4
+#define SYMBOL_QUOTE        0xf6be341a7b50a73
+#define SYMBOL_BEGIN        0x8facd8be36ce1840
+#define SYMBOL_BOOLEANP     0x9bc083e90a3bef42
+#define SYMBOL_SYMBOLP      0xf99d2ea3e715348
+#define SYMBOL_PAIRP        0xc6bb7748583568b0
+#define SYMBOL_NUMBERP      0x4d61b5269fe76c81
+#define SYMBOL_CHARP        0xc7e16b3ad2b8a98
+#define SYMBOL_VECTORP      0x77b7e53c30b17583
+#define SYMBOL_STRINGP      0x54dddb4b267e2d75
+#define SYMBOL_PROCEDUREP   0x80dd3f7b72e0d2fb
 
 struct stack_slot_t
 {
@@ -81,6 +89,49 @@ struct compiler_context_t
     int num_fn_locals;
     struct function_local_t *locals;
 };
+
+struct instruction_t
+{
+    struct slist_t link;
+
+    unsigned char opcode;
+    int offset;
+    size_t size;
+    struct instruction_t *reloc;
+
+    union data
+    {
+        unsigned char u1;
+                 char s1;
+        unsigned short u2;
+                 short s2;
+        unsigned int u4;
+                 int s4;
+        float f4;
+        uint64_t u8;
+        int64_t s8;
+        double f8;
+        char string[1];
+    } data;
+};
+
+static struct instruction_t *
+compile_form(struct compiler_context_t *context, struct instruction_t *next, struct evil_object_t *body);
+
+static struct instruction_t *
+compile_get_bound_location(struct compiler_context_t *context, struct instruction_t *next, struct evil_object_t *symbol);
+
+static struct instruction_t *
+compile_load(struct compiler_context_t *context, struct instruction_t *next);
+
+static struct instruction_t *
+compile_lambda(struct compiler_context_t *incoming_context, struct instruction_t *next, struct evil_object_t *lambda_body);
+
+static struct instruction_t *
+compile_load_function_local(struct compiler_context_t *context, struct instruction_t *next, struct evil_object_t *object);
+
+static void
+disassemble_bytecode(struct evil_environment_t *environment, const unsigned char *ptr, size_t num_bytes);
 
 static void
 create_slots_for_args(
@@ -159,46 +210,6 @@ get_stack_slot(struct stack_slot_t *slots, uint64_t hash)
 
     return NULL;
 }
-
-struct instruction_t
-{
-    struct slist_t link;
-
-    unsigned char opcode;
-    int offset;
-    size_t size;
-    struct instruction_t *reloc;
-
-    union data
-    {
-        unsigned char u1;
-                 char s1;
-        unsigned short u2;
-                 short s2;
-        unsigned int u4;
-                 int s4;
-        float f4;
-        uint64_t u8;
-        int64_t s8;
-        double f8;
-        char string[1];
-    } data;
-};
-
-static struct instruction_t *
-compile_form(struct compiler_context_t *context, struct instruction_t *next, struct evil_object_t *body);
-
-static struct instruction_t *
-compile_get_bound_location(struct compiler_context_t *context, struct instruction_t *next, struct evil_object_t *symbol);
-
-static struct instruction_t *
-compile_load(struct compiler_context_t *context, struct instruction_t *next);
-
-static struct instruction_t *
-compile_lambda(struct compiler_context_t *incoming_context, struct instruction_t *next, struct evil_object_t *lambda_body);
-
-static struct instruction_t *
-compile_load_function_local(struct compiler_context_t *context, struct instruction_t *next, struct evil_object_t *object);
 
 static struct instruction_t *
 find_before(struct instruction_t *start, struct instruction_t *target)
@@ -622,6 +633,7 @@ compile_literal(struct compiler_context_t *context, struct instruction_t *next, 
     {
         case TAG_BOOLEAN:
             instruction->opcode = OPCODE_LDIMM_1_BOOL;
+            instruction->size = 1;
             instruction->data.s1 = (char)literal->value.fixnum_value;
             break;
         case TAG_SYMBOL:
@@ -1051,6 +1063,37 @@ COMPILE_PAIR_ACCESSOR(first, 0)
 COMPILE_PAIR_ACCESSOR(rest, 1)
 
 static struct instruction_t *
+compile_type_predicate(struct compiler_context_t *context, struct instruction_t *next, struct evil_object_t *args, int type)
+{
+    struct evil_object_t *expression_form;
+    struct instruction_t *expression;
+    struct instruction_t *ldtype;
+    struct instruction_t *type_literal;
+    struct instruction_t *cmp_eq;
+
+    expression_form = CAR(args);
+    expression = compile_form(context, next, expression_form);
+   
+    ldtype = allocate_instruction(context);
+    ldtype->opcode = OPCODE_LDTYPE;
+    ldtype->link.next = &expression->link;
+
+    assert(type >= -128 && type <= 127);
+
+    type_literal = allocate_instruction(context);
+    type_literal->opcode = OPCODE_LDIMM_1_FIXNUM;
+    type_literal->data.s1 = (char)type;
+    type_literal->size = 1;
+    type_literal->link.next = &ldtype->link;
+
+    cmp_eq = allocate_instruction(context);
+    cmp_eq->opcode = OPCODE_CMP_EQUAL;
+    cmp_eq->link.next = &type_literal->link;
+
+    return cmp_eq;
+}
+
+static struct instruction_t *
 compile_form(struct compiler_context_t *context, struct instruction_t *next, struct evil_object_t *body)
 {
     struct evil_object_t *symbol_object;
@@ -1115,6 +1158,24 @@ compile_form(struct compiler_context_t *context, struct instruction_t *next, str
                 return compile_quote(context, next, function_args);
             case SYMBOL_BEGIN:
                 return compile_begin(context, next, function_args);
+            case SYMBOL_BOOLEANP:
+                return compile_type_predicate(context, next, function_args, TAG_BOOLEAN);
+            case SYMBOL_SYMBOLP:
+                return compile_type_predicate(context, next, function_args, TAG_SYMBOL);
+            case SYMBOL_PAIRP:
+                return compile_type_predicate(context, next, function_args, TAG_PAIR);
+            /*
+            case SYMBOL_NUMBERP:
+                return compile_type_predicate(context, next, function_args, TAG_???);
+            */
+            case SYMBOL_CHARP:
+                return compile_type_predicate(context, next, function_args, TAG_CHAR);
+            case SYMBOL_VECTORP:
+                return compile_type_predicate(context, next, function_args, TAG_VECTOR);
+            case SYMBOL_STRINGP:
+                return compile_type_predicate(context, next, function_args, TAG_STRING);
+            case SYMBOL_PROCEDUREP:
+                return compile_type_predicate(context, next, function_args, TAG_PROCEDURE);
             default:
                 /*
                  * The function/procedure isn't one that is handled by the
@@ -1156,7 +1217,7 @@ calculate_bytecode_size_and_offsets(struct slist_t *root)
         struct instruction_t *insn;
 
         insn = (struct instruction_t *)i;
-        insn->offset = size;
+        insn->offset = (int)size;
         size += 1 + insn->size;
     }
 
@@ -1312,7 +1373,11 @@ assemble(struct evil_environment_t *environment, struct compiler_context_t *cont
      * If this assert fires then chances are we've forgotten to set the size
      * field of an instruction instance.
      */
-    assert(idx == num_bytes);
+    if (idx != num_bytes)
+    {
+        disassemble_bytecode(environment, bytes, num_bytes);
+        assert(idx == num_bytes);
+    }
 
     /*
      * Insert the function local objects into the slots in the function object.
@@ -1448,7 +1513,7 @@ promote_tailcalls(struct instruction_t *root)
 
             next = (struct instruction_t *)i->next;
 
-            if (next->opcode == OPCODE_CALL)
+            if (next && next->opcode == OPCODE_CALL)
             {
                 next->opcode = OPCODE_TAILCALL;
             }
@@ -1475,25 +1540,12 @@ print_hex_bytes(const unsigned char *c, size_t size)
 }
 
 static void
-disassemble_procedure(struct evil_environment_t *environment, struct evil_object_t *args, const char *name)
+disassemble_bytecode(struct evil_environment_t *environment, const unsigned char *ptr, size_t num_bytes)
 {
-    struct evil_object_t *procedure;
-    struct evil_object_t *byte_code_object;
-    const unsigned char *ptr;
     size_t i;
-    size_t num_bytes;
 
-    procedure = args;
-    assert(procedure->tag_count.tag == TAG_PROCEDURE);
-
-    byte_code_object = deref(&VECTOR_BASE(procedure)[FIELD_CODE]);
-    assert(byte_code_object->tag_count.tag == TAG_STRING);
-
-    ptr = (unsigned char *)byte_code_object->value.string_value;
-
-    evil_printf("%s:\n", name);
-
-    for (i = 0, num_bytes = byte_code_object->tag_count.count; i < num_bytes;)
+    i = 0;
+    while (i < num_bytes)
     {
         unsigned char c = ptr[i];
 
@@ -1686,21 +1738,9 @@ disassemble_procedure(struct evil_environment_t *environment, struct evil_object
                 evil_printf("SET\n");
                 ++i;
                 break;
-            case OPCODE_NEW:
-                {
-                    enum evil_tag_t tag;
-
-                    tag = (enum evil_tag_t)ptr[i + 1];
-                    print_hex_bytes(ptr + i, 2);
-
-                    evil_printf("NEW %s\n", type_name(tag));
-                }
-
-                i += 2;
-                break;
-            case OPCODE_NEW_VECTOR:
+            case OPCODE_LDTYPE:
                 print_hex_bytes(ptr + i, 1);
-                evil_printf("NEW_VECTOR\n");
+                evil_printf("LDTYPE\n");
                 ++i;
                 break;
             case OPCODE_CMP_EQUAL:
@@ -1848,6 +1888,26 @@ disassemble_procedure(struct evil_environment_t *environment, struct evil_object
                 break;
         }
     }
+}
+
+static void
+disassemble_procedure(struct evil_environment_t *environment, struct evil_object_t *args, const char *name)
+{
+    struct evil_object_t *procedure;
+    struct evil_object_t *byte_code_object;
+    const unsigned char *ptr;
+
+    procedure = args;
+    assert(procedure->tag_count.tag == TAG_PROCEDURE);
+
+    byte_code_object = deref(&VECTOR_BASE(procedure)[FIELD_CODE]);
+    assert(byte_code_object->tag_count.tag == TAG_STRING);
+
+    ptr = (unsigned char *)byte_code_object->value.string_value;
+
+    evil_printf("%s:\n", name);
+
+    disassemble_bytecode(environment, ptr, byte_code_object->tag_count.count);
 }
 
 struct evil_object_t
@@ -2004,7 +2064,7 @@ evil_lambda(struct evil_environment_t *environment, int num_args, struct evil_ob
 {
     UNUSED(num_args);
     assert(num_args == 1);
-
+    
     return compile_form_to_bytecode(NULL, environment, lambda_body);
 }
 
