@@ -12,6 +12,8 @@
 
 #include <assert.h>
 #include <ctype.h>
+#include <float.h>
+#include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -25,6 +27,7 @@
     #define snprintf _snprintf
 #else
     #include <dirent.h>
+    #include <time.h>
 #endif
 
 #include "base.h"
@@ -39,9 +42,26 @@
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #endif
 
+#ifndef MAX
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+#endif
+
+#define NUM_BENCHMARK_ITERATIONS 30
+
 char *print_buffer;
 size_t print_buffer_offset;
 size_t print_buffer_size;
+
+struct test_t;
+
+static void
+print_unit_test_summary(struct test_t *tests, int num_tests);
+
+static void
+print_benchmark_summary(struct test_t *tests, int num_tests);
+
+static void
+(*print_test_summary)(struct test_t *tests, int num_tests) = print_unit_test_summary;
 
 void
 evil_debug_printf(const char *format, ...)
@@ -246,7 +266,7 @@ create_test_ast(struct evil_environment_t *environment, struct evil_object_handl
 
     string_object = evil_resolve_object_handle(string_handle);
     ast = evil_read(environment, 1, string_object);
-    
+
     return evil_create_object_handle_from_value(environment, ast);
 }
 
@@ -364,6 +384,26 @@ run_test(struct evil_environment_t *environment, const char *test, const char *e
     {
         FindClose(dir);
     }
+
+    static uint64_t
+    get_ticks(void)
+    {
+        uint64_t time;
+
+        QueryPerformanceCounter((LARGE_INTEGER *)&time);
+
+        return time;
+    }
+
+    static uint64_t
+    get_tick_frequency(void)
+    {
+        uint64_t frequency;
+
+        QueryPerformanceFrequency((LARGE_INTEGER *)&frequency);
+
+        return frequency;
+    }
 #else
     typedef DIR *directory_t;
     static char directory_root[256];
@@ -408,6 +448,22 @@ run_test(struct evil_environment_t *environment, const char *test, const char *e
     end_directory_traversal(directory_t dir)
     {
         closedir(dir);
+    }
+
+    static uint64_t
+    get_ticks(void)
+    {
+        struct timespec clock_time;
+
+        clock_gettime(CLOCK_REALTIME, &clock_time);
+
+        return (clock_time.tv_sec * UINT64_C(1000000000)) + clock_time.tv_nsec;
+    }
+
+    static uint64_t
+    get_tick_frequency(void)
+    {
+        return UINT64_C(1000000000);
     }
 #endif
 
@@ -503,40 +559,253 @@ should_run_test(const char *test, int num_filters, char **filters)
     return 0;
 }
 
-int
-evil_run_tests(int argc, char *argv[])
+struct test_t
 {
-    directory_t dir;
-    struct evil_environment_t *environment;
-    int num_tests;
-    int num_passed;
+    uint64_t ticks;
+    int success;
+    char filename[260];
+};
 
-    #define TEST_DIR "tests"
+static int
+test_comparer(const void *a, const void *b)
+{
+    const struct test_t *test_a;
+    const struct test_t *test_b;
+
+    test_a = a;
+    test_b = b;
+
+    return strcmp(test_a->filename, test_b->filename);
+}
+
+static struct test_t *
+setup_benchmarks(int argc, char *argv[], struct test_t *old_tests, int *num_tests_ptr)
+{
+    int i;
+    int num_tests;
+    struct test_t *tests;
+    struct test_t *p;
+
+    tests = NULL;
+    num_tests = *num_tests_ptr;
+
+    if (argc < 2 || strcmp(argv[1], "-benchmark") != 0)
+    {
+        return old_tests;
+    }
+
+
+    tests = calloc(num_tests * NUM_BENCHMARK_ITERATIONS, sizeof(struct test_t));
+    p = tests;
+
+    for (i = 0; i < num_tests; ++i)
+    {
+        int ii;
+
+        for (ii = 0; ii < NUM_BENCHMARK_ITERATIONS; ++ii)
+        {
+            memmove(p, old_tests + i, sizeof(struct test_t));
+            ++p;
+        }
+    }
+
+    *num_tests_ptr = num_tests * NUM_BENCHMARK_ITERATIONS;
+    print_test_summary = print_benchmark_summary;
+
+    return tests;
+}
+
+static struct test_t *
+initialize_tests(const char *directory_name, int argc, char *argv[], int *num_tests_ptr)
+{
+    int num_tests;
+    struct test_t *tests;
+    directory_t dir;
 
     num_tests = 0;
-    num_passed = 0;
-    environment = create_test_environment();
-    dir = begin_directory_traversal(TEST_DIR);
+    tests = NULL;
+    dir = begin_directory_traversal(directory_name);
 
     if (!is_valid_directory(dir))
     {
-        return 1;
+        *num_tests_ptr = 0;
+        return NULL;
     }
 
     for (;;)
     {
         char filename[260];
-        char *test_file;
-        char *test_end;
-        char *test;
-        char *expected;
-        int result;
+
+        memset(filename, 0, sizeof filename);
 
         if (get_next_file(dir, filename, sizeof filename))
         {
             break;
         }
 
+        if (!should_run_test(filename, argc - 1, argv + 1))
+        {
+            continue;
+        }
+
+        tests = realloc(tests, (sizeof(struct test_t) * (num_tests + 1)));
+        memmove(tests[num_tests].filename, filename, sizeof filename);
+        tests[num_tests].success = 0;
+
+        ++num_tests;
+    }
+
+    qsort(tests, num_tests, sizeof(struct test_t), test_comparer);
+    *num_tests_ptr = num_tests;
+
+    end_directory_traversal(dir);
+
+    tests = setup_benchmarks(argc, argv, tests, num_tests_ptr);
+
+    return tests;
+}
+
+static void
+print_unit_test_summary(struct test_t *tests, int num_tests)
+{
+    int num_passed;
+    int i;
+    size_t max_test_name_length;
+    double ticks_to_ms;
+
+    num_passed = 0;
+    max_test_name_length = 0;
+    ticks_to_ms = 1000.0 / (double)get_tick_frequency();
+
+    for (i = 0; i < num_tests; ++i)
+    {
+        size_t test_name_length;
+
+        test_name_length = strlen(tests[i].filename);
+        max_test_name_length = MAX(test_name_length, max_test_name_length);
+    }
+
+    printf("\n========================================\n");
+
+    for (i = 0; i < num_tests; ++i)
+    {
+        size_t test_name_length;
+        double test_time;
+
+        test_name_length = strlen(tests[i].filename);
+        test_time = (double)tests[i].ticks * ticks_to_ms;
+
+        printf("    %s %*s %s (%.2f ms)\n",
+                tests[i].filename,
+                (int)(max_test_name_length - test_name_length),
+                "",
+                tests[i].success ? "passed" : "FAILED",
+                test_time);
+
+        if (tests[i].success)
+        {
+            ++num_passed;
+        }
+    }
+
+    printf("\n%d/%d passed\n", num_passed, num_tests);
+}
+
+static void
+print_benchmark_summary(struct test_t *tests, int num_tests)
+{
+    int i;
+    int num_test_cases;
+    double ticks_to_ms;
+
+    num_test_cases = num_tests / NUM_BENCHMARK_ITERATIONS;
+    ticks_to_ms = 1000.0 / (double)get_tick_frequency();
+
+    printf("\n========================================\n");
+    printf("Test, Iterations, Min, Max, Mean, Std Dev\n");
+
+    for (i = 0; i < num_test_cases; ++i)
+    {
+        int ii;
+        double total_ms;
+        double mean;
+        double sum_squares;
+        double stddev;
+        double min;
+        double max;
+
+        min = FLT_MAX;
+        max = 0;
+        total_ms = 0;
+
+        for (ii = 0; ii < NUM_BENCHMARK_ITERATIONS; ++ii)
+        {
+            int idx;
+            double ms;
+
+            idx = (i * NUM_BENCHMARK_ITERATIONS) + ii;
+            ms = tests[idx].ticks * ticks_to_ms;
+            total_ms += ms;
+            min = MIN(ms, min);
+            max = MAX(ms, max);
+
+            if (ii < (NUM_BENCHMARK_ITERATIONS - 1))
+            {
+                assert(strcmp(tests[idx].filename, tests[idx + 1].filename) == 0);
+            }
+        }
+
+        mean = total_ms / (double)NUM_BENCHMARK_ITERATIONS;
+        sum_squares = 0;
+
+        for (ii = 0; ii < NUM_BENCHMARK_ITERATIONS; ++ii)
+        {
+            int idx;
+            double ms;
+            double difference;
+
+            idx = (i * NUM_BENCHMARK_ITERATIONS) + ii;
+            ms = tests[idx].ticks * ticks_to_ms;
+            difference = ms - mean;
+
+            sum_squares += difference * difference;
+        }
+
+        stddev = sqrt(sum_squares / (double)NUM_BENCHMARK_ITERATIONS);
+
+        printf("%s,%d,%f,%f,%f,%f\n", tests[i * NUM_BENCHMARK_ITERATIONS].filename, NUM_BENCHMARK_ITERATIONS, min, max, mean, stddev);
+    }
+}
+
+int
+evil_run_tests(int argc, char *argv[])
+{
+    struct evil_environment_t *environment;
+    int num_tests;
+    int num_passed;
+    int i;
+    struct test_t *tests;
+
+    #define TEST_DIR "tests"
+
+    num_tests = 0;
+    num_passed = 0;
+
+    tests = initialize_tests(TEST_DIR, argc, argv, &num_tests);
+    environment = create_test_environment();
+
+    for (i = 0; i < num_tests; ++i)
+    {
+        const char *filename;
+        char *test_file;
+        char *test_end;
+        char *test;
+        char *expected;
+        int result;
+        uint64_t begin;
+        uint64_t end;
+
+        filename = tests[i].filename;
         test_file = read_test_file(filename);
         test_end = test_file + strlen(test_file);
 
@@ -544,11 +813,6 @@ evil_run_tests(int argc, char *argv[])
         test_end = remove_comments(test_file, test_end);
 
         test = test_file;
-
-        if (!should_run_test(filename, argc - 1, argv + 1))
-        {
-            goto next_test;
-        }
 
         expected = test_file;
 
@@ -579,22 +843,24 @@ evil_run_tests(int argc, char *argv[])
         *expected = 0;
         ++expected;
 
+        begin = get_ticks();
         result = run_test(environment, test, expected);
+        end = get_ticks();
         report_test_result(filename, result, expected);
+        tests[i].success = result;
+        tests[i].ticks = end - begin;
 
-        ++num_tests;
         num_passed += result;
 
     next_test:
         free(test);
     }
 
-    end_directory_traversal(dir);
-    free_print_buffer();
-    destroy_test_environment(environment);
+    print_test_summary(tests, num_tests);
 
-    printf("\n========================================\n");
-    printf("%d/%d tests passed\n", num_passed, num_tests);
+    destroy_test_environment(environment);
+    free_print_buffer();
+    free(tests);
 
     return num_tests - num_passed;
 }
