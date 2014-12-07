@@ -1,0 +1,42 @@
+(begin
+
+ (define a (lambda (i j)
+            (/ 1.0 (+ (* (+ i j)
+                         (/ (+ i (+ j 1)) 2.0)) 
+                      (+ i 1)))))
+
+ (define multiply-at-av (lambda (u v i n)
+                         (if (< i n)
+                          (begin
+                           (set! (vector-ref u i) (+ (vector-ref u i) 0.0))
+                           (multiply-at-av u v (+ 1 i) n))
+                          0)))
+
+ (define dot (lambda (v u n)
+              (let* ((f (lambda (v u n i sum)
+                          (if (eq n i)
+                            sum
+                            (let ((v0 (vector-ref v i))
+                                  (u0 (vector-ref u i)))
+                              (f v u n (+ i 1) (+ (* v0 v0) (* u0 u0))))))))
+                (f v u n 0 0))))
+
+ (define spectral-norm-test (lambda (u v n i limit)
+                             (if (< i limit)
+                              (begin 
+                               (multiply-at-av u v 0 n)
+                               (multiply-at-av v u 0 n))
+                              (/ (dot u v n) (dot v v n)))))
+
+ (define spectral-norm (lambda (n)
+                        (let ((u (make-vector n 1.0))
+                              (v (make-vector n 0.0)))
+                         (spectral-norm-test u v n 0 10))))
+
+ (disassemble 'a)
+ (disassemble 'multiply-at-av)
+ (disassemble 'dot)
+ (disassemble 'spectral-norm-test)
+ (disassemble 'spectral-norm)
+ (spectral-norm 128))
+>5500
