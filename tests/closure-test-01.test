@@ -1,0 +1,5 @@
+(begin (define fn (lambda () (let ((x 0) (y (lambda () (set! x (+ 1 x)) x))) y))) (let ((x (fn))) (print (x)) (print (x)) (print (x))))
+>1
+2
+3
+'()
