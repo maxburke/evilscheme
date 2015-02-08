@@ -244,6 +244,8 @@ gc_alloc(struct heap_t *heap, enum evil_tag_t type, size_t extra_bytes)
     {
         object = gc_alloc_vector(heap, 2);
         object->tag_count.tag = TAG_PAIR;
+        *RAW_CAR(object) = make_empty_ref();
+        *RAW_CDR(object) = make_empty_ref();
 
         return object;
     }
