@@ -82,6 +82,21 @@ make_ref(struct evil_object_t *ptr)
     return *ptr;
 }
 
+static inline struct evil_object_t
+make_inner_reference(struct evil_object_t *object, int64_t index)
+{
+    struct evil_object_t inner_reference;
+
+    assert(index >= 0 && index < 65536);
+
+    inner_reference.tag_count.tag = TAG_INNER_REFERENCE;
+    inner_reference.tag_count.flag = 0;
+    inner_reference.tag_count.count = (unsigned short)index;
+    inner_reference.value.ref = object;
+
+    return inner_reference;
+}
+
 /*
  * This helper method creates a reference to the empty pair object. The
  * compiler shouldn't ever barf on a NULL value as the empty pair is used
@@ -114,9 +129,24 @@ make_fixnum_object(int64_t value)
 static inline struct evil_object_t *
 deref(struct evil_object_t *ptr)
 {
-    assert(ptr->tag_count.tag != TAG_INNER_REFERENCE);
+    /*
+     * assert(ptr->tag_count.tag != TAG_INNER_REFERENCE);
+     */
 
-    return (ptr == NULL) ? NULL : ((ptr->tag_count.tag == TAG_REFERENCE) ? ptr->value.ref : ptr);
+    if (ptr == NULL)
+    {
+        return NULL;
+    }
+
+    switch (ptr->tag_count.tag)
+    {
+        case TAG_REFERENCE:
+            return ptr->value.ref;
+        case TAG_INNER_REFERENCE:
+            return ptr->value.ref + ptr->tag_count.count;
+        default:
+            return ptr;
+    }
 }
 
 /*
