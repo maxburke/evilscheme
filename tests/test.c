@@ -85,7 +85,7 @@ evil_printf(const char *format, ...)
     assert(print_buffer_size >= print_buffer_offset);
     buffer_space = print_buffer_size - print_buffer_offset;
     required_length = vsnprintf(print_buffer + print_buffer_offset, buffer_space, format, args);
-    assert(required_length >= 0);
+    assert(buffer_space == 0 || required_length >= 0);
 
     if (buffer_space < (size_t)required_length)
     {
