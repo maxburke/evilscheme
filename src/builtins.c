@@ -174,7 +174,7 @@ evil_vector_ref(struct evil_environment_t *environment, int num_args, struct evi
     index = evil_coerce_fixnum(element);
     assert(index < 65536);
 
-    return make_ref(VECTOR_BASE(vector) + index);
+    return make_inner_reference(VECTOR_BASE(vector), index);
 }
 
 struct evil_object_t
