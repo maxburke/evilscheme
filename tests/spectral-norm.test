@@ -5,12 +5,33 @@
                          (/ (+ i (+ j 1)) 2.0)) 
                       (+ i 1)))))
 
- (define multiply-at-av (lambda (u v i n)
-                         (if (< i n)
-                          (begin
-                           (set! (vector-ref u i) (+ (vector-ref u i) 0.0))
-                           (multiply-at-av u v (+ 1 i) n))
-                          0)))
+ (define a-times-u-core (lambda (u au i j n)
+                         (set! (vector-ref au i) (+ (vector-ref au j) (a i j)))
+                         (if (< j n)
+                          (a-times-u-core u au i (+ j 1) n))))
+
+ (define a-times-u (lambda (u au i n)
+                    (set! (vector-ref au i) 0)
+                    (a-times-u-core u au i 0 n)
+                    (if (< i n)
+                     (a-times-u u au (+ i 1) n))))
+
+ (define at-times-u-core (lambda (u au i j n)
+                          (set! (vector-ref au i) (+ (vector-ref au j) (a j i)))
+                          (if (< j n)
+                           (a-times-u-core u au i (+ j 1) n))))
+
+ (define at-times-u (lambda (u au i n)
+                     (set! (vector-ref au i) 0)
+                     (a-times-u-core u au i 0 n)
+                     (if (< i n)
+                      (at-times-u u au (+ i 1) n))))
+
+ (define ata-times-u (lambda (u atau n)
+                      (let ((v (make-vector n)))
+                       (a-times-u u v 0 n)
+                       (at-times-u v atau 0 n))))
+
 
  (define dot (lambda (v u n)
               (let* ((f (lambda (v u n i sum)
@@ -21,11 +42,16 @@
                               (f v u n (+ i 1) (+ (* v0 v0) (* u0 u0))))))))
                 (f v u n 0 0))))
 
+ (define spectral-norm-test-core (lambda (u v n i limit)
+                                  (if (< i limit)
+                                   (begin
+                                    (ata-times-u u v n)
+                                    (ata-times-u v u n)
+                                    (spectral-norm-test-core u v n (+ i 1) limit)))))
+
  (define spectral-norm-test (lambda (u v n i limit)
-                             (if (< i limit)
-                              (begin 
-                               (multiply-at-av u v 0 n)
-                               (multiply-at-av v u 0 n))
+                             (begin
+                              (spectran-norm-test-core u v n i limit)
                               (/ (dot u v n) (dot v v n)))))
 
  (define spectral-norm (lambda (n)
@@ -34,7 +60,11 @@
                          (spectral-norm-test u v n 0 10))))
 
  (disassemble 'a)
- (disassemble 'multiply-at-av)
+ (disassemble 'a-times-u-core)
+ (disassemble 'a-times-u)
+ (disassemble 'at-times-u-core)
+ (disassemble 'at-times-u)
+ (disassemble 'ata-times-u)
  (disassemble 'dot)
  (disassemble 'spectral-norm-test)
  (disassemble 'spectral-norm)
