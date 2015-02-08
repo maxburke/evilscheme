@@ -535,6 +535,10 @@ vm_run(struct evil_environment_t *environment, struct evil_object_t *initial_fun
     sp = vm_push_ref(sp, NULL);                 /* program area chain */
     sp = vm_push_return_address(sp, NULL, 0);   /* return address */
     sp -= vm_extract_num_locals(procedure);
+
+/*
+ * TODO: Remove this!!!!
+ */
 static int insn_count;
     for (;;)
     {
