@@ -210,7 +210,13 @@ enum opcode_t
      * compiler. This is eliminated by an "optimization" pass at the end of
      * compilation.
      */
-    OPCODE_NOP
+    OPCODE_NOP,
+
+    /*
+     * This last opcode is for VM tracing to help identify bad data in the
+     * bytecode stream.
+     */
+    OPCODE_UNKNOWN
 };
 
 enum procedure_field_index_t

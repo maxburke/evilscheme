@@ -40,10 +40,14 @@ DISABLE_WARNING(4996)
 
 #define ENABLE_VM_TRACING 0
 
+#define VM_TRACE_OP_IMPL(x) do { fprintf(stderr, "[vm] %32s program_area begin: %p sp begin: %p", #x, (void *)program_area, (void *)sp); } while (0)
+#define VM_TRACE_IMPL(x) do { fprintf(stderr, "[vm] %s", x); } while (0)
+#define VM_TRACE_STACK() fprintf(stderr, " sp end: %p\n", (void *)sp); vm_trace_stack(environment, sp, program_area)
+
 #if ENABLE_VM_TRACING
-#   define VM_TRACE_OP(x) do { fprintf(stderr, "[vm] %32s program_area begin: %p sp begin: %p", #x, (void *)program_area, (void *)sp); } while (0)
-#   define VM_TRACE(x) do { fprintf(stderr, "[vm] %s", x); } while (0)
-#   define VM_CONTINUE() fprintf(stderr, " sp end: %p\n", (void *)sp); vm_trace_stack(environment, sp, program_area); continue
+#   define VM_TRACE_OP(x) VM_TRACE_OP_IMPL(x)
+#   define VM_TRACE(x) VM_TRACE_IMPL(x)
+#   define VM_CONTINUE() VM_TRACE_STACK(); continue
 #else
 #   define VM_TRACE_OP(x)
 #   define VM_TRACE(x)
@@ -228,21 +232,6 @@ vm_push_bool(struct evil_object_t *sp, int val)
     *(sp--) = boolean;
 
     return sp;
-}
-
-static inline struct evil_object_t
-vm_create_inner_reference(struct evil_object_t *object, int64_t index)
-{
-    struct evil_object_t inner_reference;
-
-    assert(index >= 0 && index < 65536);
-
-    inner_reference.tag_count.tag = TAG_INNER_REFERENCE;
-    inner_reference.tag_count.flag = 0;
-    inner_reference.tag_count.count = (unsigned short)index;
-    inner_reference.value.ref = object;
-
-    return inner_reference;
 }
 
 static inline unsigned char
@@ -546,9 +535,10 @@ vm_run(struct evil_environment_t *environment, struct evil_object_t *initial_fun
     sp = vm_push_ref(sp, NULL);                 /* program area chain */
     sp = vm_push_return_address(sp, NULL, 0);   /* return address */
     sp -= vm_extract_num_locals(procedure);
-
+static int insn_count;
     for (;;)
     {
+++insn_count;
         unsigned byte = *pc++;
 
         switch (byte)
@@ -687,7 +677,7 @@ vm_run(struct evil_environment_t *environment, struct evil_object_t *initial_fun
                     VM_ASSERT(ref->tag_count.tag == TAG_REFERENCE);
                     VM_ASSERT(index->tag_count.tag == TAG_FIXNUM);
 
-                    *ref = vm_create_inner_reference(ref->value.ref, index->value.fixnum_value);
+                    *ref = make_inner_reference(ref->value.ref, index->value.fixnum_value);
                     ++sp;
                 }
                 VM_CONTINUE();
@@ -696,12 +686,13 @@ vm_run(struct evil_environment_t *environment, struct evil_object_t *initial_fun
                 {
                     struct evil_object_t *source = sp + 2;
                     struct evil_object_t *ref = sp + 1;
-                    struct evil_object_t *ref_obj = ref->value.ref;
+
+                    VM_ASSERT(ref->tag_count.tag == TAG_REFERENCE || ref->tag_count.tag == TAG_INNER_REFERENCE);
+
+                    struct evil_object_t *ref_obj = deref(ref);
+
                     unsigned short ref_index = ref->tag_count.count;
-
-                    const unsigned char target_type = ref_obj->tag_count.tag;
-
-                    VM_ASSERT(target_type == TAG_STRING || target_type == TAG_VECTOR);
+                    unsigned char target_type = ref_obj->tag_count.tag;
 
                     if (target_type == TAG_STRING)
                     {
@@ -716,10 +707,7 @@ vm_run(struct evil_environment_t *environment, struct evil_object_t *initial_fun
                     }
                     else
                     {
-                        struct evil_object_t *target;
-
-                        target = vm_vector_index(ref_obj, ref_index);
-                        *target = *source;
+                        *ref_obj = *source;
                     }
 
                     sp += 2;
@@ -1079,6 +1067,8 @@ vm_run(struct evil_environment_t *environment, struct evil_object_t *initial_fun
                 VM_TRACE_OP(OPCODE_NOP);
                 VM_CONTINUE();
             default:
+                VM_TRACE_OP_IMPL(OPCODE_UNKNOWN);
+                VM_TRACE_STACK();
                 BREAK();
                 VM_CONTINUE();
         }
