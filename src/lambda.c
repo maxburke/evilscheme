@@ -244,7 +244,7 @@ compile_if(struct compiler_context_t *context, struct instruction_t *next, struc
     test_form = CAR(body);
     temp = CDR(body);
     consequent_form = CAR(temp);
-    alternate_form = CAR(CDR(temp));
+    alternate_form = CDR(temp);
 
     test_code = compile_form(context, next, test_form);
 
@@ -285,7 +285,9 @@ compile_if(struct compiler_context_t *context, struct instruction_t *next, struc
         return nop;
     }
 
-    alternate_code = compile_form(context, cond_br, alternate_form);
+    assert(alternate_form->tag_count.tag == TAG_PAIR);
+
+    alternate_code = compile_form(context, cond_br, CAR(alternate_form));
     br->link.next = &alternate_code->link;
     br->reloc = nop;
     consequent_code = compile_form(context, br, consequent_form);
