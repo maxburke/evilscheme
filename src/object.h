@@ -133,14 +133,12 @@ deref(struct evil_object_t *ptr)
      * assert(ptr->tag_count.tag != TAG_INNER_REFERENCE);
      */
 
-    if (ptr == NULL)
-    {
-        return NULL;
-    }
+    assert(ptr != NULL);
 
     switch (ptr->tag_count.tag)
     {
         case TAG_REFERENCE:
+            assert(ptr->value.ref != NULL);
             return ptr->value.ref;
         case TAG_INNER_REFERENCE:
             return ptr->value.ref + ptr->tag_count.count;

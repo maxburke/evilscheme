@@ -51,7 +51,7 @@
 
  (define spectral-norm-test (lambda (u v n i limit)
                              (begin
-                              (spectran-norm-test-core u v n i limit)
+                              (spectral-norm-test-core u v n i limit)
                               (/ (dot u v n) (dot v v n)))))
 
  (define spectral-norm (lambda (n)

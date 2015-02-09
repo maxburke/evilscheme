@@ -38,7 +38,7 @@ DISABLE_WARNING(4996)
 #   define VM_ASSERT(x)
 #endif
 
-#define ENABLE_VM_TRACING 0
+#define ENABLE_VM_TRACING 1
 
 #define VM_TRACE_OP_IMPL(x) do { fprintf(stderr, "[vm] %32s program_area begin: %p sp begin: %p", #x, (void *)program_area, (void *)sp); } while (0)
 #define VM_TRACE_IMPL(x) do { fprintf(stderr, "[vm] %s", x); } while (0)
@@ -125,8 +125,8 @@ vm_compare_equal(const struct evil_object_t *a, const struct evil_object_t *b);
     } while (0)
 
 #define CMPN_IMPL(OP) {                                                                     \
-        struct evil_object_t *a = deref(sp + 1);                                                 \
-        struct evil_object_t *b = deref(sp + 2);                                                 \
+        struct evil_object_t *a = deref(sp + 1);                                            \
+        struct evil_object_t *b = deref(sp + 2);                                            \
         unsigned char a_tag = a->tag_count.tag;                                             \
         unsigned char b_tag = b->tag_count.tag;                                             \
         int result;                                                                         \
@@ -141,8 +141,8 @@ vm_compare_equal(const struct evil_object_t *a, const struct evil_object_t *b);
     }
 
 #define NUMERIC_BINOP(OP) {                                                                 \
-        struct evil_object_t *a = deref(sp + 2);                                                 \
-        struct evil_object_t *b = deref(sp + 1);                                                 \
+        struct evil_object_t *a = deref(sp + 2);                                            \
+        struct evil_object_t *b = deref(sp + 1);                                            \
         unsigned char a_tag = a->tag_count.tag;                                             \
         unsigned char b_tag = b->tag_count.tag;                                             \
                                                                                             \
@@ -161,8 +161,8 @@ vm_compare_equal(const struct evil_object_t *a, const struct evil_object_t *b);
     }
 
 #define FIXNUM_BINOP(OP) {                                                                  \
-        struct evil_object_t *a = deref(sp + 2);                                                 \
-        struct evil_object_t *b = deref(sp + 1);                                                 \
+        struct evil_object_t *a = deref(sp + 2);                                            \
+        struct evil_object_t *b = deref(sp + 1);                                            \
         unsigned char a_tag = a->tag_count.tag;                                             \
         unsigned char b_tag = b->tag_count.tag;                                             \
         UNUSED(a_tag);                                                                      \
@@ -238,7 +238,7 @@ static inline void
 vm_demote_numeric(struct evil_object_t *object)
 {
 #if ENABLE_VM_ASSERTS
-    VM_ASSERT_NOTRACE(object->tag_count.tag == TAG_FLONUM);
+    VM_ASSERT_NOTRACE(object->tag_count.tag == TAG_FIXNUM);
 #endif
 
     object->tag_count.tag = TAG_FLONUM;
