@@ -126,7 +126,7 @@ evil_make_vector(struct evil_environment_t *environment, int num_args, struct ev
     vector = gc_alloc_vector(environment->heap, fixnum_size);
     vector_fill_args[0] = make_ref(vector);
 
-    vector_fill_args[1] = (num_args == 2) ? *fill : make_ref(empty_pair);
+    vector_fill_args[1] = (num_args == 2) ? *fill : make_fixnum_object(0);
 
     return evil_vector_fill(environment, 2, vector_fill_args);
 }
@@ -173,6 +173,7 @@ evil_vector_ref(struct evil_environment_t *environment, int num_args, struct evi
 
     index = evil_coerce_fixnum(element);
     assert(index < 65536);
+    assert(index < vector->tag_count.count);
 
     return make_inner_reference(VECTOR_BASE(vector), index);
 }
