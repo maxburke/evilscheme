@@ -33,6 +33,18 @@
     <ClCompile Include="src\vm.c" />
     <ClCompile Include="tests\test.c" />
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="include\evil_scheme.h" />
+    <ClInclude Include="src\base.h" />
+    <ClInclude Include="src\dlist.h" />
+    <ClInclude Include="src\environment.h" />
+    <ClInclude Include="src\gc.h" />
+    <ClInclude Include="src\linear_allocator.h" />
+    <ClInclude Include="src\object.h" />
+    <ClInclude Include="src\runtime.h" />
+    <ClInclude Include="src\slist.h" />
+    <ClInclude Include="src\vm.h" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{86048E59-DBC0-4531-9E2B-D293C834F972}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
