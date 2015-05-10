@@ -85,7 +85,6 @@ evil_printf(const char *format, ...)
     assert(print_buffer_size >= print_buffer_offset);
     buffer_space = print_buffer_size - print_buffer_offset;
     required_length = vsnprintf(print_buffer + print_buffer_offset, buffer_space, format, args);
-    assert(buffer_space == 0 || required_length >= 0);
 
     if (buffer_space < (size_t)required_length)
     {
@@ -563,6 +562,7 @@ struct test_t
 {
     uint64_t ticks;
     int success;
+    int broken;
     char filename[260];
 };
 
@@ -699,7 +699,7 @@ print_unit_test_summary(struct test_t *tests, int num_tests)
                 tests[i].filename,
                 (int)(max_test_name_length - test_name_length),
                 "",
-                tests[i].success ? "passed" : "FAILED",
+                tests[i].broken ? "*** BROKEN ***" : (tests[i].success ? "passed" : "FAILED"),
                 test_time);
 
         if (tests[i].success)
@@ -783,6 +783,7 @@ evil_run_tests(int argc, char *argv[])
     struct evil_environment_t *environment;
     int num_tests;
     int num_passed;
+    int num_broken;
     int i;
     struct test_t *tests;
 
@@ -790,6 +791,7 @@ evil_run_tests(int argc, char *argv[])
 
     num_tests = 0;
     num_passed = 0;
+    num_broken = 0;
 
     tests = initialize_tests(TEST_DIR, argc, argv, &num_tests);
     environment = create_test_environment();
@@ -808,6 +810,13 @@ evil_run_tests(int argc, char *argv[])
         filename = tests[i].filename;
         test_file = read_test_file(filename);
         test_end = test_file + strlen(test_file);
+        test = NULL;
+
+        if (strstr(test_file, "#!broken") != NULL)
+        {
+            tests[i].broken = 1;
+            goto next_test;
+        }
 
         test_end = remove_character(test_file, test_end, '\r');
         test_end = remove_comments(test_file, test_end);
@@ -853,7 +862,10 @@ evil_run_tests(int argc, char *argv[])
         num_passed += result;
 
     next_test:
-        free(test);
+        if (test)
+        {
+            free(test);
+        }
     }
 
     print_test_summary(tests, num_tests);
