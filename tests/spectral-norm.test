@@ -1,3 +1,4 @@
+#!broken
 (begin
 
  (define a (lambda (i j)
@@ -28,7 +29,7 @@
                       (at-times-u u au (+ i 1) n))))
 
  (define ata-times-u (lambda (u atau n)
-                      (let ((v (make-vector n)))
+                      (let ((v (make-vector (+ n 1))))
                        (a-times-u u v 0 n)
                        (at-times-u v atau 0 n))))
 
@@ -55,9 +56,9 @@
                               (/ (dot u v n) (dot v v n)))))
 
  (define spectral-norm (lambda (n)
-                        (let ((u (make-vector n 1.0))
-                              (v (make-vector n 0.0)))
-                         (spectral-norm-test u v n 0 10))))
+                        (let ((u (make-vector (+ n 1) 1.0))
+                              (v (make-vector (+ n 1) 0.0)))
+                         (spectral-norm-test u v (- n 1) 0 10))))
 
  (disassemble 'a)
  (disassemble 'a-times-u-core)
