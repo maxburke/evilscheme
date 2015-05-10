@@ -649,8 +649,10 @@ initialize_tests(const char *directory_name, int argc, char *argv[], int *num_te
         }
 
         tests = realloc(tests, (sizeof(struct test_t) * (num_tests + 1)));
-        memmove(tests[num_tests].filename, filename, sizeof filename);
+        tests[num_tests].ticks = 0;
         tests[num_tests].success = 0;
+        tests[num_tests].broken = 0;
+        memmove(tests[num_tests].filename, filename, sizeof filename);
 
         ++num_tests;
     }
