@@ -671,11 +671,13 @@ static void
 print_unit_test_summary(struct test_t *tests, int num_tests)
 {
     int num_passed;
+    int num_broken;
     int i;
     size_t max_test_name_length;
     double ticks_to_ms;
 
     num_passed = 0;
+    num_broken = 0;
     max_test_name_length = 0;
     ticks_to_ms = 1000.0 / (double)get_tick_frequency();
 
@@ -693,24 +695,40 @@ print_unit_test_summary(struct test_t *tests, int num_tests)
     {
         size_t test_name_length;
         double test_time;
+        const char *status;
 
         test_name_length = strlen(tests[i].filename);
         test_time = (double)tests[i].ticks * ticks_to_ms;
+
+        if (tests[i].broken)
+        {
+            status = "BROKEN";
+            ++num_broken;
+        }
+        else
+        {
+            if (tests[i].success)
+            {
+                status = "passed";
+                ++num_passed;
+            }
+            else
+            {
+                status = "FAILED";
+            }
+        }
 
         printf("    %s %*s %s (%.2f ms)\n",
                 tests[i].filename,
                 (int)(max_test_name_length - test_name_length),
                 "",
-                tests[i].broken ? "*** BROKEN ***" : (tests[i].success ? "passed" : "FAILED"),
+                status,
                 test_time);
-
-        if (tests[i].success)
-        {
-            ++num_passed;
-        }
     }
 
-    printf("\n%d/%d passed\n", num_passed, num_tests);
+    printf("\npassed: %d\n", num_passed);
+    printf("broken: %d\n", num_broken);
+    printf("failed: %d\n", num_tests - num_passed - num_broken);
 }
 
 static void
