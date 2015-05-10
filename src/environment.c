@@ -40,10 +40,10 @@ get_bound_location(struct evil_environment_t *environment, uint64_t symbol_hash,
         }
 
         if (!recurse)
-            return NULL;
+            return empty_pair;
     }
 
-    return NULL;
+    return empty_pair;
 }
 
 struct evil_object_t *
@@ -56,7 +56,7 @@ bind(struct evil_environment_t *environment, struct evil_object_t symbol)
 
     assert(symbol.tag_count.tag == TAG_SYMBOL);
     location = get_bound_location(environment, symbol.value.symbol_hash, 0);
-    if (location != NULL)
+    if (location != empty_pair)
         return location;
 
     for (current_fragment = environment->symbol_table_fragment;

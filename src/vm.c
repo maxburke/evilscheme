@@ -38,7 +38,7 @@ DISABLE_WARNING(4996)
 #   define VM_ASSERT(x)
 #endif
 
-#define ENABLE_VM_TRACING 1
+#define ENABLE_VM_TRACING 0
 
 #define VM_TRACE_OP_IMPL(x) do { fprintf(stderr, "[vm] %32s program_area begin: %p sp begin: %p", #x, (void *)program_area, (void *)sp); } while (0)
 #define VM_TRACE_IMPL(x) do { fprintf(stderr, "[vm] %s", x); } while (0)
@@ -125,8 +125,8 @@ vm_compare_equal(const struct evil_object_t *a, const struct evil_object_t *b);
     } while (0)
 
 #define CMPN_IMPL(OP) {                                                                     \
-        struct evil_object_t *a = deref(sp + 1);                                            \
-        struct evil_object_t *b = deref(sp + 2);                                            \
+        struct evil_object_t *a = value_deref(sp + 1);                                      \
+        struct evil_object_t *b = value_deref(sp + 2);                                      \
         unsigned char a_tag = a->tag_count.tag;                                             \
         unsigned char b_tag = b->tag_count.tag;                                             \
         int result;                                                                         \
@@ -141,8 +141,8 @@ vm_compare_equal(const struct evil_object_t *a, const struct evil_object_t *b);
     }
 
 #define NUMERIC_BINOP(OP) {                                                                 \
-        struct evil_object_t *a = deref(sp + 2);                                            \
-        struct evil_object_t *b = deref(sp + 1);                                            \
+        struct evil_object_t *a = value_deref(sp + 2);                                      \
+        struct evil_object_t *b = value_deref(sp + 1);                                      \
         unsigned char a_tag = a->tag_count.tag;                                             \
         unsigned char b_tag = b->tag_count.tag;                                             \
                                                                                             \
@@ -161,8 +161,8 @@ vm_compare_equal(const struct evil_object_t *a, const struct evil_object_t *b);
     }
 
 #define FIXNUM_BINOP(OP) {                                                                  \
-        struct evil_object_t *a = deref(sp + 2);                                            \
-        struct evil_object_t *b = deref(sp + 1);                                            \
+        struct evil_object_t *a = value_deref(sp + 2);                                      \
+        struct evil_object_t *b = value_deref(sp + 1);                                      \
         unsigned char a_tag = a->tag_count.tag;                                             \
         unsigned char b_tag = b->tag_count.tag;                                             \
         UNUSED(a_tag);                                                                      \
@@ -205,16 +205,34 @@ vm_push_return_address(struct evil_object_t *sp, struct evil_object_t *fn, unsig
 }
 
 static inline struct evil_object_t *
-vm_push_ref(struct evil_object_t *sp, struct evil_object_t *object)
+vm_push_null_ref(struct evil_object_t *sp)
 {
-    struct evil_object_t return_address;
+    struct evil_object_t object;
 
-    return_address.tag_count.tag = TAG_REFERENCE;
-    return_address.tag_count.flag = 0;
-    return_address.tag_count.count = 1;
-    return_address.value.ref = object;
+    object.tag_count.tag = TAG_REFERENCE;
+    object.tag_count.flag = 0;
+    object.tag_count.count = 1;
+    object.value.ref = NULL;
 
-    *(sp--) = return_address;
+    *(sp--) = object;
+
+    return sp;
+}
+
+static inline struct evil_object_t *
+vm_push_ref(struct evil_object_t *sp, struct evil_object_t *ptr)
+{
+    struct evil_object_t object;
+
+    assert(ptr != NULL);
+if (ptr->tag_count.tag == TAG_INVALID)
+    BREAK();
+    object.tag_count.tag = TAG_REFERENCE;
+    object.tag_count.flag = 0;
+    object.tag_count.count = 1;
+    object.value.ref = ptr;
+
+    *(sp--) = object;
 
     return sp;
 }
@@ -426,10 +444,16 @@ vm_trace_stack(struct evil_environment_t *environment, struct evil_object_t *sp,
                 break;
                 break;
             case TAG_PROCEDURE:
+                fprintf(stderr, "ERROR: PROCEDURE TYPE ON STACK");
+                break;
             case TAG_PAIR:
+                fprintf(stderr, "ERROR: PAIR TYPE ON STACK");
+                break;
             case TAG_VECTOR:
+                fprintf(stderr, "ERROR: VECTOR TYPE ON STACK");
+                break;
             case TAG_STRING:
-                fprintf(stderr, "ERROR: REFERENCE TYPE ON STACK");
+                fprintf(stderr, "ERROR: STRING TYPE ON STACK");
                 break;
         }
 
@@ -515,7 +539,7 @@ vm_run(struct evil_environment_t *environment, struct evil_object_t *initial_fun
      */
     program_area = sp + 1;
 
-    sp = vm_push_ref(sp, NULL);                 /* program area chain */
+    sp = vm_push_null_ref(sp);                  /* program area chain */
     sp = vm_push_return_address(sp, NULL, 0);   /* return address */
     sp -= vm_extract_num_locals(procedure);
 
@@ -651,8 +675,22 @@ static int insn_count;
                     }
                     else
                     {
+                        struct evil_object_t *dereffed_value;
+
                         object = ref;
-                        *ref = *deref(object);
+                        dereffed_value = deref(object);
+
+                        if (dereffed_value == empty_pair)
+                        {
+                            /*
+                             * TODO: Loading from empty ptr is probably bad.
+                             * Would be a good opportunity to break execution
+                             * and enter the debugger.
+                             */
+                            BREAK();
+                        }
+
+                        *ref = *dereffed_value;
                     }
                 }
                 VM_CONTINUE();
@@ -694,7 +732,7 @@ static int insn_count;
                     }
                     else
                     {
-                        *ref_obj = *source;
+                        *ref_obj = *deref(source);
                     }
 
                     sp += 2;
@@ -827,7 +865,7 @@ static int insn_count;
                          * Save the return address and create space for the local slots.
                          */
                         sp = vm_push_ref(sp, old_program_area);
-                        sp = vm_push_return_address(sp, fn, (unsigned short)return_offset);
+                        sp = vm_push_return_address(sp, procedure, (unsigned short)return_offset);
                         sp -= vm_extract_num_locals(fn);
 
                         /*
@@ -1000,11 +1038,11 @@ static int insn_count;
 
                     if (parent != NULL)
                     {
-                        pc = vm_extract_code_pointer(parent) + return_address->tag_count.count;
-                        pc_base = pc;
-                        procedure = parent;
+                        pc_base = vm_extract_code_pointer(parent);
+                        pc = pc_base + return_address->tag_count.count;
 
                         sp = program_area + vm_extract_num_args(procedure) - 2;
+                        procedure = parent;
                         *(sp + 1) = *return_value;
 
                         program_area = deref(prev_program_area_ref);

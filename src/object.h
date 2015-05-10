@@ -69,6 +69,8 @@ make_ref(struct evil_object_t *ptr)
 {
     struct evil_object_t ref;
 
+    assert(ptr != NULL);
+
     if (is_reference_type(ptr))
     {
         ref.tag_count.tag = TAG_REFERENCE;
@@ -88,6 +90,7 @@ make_inner_reference(struct evil_object_t *object, int64_t index)
     struct evil_object_t inner_reference;
 
     assert(index >= 0 && index < 65536);
+    assert(object != NULL);
 
     inner_reference.tag_count.tag = TAG_INNER_REFERENCE;
     inner_reference.tag_count.flag = 0;
@@ -144,6 +147,24 @@ deref(struct evil_object_t *ptr)
             return ptr->value.ref + ptr->tag_count.count;
         default:
             return ptr;
+    }
+}
+
+static inline struct evil_object_t *
+value_deref(struct evil_object_t *ptr)
+{
+    for (;;)
+    {
+        struct evil_object_t *dereffed;
+
+        dereffed = deref(ptr);
+
+        if (dereffed == ptr)
+        {
+            return dereffed;
+        }
+
+        ptr = dereffed;
     }
 }
 
