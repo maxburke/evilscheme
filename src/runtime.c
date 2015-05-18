@@ -105,6 +105,11 @@ environment_initialize(struct evil_environment_t *environment)
         procedure->tag_count.tag = TAG_SPECIAL_FUNCTION;
         procedure_base = VECTOR_BASE(procedure);
 
+        /*
+         * TODO: When functions get a lexical environment instead of
+         * environment this will need to be altered.
+         * -mburke 2015/05/17
+         */
         procedure_base[FIELD_ENVIRONMENT] = make_ref((struct evil_object_t *)environment);
         procedure_base[FIELD_NUM_ARGS] = make_fixnum_object(initializers[i].num_args);
         procedure_base[FIELD_NUM_LOCALS] = make_fixnum_object(0);
@@ -130,6 +135,7 @@ evil_environment_create(void *stack, size_t stack_size, void *heap_mem, size_t h
      * newly allocated values.
      */
     struct evil_environment_t *env;
+    struct evil_object_t *lexical_environment_ptr;
 
     heap = gc_create(heap_mem, heap_size);
 
@@ -149,7 +155,11 @@ evil_environment_create(void *stack, size_t stack_size, void *heap_mem, size_t h
     memset(stack, 0, stack_size);
 
     env->heap = heap;
-    env->symbol_table_fragment = NULL;
+
+    lexical_environment_ptr = gc_alloc_vector(heap, FIELD_LEX_ENV_NUM_FIELDS);
+    VECTOR_BASE(lexical_environment_ptr)[FIELD_LEX_ENV_PARENT_ENVIRONMENT] = make_empty_ref();
+    VECTOR_BASE(lexical_environment_ptr)[FIELD_LEX_ENV_SYMBOL_TABLE_FRAGMENT] = make_empty_ref();
+    env->lexical_environment = make_ref(lexical_environment_ptr);
 
     environment_initialize(env);
     gc_set_environment(heap, env);

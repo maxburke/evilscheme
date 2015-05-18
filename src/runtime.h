@@ -21,6 +21,13 @@ struct interned_symbol_names_table_t
     struct symbol_string_internment_page_t *string_internment_page_base;
 };
 
+enum lexical_environment_fields_t
+{
+    FIELD_LEX_ENV_PARENT_ENVIRONMENT,
+    FIELD_LEX_ENV_SYMBOL_TABLE_FRAGMENT,
+    FIELD_LEX_ENV_NUM_FIELDS
+};
+
 struct evil_environment_t
 {
     struct evil_tag_count_t tag_count;
@@ -34,9 +41,9 @@ struct evil_environment_t
     struct evil_object_t *stack_ptr;
 
     struct heap_t *heap;
-    struct evil_environment_t *parent_environment;
-    struct symbol_table_fragment_t *symbol_table_fragment;
+
     struct interned_symbol_names_table_t symbol_names;
+    struct evil_object_t lexical_environment;
 };
 
 struct evil_environment_t *

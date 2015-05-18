@@ -12,17 +12,14 @@
 #define NUM_ENTRIES_PER_FRAGMENT 16
 #define INVALID_HASH 0
 
-struct symbol_table_entry_t
+enum
 {
-    struct evil_object_t symbol;
-    struct evil_object_t object;
+    FIELD_SYMBOL_TABLE_FRAGMENT_NEXT_FRAGMENT,
+    FIELD_SYMBOL_TABLE_FRAGMENT_NUM = (2 * NUM_ENTRIES_PER_FRAGMENT) + 1
 };
 
-struct symbol_table_fragment_t
-{
-    struct symbol_table_entry_t entries[NUM_ENTRIES_PER_FRAGMENT];
-    struct symbol_table_fragment_t *next_fragment;
-};
+#define SYMBOL_AT(fragment, i) VECTOR_BASE(fragment)[(2 * (i)) + 2]
+#define OBJECT_AT(fragment, i) VECTOR_BASE(fragment)[(2 * (i)) + 1]
 
 struct evil_environment_t;
 

@@ -509,30 +509,6 @@ mark_evaluation_stack(struct heap_t *heap, struct evil_object_t *stack_ptr, stru
 }
 
 static void
-mark_symbol_table(struct heap_t *heap, struct symbol_table_fragment_t *symbol_table)
-{
-    while (symbol_table != NULL)
-    {
-        int i;
-        struct symbol_table_entry_t *entry;
-
-        entry = symbol_table->entries;
-
-        for (i = 0; i < NUM_ENTRIES_PER_FRAGMENT; ++i, ++entry)
-        {
-            assert(is_value_type(&entry->symbol));
-
-            if (entry->symbol.value.symbol_hash != INVALID_HASH)
-            {
-                scan_object(heap, &entry->object);
-            }
-        }
-
-        symbol_table = symbol_table->next_fragment;
-    }
-}
-
-static void
 mark_object_handles(struct heap_t *heap)
 {
     struct dlist_t *i;
@@ -550,7 +526,7 @@ static void
 mark_roots(struct heap_t *heap, struct evil_environment_t *environment)
 {
     mark_evaluation_stack(heap, environment->stack_ptr, environment->stack_top);
-    mark_symbol_table(heap, environment->symbol_table_fragment);
+    scan_object(heap, &environment->lexical_environment);
     mark_object_handles(heap);
 }
 

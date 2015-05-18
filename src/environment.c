@@ -12,74 +12,118 @@
 #include "object.h"
 #include "evil_scheme.h"
 #include "runtime.h"
+#include "gc.h"
 
 struct evil_object_t *
-get_bound_location(struct evil_environment_t *environment, uint64_t symbol_hash, int recurse)
+get_bound_location_impl(struct evil_object_t *lexical_environment, uint64_t symbol_hash, int recurse)
 {
-    struct evil_environment_t *current_environment;
-    struct symbol_table_fragment_t *fragment;
-    int i;
+    struct evil_object_t *lexical_environment_ptr;
 
-    for (current_environment = environment;
-            current_environment != NULL;
-            current_environment = current_environment->parent_environment)
+    for (lexical_environment_ptr = deref(lexical_environment);
+            lexical_environment_ptr != empty_pair;
+            lexical_environment_ptr = deref(&VECTOR_BASE(lexical_environment_ptr)[FIELD_LEX_ENV_PARENT_ENVIRONMENT]))
     {
-        for (fragment = current_environment->symbol_table_fragment;
-                fragment != NULL;
-                fragment = fragment->next_fragment)
+        struct evil_object_t *symbol_table_fragment;
+
+        for (symbol_table_fragment = deref(&VECTOR_BASE(lexical_environment_ptr)[FIELD_LEX_ENV_SYMBOL_TABLE_FRAGMENT]);
+                symbol_table_fragment != empty_pair;
+                symbol_table_fragment = deref(&VECTOR_BASE(symbol_table_fragment)[FIELD_SYMBOL_TABLE_FRAGMENT_NEXT_FRAGMENT]))
         {
-            struct symbol_table_entry_t *entries = fragment->entries;
+            int i;
 
             for (i = 0; i < NUM_ENTRIES_PER_FRAGMENT; ++i)
             {
-                if (entries[i].symbol.value.symbol_hash == symbol_hash)
+                if (SYMBOL_AT(symbol_table_fragment, i).value.symbol_hash == symbol_hash)
                 {
-                    return &entries[i].object;
+                    /*
+                     * TODO: Return an inner reference.
+                     */
+                    return &OBJECT_AT(symbol_table_fragment, i);
                 }
             }
         }
 
         if (!recurse)
+        {
             return empty_pair;
+        }
     }
 
     return empty_pair;
 }
 
 struct evil_object_t *
+get_bound_location(struct evil_environment_t *environment, uint64_t symbol_hash, int recurse)
+{
+    return get_bound_location_impl(&environment->lexical_environment, symbol_hash, recurse);
+}
+
+/*
+ * bind needs to take a lexical environment, not environment.
+ */
+struct evil_object_t *
 bind(struct evil_environment_t *environment, struct evil_object_t symbol)
 {
-    struct evil_object_t *location;
-    struct symbol_table_fragment_t *current_fragment;
-    struct symbol_table_fragment_t *new_fragment;
-    size_t i;
-
     assert(symbol.tag_count.tag == TAG_SYMBOL);
-    location = get_bound_location(environment, symbol.value.symbol_hash, 0);
+
+    struct evil_object_t *lexical_environment_ptr;
+    uint64_t symbol_hash;
+    struct evil_object_t *location;
+    struct evil_object_t *symbol_table_fragment;
+    struct evil_object_t *new_fragment;
+    int i;
+    struct evil_object_t default_symbol_value;
+
+    lexical_environment_ptr = deref(&environment->lexical_environment);
+    symbol_hash = symbol.value.symbol_hash;
+    location = get_bound_location_impl(lexical_environment_ptr, symbol_hash, 0);
+
     if (location != empty_pair)
-        return location;
-
-    for (current_fragment = environment->symbol_table_fragment;
-            current_fragment != NULL;
-            current_fragment = current_fragment->next_fragment)
     {
-        struct symbol_table_entry_t *entries = current_fragment->entries;
+        return location;
+    }
 
+    for (symbol_table_fragment = deref(&VECTOR_BASE(lexical_environment_ptr)[FIELD_LEX_ENV_SYMBOL_TABLE_FRAGMENT]);
+            symbol_table_fragment != empty_pair;
+            symbol_table_fragment = deref(&VECTOR_BASE(symbol_table_fragment)[FIELD_SYMBOL_TABLE_FRAGMENT_NEXT_FRAGMENT]))
+    {
         for (i = 0; i < NUM_ENTRIES_PER_FRAGMENT; ++i)
         {
-            if (entries[i].symbol.value.symbol_hash == INVALID_HASH)
+            struct evil_object_t *symbol_ptr;
+
+            symbol_ptr = &SYMBOL_AT(symbol_table_fragment, i);
+            if (symbol_ptr->value.symbol_hash == INVALID_HASH)
             {
-                entries[i].symbol = symbol;
-                return &entries[i].object;
+                *symbol_ptr = symbol;
+
+                /*
+                 * TODO: Return an inner reference.
+                 */
+                return &OBJECT_AT(symbol_table_fragment, i);
             }
         }
     }
 
-    new_fragment = calloc(sizeof(struct symbol_table_fragment_t), 1);
-    new_fragment->next_fragment = environment->symbol_table_fragment;
-    environment->symbol_table_fragment = new_fragment;
-    new_fragment->entries[0].symbol = symbol;
+    new_fragment = gc_alloc_vector(environment->heap, FIELD_SYMBOL_TABLE_FRAGMENT_NUM);
+    VECTOR_BASE(new_fragment)[FIELD_SYMBOL_TABLE_FRAGMENT_NEXT_FRAGMENT]
+        = make_ref(&VECTOR_BASE(lexical_environment_ptr)[FIELD_LEX_ENV_SYMBOL_TABLE_FRAGMENT]);
+    VECTOR_BASE(lexical_environment_ptr)[FIELD_LEX_ENV_SYMBOL_TABLE_FRAGMENT] = make_ref(new_fragment);
 
-    return &new_fragment->entries[0].object;
+    default_symbol_value.tag_count.tag = TAG_SYMBOL;
+    default_symbol_value.tag_count.flag = 0;
+    default_symbol_value.tag_count.count = 1;
+    default_symbol_value.value.symbol_hash = 0;
+
+    for (i = 1; i < NUM_ENTRIES_PER_FRAGMENT; ++i)
+    {
+        SYMBOL_AT(new_fragment, i) = default_symbol_value;
+        OBJECT_AT(new_fragment, i) = make_ref(empty_pair);
+    }
+
+    SYMBOL_AT(new_fragment, 0) = symbol;
+    /*
+     * TODO: Return an inner reference.
+     */
+    return &OBJECT_AT(new_fragment, 0);
 }
 
