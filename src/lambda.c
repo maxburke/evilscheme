@@ -77,6 +77,12 @@ struct function_local_t
     struct evil_object_t *object;
 };
 
+struct closure_variable_t
+{
+    struct slist_t link;
+    uint64_t symbol_hash;
+};
+
 struct compiler_context_t
 {
     struct compiler_context_t *previous_context;
@@ -88,6 +94,10 @@ struct compiler_context_t
     int max_stack_slots;
     int num_fn_locals;
     struct function_local_t *locals;
+    struct closure_variable_t *closure_variables;
+    struct evil_object_handle_t *lexical_environment;
+    struct evil_object_handle_t *parent_environment;
+    int closure_has_allocated_environment;
 };
 
 struct instruction_t
@@ -1095,6 +1105,30 @@ compile_type_predicate(struct compiler_context_t *context, struct instruction_t 
     return cmp_eq;
 }
 
+static struct compiler_context_t *
+symbol_is_local_in_previous_context(struct compiler_context_t *context, uint64_t symbol_hash)
+{
+    struct compiler_context_t *previous_context;
+    struct stack_slot_t *slots;
+
+    previous_context = context->previous_context;
+
+    if (previous_context == NULL)
+    {
+        return NULL;
+    }
+
+    for (slots = previous_context->stack_slots; slots != NULL; slots = (struct stack_slot_t *)slots->link.next)
+    {
+        if (slots->symbol_hash == symbol_hash)
+        {
+            return previous_context;
+        }
+    }
+
+    return symbol_is_local_in_previous_context(previous_context, symbol_hash);
+}
+
 static struct instruction_t *
 compile_form(struct compiler_context_t *context, struct instruction_t *next, struct evil_object_t *body)
 {
@@ -1102,6 +1136,7 @@ compile_form(struct compiler_context_t *context, struct instruction_t *next, str
     uint64_t symbol_hash;
     struct stack_slot_t *slot;
     struct instruction_t *bound_location;
+    struct compiler_context_t *closure_root_context;
 
     symbol_object = body;
 
@@ -1200,6 +1235,56 @@ compile_form(struct compiler_context_t *context, struct instruction_t *next, str
     if (slot != NULL)
     {
         return compile_load_slot(context, next, slot);
+    }
+
+    if ((closure_root_context = symbol_is_local_in_previous_context(context, symbol_object->value.symbol_hash)) != NULL)
+    {
+        struct closure_variable_t *closure_variable;
+        struct evil_object_t *lexical_environment_ptr;
+        struct evil_environment_t *environment;
+
+        environment = context->environment;
+        closure_variable = linear_allocator_alloc(closure_root_context->pool, sizeof(struct closure_variable_t));
+        closure_variable->link.next = &context->closure_variables->link;
+        closure_variable->symbol_hash = symbol_object->value.symbol_hash;
+        closure_root_context->closure_variables = closure_variable;
+
+        if (closure_root_context->lexical_environment == NULL)
+        {
+            struct evil_object_t *parent_environment;
+
+            lexical_environment_ptr = gc_alloc_vector(environment->heap, FIELD_LEX_ENV_NUM_FIELDS);
+
+            parent_environment = closure_root_context->parent_environment
+                ? evil_resolve_object_handle(closure_root_context->parent_environment)
+                : &closure_root_context->environment->lexical_environment;
+
+            VECTOR_BASE(lexical_environment_ptr)[FIELD_LEX_ENV_PARENT_ENVIRONMENT] = make_ref(parent_environment);
+            VECTOR_BASE(lexical_environment_ptr)[FIELD_LEX_ENV_SYMBOL_TABLE_FRAGMENT] = make_empty_ref();
+            closure_root_context->lexical_environment = evil_create_object_handle(environment, lexical_environment_ptr);
+            closure_root_context->closure_has_allocated_environment = 1;
+        }
+
+        lexical_environment_ptr = evil_resolve_object_handle(closure_root_context->lexical_environment);
+        context->parent_environment = evil_create_object_handle(environment, lexical_environment_ptr);
+        bind(environment, make_ref(lexical_environment_ptr), *symbol_object);
+
+        /*
+         * TODO: mburke 2015/05/10
+         * If the symbol is local in a previous context it needs to be demoting it
+         * to a pseudo-global by:
+         *   - creating a new environment for the caller if it does not exist
+         *   - replacing stack refs to GBL-based refs
+         *   - ensuring that the function being created has a reference to that
+         *     environment block
+         */
+
+        /*
+         * TODO: here's how to do it. If we notice this is a local in a parent scope,
+         * note it in the list of closed variables. Continue as if we are generating code
+         * for a normal global variable symbol reference. The stack value will be demoted
+         * in the appropriate scope.
+         */
     }
 
     bound_location = compile_get_bound_location(context, next, symbol_object);
@@ -1949,6 +2034,18 @@ evil_disassemble(struct evil_environment_t *environment, int num_args, struct ev
     return make_empty_ref();
 }
 
+static struct instruction_t *
+demote_closure_references(struct compiler_context_t *context, struct instruction_t *root)
+{
+    /*
+     * TODO: demote closure references!
+     */
+
+    BREAK();
+
+    return root;
+}
+
 static struct evil_object_t
 compile_form_to_bytecode(struct compiler_context_t *previous_context, struct evil_environment_t *environment, struct evil_object_t *lambda_body)
 {
@@ -1972,6 +2069,11 @@ compile_form_to_bytecode(struct compiler_context_t *previous_context, struct evi
     collapse_nops(root);
     eliminate_branch_to_return(root);
     root = promote_tailcalls(root);
+
+    if (context.closure_variables != NULL)
+    {
+        root = demote_closure_references(&context, root);
+    }
 
     procedure = assemble(environment, &context, root);
 

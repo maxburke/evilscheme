@@ -27,6 +27,6 @@ struct evil_object_t *
 get_bound_location(struct evil_environment_t *environment, uint64_t symbol_hash, int recurse);
 
 struct evil_object_t *
-bind(struct evil_environment_t *environment, struct evil_object_t symbol);
+bind(struct evil_environment_t *environment, struct evil_object_t lexical_environment, struct evil_object_t symbol);
 
 #endif

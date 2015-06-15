@@ -803,7 +803,6 @@ evil_run_tests(int argc, char *argv[])
     struct evil_environment_t *environment;
     int num_tests;
     int num_passed;
-    int num_broken;
     int i;
     struct test_t *tests;
 
@@ -811,7 +810,6 @@ evil_run_tests(int argc, char *argv[])
 
     num_tests = 0;
     num_passed = 0;
-    num_broken = 0;
 
     tests = initialize_tests(TEST_DIR, argc, argv, &num_tests);
     environment = create_test_environment();

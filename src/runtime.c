@@ -116,7 +116,7 @@ environment_initialize(struct evil_environment_t *environment)
         procedure_base[FIELD_NUM_FN_LOCALS] = make_fixnum_object(0);
         procedure_base[FIELD_CODE] = function;
 
-        place = bind(environment, symbol);
+        place = bind(environment, environment->lexical_environment, symbol);
         *place = make_ref(procedure);
     }
 }

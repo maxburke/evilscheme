@@ -33,6 +33,10 @@ get_bound_location_impl(struct evil_object_t *lexical_environment, uint64_t symb
 
             for (i = 0; i < NUM_ENTRIES_PER_FRAGMENT; ++i)
             {
+                /*
+                 * TODO: This can now bail out when it finds the first 
+                 * INVALID_HASH
+                 */
                 if (SYMBOL_AT(symbol_table_fragment, i).value.symbol_hash == symbol_hash)
                 {
                     /*
@@ -58,11 +62,33 @@ get_bound_location(struct evil_environment_t *environment, uint64_t symbol_hash,
     return get_bound_location_impl(&environment->lexical_environment, symbol_hash, recurse);
 }
 
+static void
+append_symbol_table_fragment(struct evil_object_t *symbol_table_fragment, struct evil_object_t *new_fragment)
+{
+    for (;;)
+    {
+        struct evil_object_t *next_symbol_table_fragment;
+
+        next_symbol_table_fragment = deref(&VECTOR_BASE(symbol_table_fragment)[FIELD_SYMBOL_TABLE_FRAGMENT_NEXT_FRAGMENT]);
+
+        if (next_symbol_table_fragment == empty_pair)
+        {
+            VECTOR_BASE(symbol_table_fragment)[FIELD_SYMBOL_TABLE_FRAGMENT_NEXT_FRAGMENT] = make_ref(new_fragment);
+
+            return;
+        }
+        else
+        {
+            symbol_table_fragment = next_symbol_table_fragment;
+        }
+    }
+}
+
 /*
  * bind needs to take a lexical environment, not environment.
  */
 struct evil_object_t *
-bind(struct evil_environment_t *environment, struct evil_object_t symbol)
+bind(struct evil_environment_t *environment, struct evil_object_t lexical_environment, struct evil_object_t symbol)
 {
     assert(symbol.tag_count.tag == TAG_SYMBOL);
 
@@ -73,8 +99,9 @@ bind(struct evil_environment_t *environment, struct evil_object_t symbol)
     struct evil_object_t *new_fragment;
     int i;
     struct evil_object_t default_symbol_value;
+    struct evil_object_handle_t *handle;
 
-    lexical_environment_ptr = deref(&environment->lexical_environment);
+    lexical_environment_ptr = deref(&lexical_environment);
     symbol_hash = symbol.value.symbol_hash;
     location = get_bound_location_impl(lexical_environment_ptr, symbol_hash, 0);
 
@@ -104,10 +131,32 @@ bind(struct evil_environment_t *environment, struct evil_object_t symbol)
         }
     }
 
+    handle = evil_create_object_handle(environment, lexical_environment_ptr);
+
     new_fragment = gc_alloc_vector(environment->heap, FIELD_SYMBOL_TABLE_FRAGMENT_NUM);
-    VECTOR_BASE(new_fragment)[FIELD_SYMBOL_TABLE_FRAGMENT_NEXT_FRAGMENT]
-        = make_ref(&VECTOR_BASE(lexical_environment_ptr)[FIELD_LEX_ENV_SYMBOL_TABLE_FRAGMENT]);
-    VECTOR_BASE(lexical_environment_ptr)[FIELD_LEX_ENV_SYMBOL_TABLE_FRAGMENT] = make_ref(new_fragment);
+
+    lexical_environment_ptr = evil_resolve_object_handle(handle);
+    evil_destroy_object_handle(environment, handle);
+
+    /*
+     * New fragments are placed at the end of the linked fragment list.
+     * Initial implementation had them at the beginning but:
+     *   a) this is slow for partially filled fragments
+     *   b) it made it difficult to link to the root of an environment.
+     */
+
+    symbol_table_fragment = deref(&VECTOR_BASE(lexical_environment_ptr)[FIELD_LEX_ENV_SYMBOL_TABLE_FRAGMENT]);
+
+    if (symbol_table_fragment == empty_pair)
+    {
+        VECTOR_BASE(lexical_environment_ptr)[FIELD_LEX_ENV_SYMBOL_TABLE_FRAGMENT] = make_ref(new_fragment);
+    }
+    else
+    {
+        append_symbol_table_fragment(symbol_table_fragment, new_fragment);
+    }
+
+    VECTOR_BASE(new_fragment)[FIELD_SYMBOL_TABLE_FRAGMENT_NEXT_FRAGMENT] = make_empty_ref();
 
     default_symbol_value.tag_count.tag = TAG_SYMBOL;
     default_symbol_value.tag_count.flag = 0;

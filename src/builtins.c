@@ -50,7 +50,7 @@ evil_define(struct evil_environment_t *environment, int num_args, struct evil_ob
     {
         struct evil_object_t *location;
 
-        location = bind(environment, *place);
+        location = bind(environment, environment->lexical_environment, *place);
         *location = *value;
     }
     else
