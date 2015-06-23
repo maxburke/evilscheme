@@ -452,11 +452,15 @@ run_test(struct evil_environment_t *environment, const char *test, const char *e
     static uint64_t
     get_ticks(void)
     {
+#ifndef __APPLE__
         struct timespec clock_time;
 
         clock_gettime(CLOCK_REALTIME, &clock_time);
 
         return (clock_time.tv_sec * UINT64_C(1000000000)) + clock_time.tv_nsec;
+#else
+        return 0;
+#endif
     }
 
     static uint64_t
