@@ -38,7 +38,7 @@ DISABLE_WARNING(4996)
 #   define VM_ASSERT(x)
 #endif
 
-#define ENABLE_VM_TRACING 0
+#define ENABLE_VM_TRACING 1
 
 #define VM_TRACE_OP_IMPL(x) do { fprintf(stderr, "[vm] %32s program_area begin: %p sp begin: %p", #x, (void *)program_area, (void *)sp); } while (0)
 #define VM_TRACE_IMPL(x) do { fprintf(stderr, "[vm] %s", x); } while (0)
@@ -225,8 +225,10 @@ vm_push_ref(struct evil_object_t *sp, struct evil_object_t *ptr)
     struct evil_object_t object;
 
     assert(ptr != NULL);
+    /*
 if (ptr->tag_count.tag == TAG_INVALID)
     BREAK();
+    */
     object.tag_count.tag = TAG_REFERENCE;
     object.tag_count.flag = 0;
     object.tag_count.count = 1;
@@ -657,21 +659,14 @@ static int insn_count;
                     if (tag == TAG_INNER_REFERENCE)
                     {
                         unsigned char evil_object_tag;
+                        unsigned short index;
 
                         object = ref->value.ref;
                         evil_object_tag = object->tag_count.tag;
 
-                        if (evil_object_tag == TAG_VECTOR || evil_object_tag == TAG_PROCEDURE || evil_object_tag == TAG_SPECIAL_FUNCTION)
-                        {
-                            unsigned short index;
-
-                            index = ref->tag_count.count;
-                            *ref = VECTOR_BASE(object)[index];
-                        }
-                        else
-                        {
-                            BREAK();
-                        }
+                        assert(evil_object_tag == TAG_VECTOR || evil_object_tag == TAG_PROCEDURE || evil_object_tag == TAG_SPECIAL_FUNCTION);
+                        index = ref->tag_count.count;
+                        *ref = VECTOR_BASE(object)[index];
                     }
                     else
                     {
@@ -692,6 +687,38 @@ static int insn_count;
 
                         *ref = *dereffed_value;
                     }
+                }
+                VM_CONTINUE();
+            case OPCODE_STORE:
+                VM_TRACE_OP(OPCODE_STORE);
+                {
+                    struct evil_object_t *ref;
+                    struct evil_object_t *object;
+                    unsigned char tag;
+
+                    object = sp + 1;
+                    ref = sp + 2;
+
+                    tag = ref->tag_count.tag;
+                    VM_ASSERT(tag == TAG_REFERENCE || tag == TAG_INNER_REFERENCE);
+
+                    if (tag == TAG_INNER_REFERENCE)
+                    {
+                        unsigned char evil_object_tag;
+                        unsigned short index;
+
+                        object = ref->value.ref;
+                        evil_object_tag = object->tag_count.tag;
+                        assert(evil_object_tag == TAG_VECTOR || evil_object_tag == TAG_PROCEDURE || evil_object_tag == TAG_SPECIAL_FUNCTION);
+                        index = ref->tag_count.count;
+                        VECTOR_BASE(object)[index] = *object;
+                    }
+                    else
+                    {
+                        *deref(ref) = *object;
+                    }
+
+                    sp += 2;
                 }
                 VM_CONTINUE();
             case OPCODE_MAKE_REF:
@@ -1043,9 +1070,9 @@ static int insn_count;
 
                         sp = program_area + vm_extract_num_args(procedure) - 2;
                         procedure = parent;
-                        *(sp + 1) = *return_value;
-
                         program_area = deref(prev_program_area_ref);
+
+                        *(sp + 1) = *return_value;
                     }
                     else
                     {
@@ -1087,6 +1114,10 @@ static int insn_count;
             case OPCODE_NOT:
                 VM_TRACE_OP(OPCODE_NOT);
                 BREAK();
+                VM_CONTINUE();
+            case OPCODE_POP:
+                VM_TRACE_OP(OPCODE_POP);
+                ++sp;
                 VM_CONTINUE();
             case OPCODE_NOP:
                 VM_TRACE_OP(OPCODE_NOP);

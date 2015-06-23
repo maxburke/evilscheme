@@ -213,6 +213,11 @@ enum opcode_t
     OPCODE_NOP,
 
     /*
+     * Stack manipulation opcodes.
+     */
+    OPCODE_POP,
+
+    /*
      * This last opcode is for VM tracing to help identify bad data in the
      * bytecode stream.
      */

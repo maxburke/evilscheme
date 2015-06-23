@@ -81,6 +81,7 @@ struct closure_variable_t
 {
     struct slist_t link;
     uint64_t symbol_hash;
+    short slot_index;
 };
 
 struct compiler_context_t
@@ -921,6 +922,7 @@ compile_define(struct compiler_context_t *context, struct instruction_t *next, s
     struct instruction_t *define_symbol_location;
     struct instruction_t *define_function;
     struct instruction_t *call;
+    struct instruction_t *pop;
     struct evil_object_t define_symbol;
 
     symbol_form = CAR(args);
@@ -950,7 +952,11 @@ compile_define(struct compiler_context_t *context, struct instruction_t *next, s
     call->opcode = OPCODE_CALL;
     call->link.next = &define_function->link;
 
-    return call;
+    pop = allocate_instruction(context);
+    pop->opcode = OPCODE_POP;
+    pop->link.next = &call->link;
+
+    return pop;
 }
 
 static struct instruction_t *
@@ -1106,7 +1112,7 @@ compile_type_predicate(struct compiler_context_t *context, struct instruction_t 
 }
 
 static struct compiler_context_t *
-symbol_is_local_in_previous_context(struct compiler_context_t *context, uint64_t symbol_hash)
+identify_local_in_previous_context(struct compiler_context_t *context, uint64_t symbol_hash)
 {
     struct compiler_context_t *previous_context;
     struct stack_slot_t *slots;
@@ -1120,13 +1126,23 @@ symbol_is_local_in_previous_context(struct compiler_context_t *context, uint64_t
 
     for (slots = previous_context->stack_slots; slots != NULL; slots = (struct stack_slot_t *)slots->link.next)
     {
-        if (slots->symbol_hash == symbol_hash)
+        struct closure_variable_t *closure_variable;
+
+        if (slots->symbol_hash != symbol_hash)
         {
-            return previous_context;
+            continue;
         }
+
+        closure_variable = linear_allocator_alloc(previous_context->pool, sizeof(struct closure_variable_t));
+        closure_variable->link.next = &previous_context->closure_variables->link;
+        closure_variable->symbol_hash = symbol_hash;
+        closure_variable->slot_index = slots->index;
+        previous_context->closure_variables = closure_variable;
+
+        return previous_context;
     }
 
-    return symbol_is_local_in_previous_context(previous_context, symbol_hash);
+    return identify_local_in_previous_context(previous_context, symbol_hash);
 }
 
 static struct instruction_t *
@@ -1237,18 +1253,12 @@ compile_form(struct compiler_context_t *context, struct instruction_t *next, str
         return compile_load_slot(context, next, slot);
     }
 
-    if ((closure_root_context = symbol_is_local_in_previous_context(context, symbol_object->value.symbol_hash)) != NULL)
+    if ((closure_root_context = identify_local_in_previous_context(context, symbol_object->value.symbol_hash)) != NULL)
     {
-        struct closure_variable_t *closure_variable;
         struct evil_object_t *lexical_environment_ptr;
         struct evil_environment_t *environment;
 
         environment = context->environment;
-        closure_variable = linear_allocator_alloc(closure_root_context->pool, sizeof(struct closure_variable_t));
-        closure_variable->link.next = &context->closure_variables->link;
-        closure_variable->symbol_hash = symbol_object->value.symbol_hash;
-        closure_root_context->closure_variables = closure_variable;
-
         if (closure_root_context->lexical_environment == NULL)
         {
             struct evil_object_t *parent_environment;
@@ -1484,6 +1494,13 @@ assemble(struct evil_environment_t *environment, struct compiler_context_t *cont
      * The object handle is no longer needed at this point.
      */
     evil_destroy_object_handle(environment, byte_code_ptr);
+
+/*
+ * TODO: remove this:
+ */
+disassemble_bytecode(environment, bytes, num_bytes);
+//BREAK();
+
 
     return procedure;
 }
@@ -1965,6 +1982,11 @@ disassemble_bytecode(struct evil_environment_t *environment, const unsigned char
                 evil_printf("NOT\n");
                 ++i;
                 break;
+            case OPCODE_POP:
+                print_hex_bytes(ptr + i, 1);
+                evil_printf("POP\n");
+                ++i;
+                break;
             case OPCODE_NOP:
                 print_hex_bytes(ptr + i, 1);
                 evil_printf("NOP\n");
@@ -2034,14 +2056,93 @@ evil_disassemble(struct evil_environment_t *environment, int num_args, struct ev
     return make_empty_ref();
 }
 
+static struct stack_slot_t *
+find_stack_slot_for_named_local(struct compiler_context_t *context, uint64_t symbol_hash)
+{
+    struct stack_slot_t *stack_slot;
+
+    for (stack_slot = context->stack_slots; 
+            stack_slot != NULL;
+            stack_slot = (struct stack_slot_t *)stack_slot->link.next)
+    {
+        if (stack_slot->symbol_hash == symbol_hash)
+        {
+            return stack_slot;
+        }
+    }
+    
+    return NULL;
+}
+
 static struct instruction_t *
 demote_closure_references(struct compiler_context_t *context, struct instruction_t *root)
 {
-    /*
-     * TODO: demote closure references!
-     */
+    struct closure_variable_t *closure_variable;
 
-    BREAK();
+    for (closure_variable = context->closure_variables;
+            closure_variable != NULL;
+            closure_variable = (struct closure_variable_t *)closure_variable->link.next)
+    {
+        struct instruction_t *i;
+        short index;
+
+        index = closure_variable->slot_index;
+
+        for (i = root; i != NULL; i = (struct instruction_t *)i->link.next)
+        {
+            unsigned char opcode;
+            short insn_slot;
+
+            opcode = i->opcode;
+
+            if (opcode != OPCODE_STSLOT_X && opcode != OPCODE_LDSLOT_X)
+            {
+                continue;
+            }
+
+            insn_slot = i->data.s2;
+
+            if (insn_slot != index)
+            {
+                continue;
+            }
+
+            if (opcode == OPCODE_STSLOT_X)
+            {
+                struct instruction_t *get_bound_location;
+
+                get_bound_location = allocate_instruction(context);
+                get_bound_location->opcode = OPCODE_GET_BOUND_LOCATION;
+                get_bound_location->size = 8;
+                get_bound_location->data.u8 = closure_variable->symbol_hash;
+
+                assert(i->link.next != NULL);
+
+                if (i->link.next != NULL)
+                {
+                    get_bound_location->link.next = i->link.next->next;
+                    i->link.next->next = &get_bound_location->link;
+
+                    i->opcode = OPCODE_STORE;
+                    i->size = 0;
+                    i->reloc = NULL;
+                }
+            }
+            else
+            {
+                struct instruction_t *get_bound_location;
+
+                get_bound_location = allocate_instruction(context);
+                get_bound_location->opcode = OPCODE_GET_BOUND_LOCATION;
+                get_bound_location->size = 8;
+                get_bound_location->data.u8 = closure_variable->symbol_hash;
+                get_bound_location->link.next = i->link.next;
+                i->link.next = &get_bound_location->link;
+
+BREAK();
+            }
+        }
+    }
 
     return root;
 }
