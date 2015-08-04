@@ -1,0 +1,6 @@
+2015/08/03
+  * Special function calls (tailcall or regular) need to be passed a lexical
+    environment
+  * tailcall followed by a return which should terminate vm_run does not work
+    (ie, eval'ing (print 1)) from the top level
+  * bind / get_bound_location should return an inner reference

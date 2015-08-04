@@ -15,7 +15,7 @@
 #include "gc.h"
 
 struct evil_object_t *
-get_bound_location_impl(struct evil_object_t *lexical_environment, uint64_t symbol_hash, int recurse)
+get_bound_location_in_lexical_environment(struct evil_object_t *lexical_environment, uint64_t symbol_hash, int recurse)
 {
     struct evil_object_t *lexical_environment_ptr;
 
@@ -33,11 +33,14 @@ get_bound_location_impl(struct evil_object_t *lexical_environment, uint64_t symb
 
             for (i = 0; i < NUM_ENTRIES_PER_FRAGMENT; ++i)
             {
-                /*
-                 * TODO: This can now bail out when it finds the first 
-                 * INVALID_HASH
-                 */
-                if (SYMBOL_AT(symbol_table_fragment, i).value.symbol_hash == symbol_hash)
+                const uint64_t hash = SYMBOL_AT(symbol_table_fragment, i).value.symbol_hash;
+
+                if (hash == INVALID_HASH)
+                {
+                    break;
+                }
+
+                if (hash == symbol_hash)
                 {
                     /*
                      * TODO: Return an inner reference.
@@ -59,7 +62,7 @@ get_bound_location_impl(struct evil_object_t *lexical_environment, uint64_t symb
 struct evil_object_t *
 get_bound_location(struct evil_environment_t *environment, uint64_t symbol_hash, int recurse)
 {
-    return get_bound_location_impl(&environment->lexical_environment, symbol_hash, recurse);
+    return get_bound_location_in_lexical_environment(&environment->lexical_environment, symbol_hash, recurse);
 }
 
 static void
@@ -103,7 +106,7 @@ bind(struct evil_environment_t *environment, struct evil_object_t lexical_enviro
 
     lexical_environment_ptr = deref(&lexical_environment);
     symbol_hash = symbol.value.symbol_hash;
-    location = get_bound_location_impl(lexical_environment_ptr, symbol_hash, 0);
+    location = get_bound_location_in_lexical_environment(lexical_environment_ptr, symbol_hash, 0);
 
     if (location != empty_pair)
     {
@@ -170,6 +173,7 @@ bind(struct evil_environment_t *environment, struct evil_object_t lexical_enviro
     }
 
     SYMBOL_AT(new_fragment, 0) = symbol;
+
     /*
      * TODO: Return an inner reference.
      */

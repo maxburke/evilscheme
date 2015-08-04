@@ -227,11 +227,20 @@ enum opcode_t
 enum procedure_field_index_t
 {
     FIELD_ENVIRONMENT,
+    FIELD_LEXICAL_ENVIRONMENT,
     FIELD_NUM_ARGS,
     FIELD_NUM_LOCALS,
     FIELD_NUM_FN_LOCALS,
     FIELD_CODE,
     FIELD_LOCALS
+};
+
+enum vm_context_save_slots_t
+{
+    VM_SLOT_PROGRAM_AREA_CHAIN = 1,
+    VM_SLOT_LEXICAL_ENVIRONMENT_CHAIN = 2,
+    VM_SLOT_PC_CHAIN = 3,
+    VM_SLOT_COUNT = 3
 };
 
 #define VARIADIC 0xffff

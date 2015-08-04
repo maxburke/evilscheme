@@ -127,15 +127,10 @@ make_fixnum_object(int64_t value)
 
 /*
  * Dereference an object if necessary.
- * TODO: What should this do for inner reference types?
  */
 static inline struct evil_object_t *
 deref(struct evil_object_t *ptr)
 {
-    /*
-     * assert(ptr->tag_count.tag != TAG_INNER_REFERENCE);
-     */
-
     assert(ptr != NULL);
 
     switch (ptr->tag_count.tag)

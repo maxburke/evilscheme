@@ -24,6 +24,9 @@ enum
 struct evil_environment_t;
 
 struct evil_object_t *
+get_bound_location_in_lexical_environment(struct evil_object_t *lexical_environment, uint64_t symbol_hash, int recurse);
+
+struct evil_object_t *
 get_bound_location(struct evil_environment_t *environment, uint64_t symbol_hash, int recurse);
 
 struct evil_object_t *

@@ -130,6 +130,9 @@ static struct instruction_t *
 compile_form(struct compiler_context_t *context, struct instruction_t *next, struct evil_object_t *body);
 
 static struct instruction_t *
+compile_load_slot(struct compiler_context_t *context, struct instruction_t *next, struct stack_slot_t *slot);
+
+static struct instruction_t *
 compile_get_bound_location(struct compiler_context_t *context, struct instruction_t *next, struct evil_object_t *symbol);
 
 static struct instruction_t *
@@ -566,13 +569,49 @@ compile_arg_eval(struct compiler_context_t *context, struct instruction_t *next,
 }
 
 static struct instruction_t *
-compile_call(struct compiler_context_t *context, struct instruction_t *next, struct evil_object_t *function, struct evil_object_t *args)
+emit_call(struct compiler_context_t *context, struct instruction_t *function, int num_args)
 {
-    struct instruction_t *evaluated_args;
-    struct instruction_t *function_symbol;
-    struct instruction_t *bound_location;
     struct instruction_t *call;
+
+    /*
+     * All function calls are emitted as normal calls. Later we run a pass
+     * over the bytecode that converts calls to tailcalls if possible.
+     *
+     * We embed the number of arguments passed into this particular invocation
+     * so that at runtime we can verify that the arity is correct for the
+     * function call.
+     */
+    call = allocate_instruction(context);
+    call->link.next = &function->link;
+    call->data.u2 = (unsigned short)num_args;
+    call->size = 2;
+    call->opcode = OPCODE_CALL;
+
+    return call;
+}
+
+static struct instruction_t *
+compile_indirect_call(struct compiler_context_t *context, struct instruction_t *next, struct evil_object_t *function_form, struct evil_object_t *args)
+{
     int num_args;
+    struct instruction_t *evaluated_args;
+    struct instruction_t *function;
+
+    num_args = 0;
+    evaluated_args = compile_arg_eval(context, next, args, &num_args);
+    function = compile_form(context, evaluated_args, function_form);
+
+    return emit_call(context, function, num_args);
+}
+
+static struct instruction_t *
+compile_direct_call(struct compiler_context_t *context, struct instruction_t *next, struct evil_object_t *function, struct evil_object_t *args)
+{
+    int num_args;
+    struct instruction_t *evaluated_args;
+    struct instruction_t *bound_location;
+    struct instruction_t *function_symbol;
+    struct stack_slot_t *slot;
 
     /*
      * Optimization opportunity -- tail calls to self can be replaced with
@@ -587,26 +626,25 @@ compile_call(struct compiler_context_t *context, struct instruction_t *next, str
 
     num_args = 0;
     evaluated_args = compile_arg_eval(context, next, args, &num_args);
-    bound_location = compile_get_bound_location(context, evaluated_args, function);
-    function_symbol = compile_load(context, bound_location);
+
+    assert(function->tag_count.tag == TAG_SYMBOL);
 
     /*
-     * All function calls are emitted as normal calls here. Later we run a pass
-     * over the bytecode that converts calls to tailcalls if possible.
-     *
-     * We embed the number of arguments passed into this particular invocation
-     * so that at runtime we can verify that the arity is correct for the
-     * function call.
+     * TODO: This should be encapsulated in some sort of resolve_symbol function.
      */
-    assert(num_args < 65536);
+    slot = get_stack_slot(context->stack_slots, function->value.symbol_hash);
 
-    call = allocate_instruction(context);
-    call->link.next = &function_symbol->link;
-    call->data.u2 = (unsigned short)num_args;
-    call->size = 2;
-    call->opcode = OPCODE_CALL;
+    if (slot == NULL)
+    {
+        bound_location = compile_get_bound_location(context, evaluated_args, function);
+        function_symbol = compile_load(context, bound_location);
+    }
+    else
+    {
+        function_symbol = compile_load_slot(context, evaluated_args, slot);
+    }
 
-    return call;
+    return emit_call(context, function_symbol, num_args);
 }
 
 static struct instruction_t *
@@ -870,11 +908,11 @@ compile_let(struct compiler_context_t *context, struct instruction_t *next, stru
 
         /*
          * The stack is arranged, from high address to low:
-         * [arg 1][arg 0][return][chain][first slot]
-         *    1      0       -1     -2       -3
+         * [arg 1][arg 0][return][env chain][pa chain][first slot]
+         *    1      0       -1     -2          -3        -4
          * This bit of strange math below calculates the stack slot:
          */
-        slot_index = -((short)slot_index + 3);
+        slot_index = -((short)slot_index + VM_SLOT_COUNT + 1);
 
         initializer_store = compile_store_slot(context, initializer, slot_index);
 
@@ -913,11 +951,8 @@ compile_let(struct compiler_context_t *context, struct instruction_t *next, stru
 }
 
 static struct instruction_t *
-compile_define(struct compiler_context_t *context, struct instruction_t *next, struct evil_object_t *args)
+compile_define_impl(struct compiler_context_t *context, uint64_t symbol_hash, struct instruction_t *value)
 {
-    struct evil_object_t *symbol_form;
-    struct evil_object_t *value_form;
-    struct instruction_t *value;
     struct instruction_t *symbol;
     struct instruction_t *define_symbol_location;
     struct instruction_t *define_function;
@@ -925,17 +960,10 @@ compile_define(struct compiler_context_t *context, struct instruction_t *next, s
     struct instruction_t *pop;
     struct evil_object_t define_symbol;
 
-    symbol_form = CAR(args);
-    value_form = CAR(CDR(args));
-
-    value = compile_form(context, next, value_form);
-
-    assert(symbol_form->tag_count.tag == TAG_SYMBOL);
-
     symbol = allocate_instruction(context);
     symbol->opcode = OPCODE_LDIMM_8_SYMBOL;
     symbol->size = 8;
-    symbol->data.u8 = symbol_form->value.symbol_hash;
+    symbol->data.u8 = symbol_hash;
     symbol->link.next = &value->link;
 
     define_symbol.tag_count.tag = TAG_SYMBOL;
@@ -957,6 +985,24 @@ compile_define(struct compiler_context_t *context, struct instruction_t *next, s
     pop->link.next = &call->link;
 
     return pop;
+}
+
+static struct instruction_t *
+compile_define(struct compiler_context_t *context, struct instruction_t *next, struct evil_object_t *args)
+{
+    struct evil_object_t *symbol_form;
+    struct evil_object_t *value_form;
+    uint64_t symbol_hash;
+    struct instruction_t *value;
+    symbol_form = CAR(args);
+    value_form = CAR(CDR(args));
+
+    value = compile_form(context, next, value_form);
+
+    assert(symbol_form->tag_count.tag == TAG_SYMBOL);
+    symbol_hash = symbol_form->value.symbol_hash;
+
+    return compile_define_impl(context, symbol_hash, value);
 }
 
 static struct instruction_t *
@@ -1165,79 +1211,89 @@ compile_form(struct compiler_context_t *context, struct instruction_t *next, str
         function_symbol = CAR(symbol_object);
         function_args = CDR(symbol_object);
 
-        assert(function_symbol->tag_count.tag == TAG_SYMBOL);
-        function_hash = function_symbol->value.symbol_hash;
-
-        switch (function_hash)
+        if (function_symbol->tag_count.tag == TAG_PAIR)
         {
-            case SYMBOL_IF:
-                return compile_if(context, next, function_args);
-            case SYMBOL_ADD:
-                return compile_add(context, next, function_args);
-            case SYMBOL_SUB:
-                return compile_sub(context, next, function_args);
-            case SYMBOL_MUL:
-                return compile_mul(context, next, function_args);
-            case SYMBOL_DIV:
-                return compile_div(context, next, function_args);
-            case SYMBOL_EQ:
-                return compile_eq(context, next, function_args);
-            case SYMBOL_LT:
-                return compile_lt(context, next, function_args);
-            case SYMBOL_GT:
-                return compile_gt(context, next, function_args);
-            case SYMBOL_LE:
-                return compile_le(context, next, function_args);
-            case SYMBOL_GE:
-                return compile_ge(context, next, function_args);
-            case SYMBOL_EQUALP:
-                return compile_equalp(context, next, function_args);
-            case SYMBOL_NULLP:
-                return compile_nullp(context, next, function_args);
-            case SYMBOL_FIRST:
-                return compile_first(context, next, function_args);
-            case SYMBOL_REST:
-                return compile_rest(context, next, function_args);
-            case SYMBOL_LAMBDA:
-                return compile_lambda(context, next, function_args);
-            case SYMBOL_SET:
-                return compile_set(context, next, function_args);
-            case SYMBOL_LET:
-            case SYMBOL_LETSTAR:
-                return compile_let(context, next, function_args);
-            case SYMBOL_DEFINE:
-                return compile_define(context, next, function_args);
-            case SYMBOL_QUOTE:
-                return compile_quote(context, next, function_args);
-            case SYMBOL_BEGIN:
-                return compile_begin(context, next, function_args);
-            case SYMBOL_BOOLEANP:
-                return compile_type_predicate(context, next, function_args, TAG_BOOLEAN);
-            case SYMBOL_SYMBOLP:
-                return compile_type_predicate(context, next, function_args, TAG_SYMBOL);
-            case SYMBOL_PAIRP:
-                return compile_type_predicate(context, next, function_args, TAG_PAIR);
             /*
-            case SYMBOL_NUMBERP:
-                return compile_type_predicate(context, next, function_args, TAG_???);
-            */
-            case SYMBOL_CHARP:
-                return compile_type_predicate(context, next, function_args, TAG_CHAR);
-            case SYMBOL_VECTORP:
-                return compile_type_predicate(context, next, function_args, TAG_VECTOR);
-            case SYMBOL_STRINGP:
-                return compile_type_predicate(context, next, function_args, TAG_STRING);
-            case SYMBOL_PROCEDUREP:
-                return compile_type_predicate(context, next, function_args, TAG_PROCEDURE);
-            default:
+             * function call is of the syntax ((fn) 1 2 3)
+             */
+            return compile_indirect_call(context, next, function_symbol, function_args);
+        }
+        else
+        {
+            assert(function_symbol->tag_count.tag == TAG_SYMBOL);
+            function_hash = function_symbol->value.symbol_hash;
+
+            switch (function_hash)
+            {
+                case SYMBOL_IF:
+                    return compile_if(context, next, function_args);
+                case SYMBOL_ADD:
+                    return compile_add(context, next, function_args);
+                case SYMBOL_SUB:
+                    return compile_sub(context, next, function_args);
+                case SYMBOL_MUL:
+                    return compile_mul(context, next, function_args);
+                case SYMBOL_DIV:
+                    return compile_div(context, next, function_args);
+                case SYMBOL_EQ:
+                    return compile_eq(context, next, function_args);
+                case SYMBOL_LT:
+                    return compile_lt(context, next, function_args);
+                case SYMBOL_GT:
+                    return compile_gt(context, next, function_args);
+                case SYMBOL_LE:
+                    return compile_le(context, next, function_args);
+                case SYMBOL_GE:
+                    return compile_ge(context, next, function_args);
+                case SYMBOL_EQUALP:
+                    return compile_equalp(context, next, function_args);
+                case SYMBOL_NULLP:
+                    return compile_nullp(context, next, function_args);
+                case SYMBOL_FIRST:
+                    return compile_first(context, next, function_args);
+                case SYMBOL_REST:
+                    return compile_rest(context, next, function_args);
+                case SYMBOL_LAMBDA:
+                    return compile_lambda(context, next, function_args);
+                case SYMBOL_SET:
+                    return compile_set(context, next, function_args);
+                case SYMBOL_LET:
+                case SYMBOL_LETSTAR:
+                    return compile_let(context, next, function_args);
+                case SYMBOL_DEFINE:
+                    return compile_define(context, next, function_args);
+                case SYMBOL_QUOTE:
+                    return compile_quote(context, next, function_args);
+                case SYMBOL_BEGIN:
+                    return compile_begin(context, next, function_args);
+                case SYMBOL_BOOLEANP:
+                    return compile_type_predicate(context, next, function_args, TAG_BOOLEAN);
+                case SYMBOL_SYMBOLP:
+                    return compile_type_predicate(context, next, function_args, TAG_SYMBOL);
+                case SYMBOL_PAIRP:
+                    return compile_type_predicate(context, next, function_args, TAG_PAIR);
                 /*
-                 * The function/procedure isn't one that is handled by the
-                 * compiler so we need to emit a call to it.
-                 */
-                evil_debug_printf("** %s (0x%" PRIx64 ") **\n",
-                    find_symbol_name(context->environment, function_hash),
-                    function_hash);
-                return compile_call(context, next, function_symbol, function_args);
+                case SYMBOL_NUMBERP:
+                    return compile_type_predicate(context, next, function_args, TAG_???);
+                */
+                case SYMBOL_CHARP:
+                    return compile_type_predicate(context, next, function_args, TAG_CHAR);
+                case SYMBOL_VECTORP:
+                    return compile_type_predicate(context, next, function_args, TAG_VECTOR);
+                case SYMBOL_STRINGP:
+                    return compile_type_predicate(context, next, function_args, TAG_STRING);
+                case SYMBOL_PROCEDUREP:
+                    return compile_type_predicate(context, next, function_args, TAG_PROCEDURE);
+                default:
+                    /*
+                     * The function/procedure isn't one that is handled by the
+                     * compiler so we need to emit a call to it.
+                     */
+                    evil_debug_printf("** %s (0x%" PRIx64 ") **\n",
+                        find_symbol_name(context->environment, function_hash),
+                        function_hash);
+                    return compile_direct_call(context, next, function_symbol, function_args);
+            }
         }
     }
 
@@ -1278,23 +1334,6 @@ compile_form(struct compiler_context_t *context, struct instruction_t *next, str
         lexical_environment_ptr = evil_resolve_object_handle(closure_root_context->lexical_environment);
         context->parent_environment = evil_create_object_handle(environment, lexical_environment_ptr);
         bind(environment, make_ref(lexical_environment_ptr), *symbol_object);
-
-        /*
-         * TODO: mburke 2015/05/10
-         * If the symbol is local in a previous context it needs to be demoting it
-         * to a pseudo-global by:
-         *   - creating a new environment for the caller if it does not exist
-         *   - replacing stack refs to GBL-based refs
-         *   - ensuring that the function being created has a reference to that
-         *     environment block
-         */
-
-        /*
-         * TODO: here's how to do it. If we notice this is a local in a parent scope,
-         * note it in the list of closed variables. Continue as if we are generating code
-         * for a normal global variable symbol reference. The stack value will be demoted
-         * in the appropriate scope.
-         */
     }
 
     bound_location = compile_get_bound_location(context, next, symbol_object);
@@ -1356,6 +1395,16 @@ assemble(struct evil_environment_t *environment, struct compiler_context_t *cont
     bytes = (unsigned char *)byte_code->value.string_value;
     procedure_base = VECTOR_BASE(procedure);
     procedure_base[FIELD_ENVIRONMENT] = make_ref((struct evil_object_t *)environment);
+
+    if (context->lexical_environment)
+    {
+        procedure_base[FIELD_LEXICAL_ENVIRONMENT] = make_ref(evil_resolve_object_handle(context->lexical_environment));
+    }
+    else
+    {
+        procedure_base[FIELD_LEXICAL_ENVIRONMENT] = environment->lexical_environment;
+    }
+
     procedure_base[FIELD_NUM_ARGS] = make_fixnum_object(context->num_args);
     procedure_base[FIELD_NUM_LOCALS] = make_fixnum_object(context->max_stack_slots);
     procedure_base[FIELD_NUM_FN_LOCALS] = make_fixnum_object(context->num_fn_locals);
@@ -1494,13 +1543,6 @@ assemble(struct evil_environment_t *environment, struct compiler_context_t *cont
      * The object handle is no longer needed at this point.
      */
     evil_destroy_object_handle(environment, byte_code_ptr);
-
-/*
- * TODO: remove this:
- */
-disassemble_bytecode(environment, bytes, num_bytes);
-//BREAK();
-
 
     return procedure;
 }
@@ -2109,24 +2151,10 @@ demote_closure_references(struct compiler_context_t *context, struct instruction
 
             if (opcode == OPCODE_STSLOT_X)
             {
-                struct instruction_t *get_bound_location;
+                struct instruction_t *define;
 
-                get_bound_location = allocate_instruction(context);
-                get_bound_location->opcode = OPCODE_GET_BOUND_LOCATION;
-                get_bound_location->size = 8;
-                get_bound_location->data.u8 = closure_variable->symbol_hash;
-
-                assert(i->link.next != NULL);
-
-                if (i->link.next != NULL)
-                {
-                    get_bound_location->link.next = i->link.next->next;
-                    i->link.next->next = &get_bound_location->link;
-
-                    i->opcode = OPCODE_STORE;
-                    i->size = 0;
-                    i->reloc = NULL;
-                }
+                define = compile_define_impl(context, closure_variable->symbol_hash, (struct instruction_t *)i->link.next);
+                memcpy(i, define, sizeof(struct instruction_t));
             }
             else
             {
@@ -2272,4 +2300,3 @@ evil_lambda(struct evil_environment_t *environment, int num_args, struct evil_ob
     
     return compile_form_to_bytecode(NULL, environment, lambda_body);
 }
-

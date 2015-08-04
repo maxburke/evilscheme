@@ -38,7 +38,7 @@ DISABLE_WARNING(4996)
 #   define VM_ASSERT(x)
 #endif
 
-#define ENABLE_VM_TRACING 1
+#define ENABLE_VM_TRACING 0
 
 #define VM_TRACE_OP_IMPL(x) do { fprintf(stderr, "[vm] %32s program_area begin: %p sp begin: %p", #x, (void *)program_area, (void *)sp); } while (0)
 #define VM_TRACE_IMPL(x) do { fprintf(stderr, "[vm] %s", x); } while (0)
@@ -225,10 +225,7 @@ vm_push_ref(struct evil_object_t *sp, struct evil_object_t *ptr)
     struct evil_object_t object;
 
     assert(ptr != NULL);
-    /*
-if (ptr->tag_count.tag == TAG_INVALID)
-    BREAK();
-    */
+
     object.tag_count.tag = TAG_REFERENCE;
     object.tag_count.flag = 0;
     object.tag_count.count = 1;
@@ -499,12 +496,15 @@ vm_extract_num_locals(struct evil_object_t *procedure)
 struct evil_object_t
 vm_run(struct evil_environment_t *environment, struct evil_object_t *initial_function, int num_args, struct evil_object_t *args)
 {
+    struct evil_object_handle_t *lexical_environment_handle;
     struct evil_object_t *procedure;
     struct evil_object_t *program_area;
     struct evil_object_t *sp;
     struct evil_object_t *old_stack;
     unsigned char *pc_base;
     unsigned char *pc;
+
+    lexical_environment_handle = evil_create_object_handle(environment, deref(&environment->lexical_environment));
 
     /*
      * This is going to get really ugly if the GC moves our procedure object
@@ -523,8 +523,8 @@ vm_run(struct evil_environment_t *environment, struct evil_object_t *initial_fun
 
     /*
      * Stack layout for VM:
-     * [high addresses]...............................................................[low addresses]
-     * [arg n - 1][...][arg 1][arg 0][program area chain][return address][stack top]...[stack_bottom]
+     * [high addresses]..................................................................................[low addresses]
+     * [arg n - 1][...][arg 1][arg 0][program area chain][environment chain][return address][stack top]...[stack_bottom]
      *                                      ^                                 ^
      *                  program_area -------+                           ------+
      *
@@ -541,17 +541,13 @@ vm_run(struct evil_environment_t *environment, struct evil_object_t *initial_fun
      */
     program_area = sp + 1;
 
-    sp = vm_push_null_ref(sp);                  /* program area chain */
+    sp = vm_push_ref(sp, program_area);
+    sp = vm_push_null_ref(sp);                  /* environment chain */
     sp = vm_push_return_address(sp, NULL, 0);   /* return address */
     sp -= vm_extract_num_locals(procedure);
 
-/*
- * TODO: Remove this!!!!
- */
-static int insn_count;
     for (;;)
     {
-++insn_count;
         unsigned byte = *pc++;
 
         switch (byte)
@@ -696,8 +692,8 @@ static int insn_count;
                     struct evil_object_t *object;
                     unsigned char tag;
 
-                    object = sp + 1;
-                    ref = sp + 2;
+                    object = sp + 2;
+                    ref = sp + 1;
 
                     tag = ref->tag_count.tag;
                     VM_ASSERT(tag == TAG_REFERENCE || tag == TAG_INNER_REFERENCE);
@@ -851,11 +847,12 @@ static int insn_count;
                 {
                     union convert_eight_t c8;
                     struct evil_object_t *object;
+                    struct evil_object_t *lexical_environment;
 
                     memcpy(c8.bytes, pc, 8);
                     pc += 8;
-
-                    object = get_bound_location(environment, c8.u8, 1);
+                    lexical_environment = evil_resolve_object_handle(lexical_environment_handle);
+                    object = get_bound_location_in_lexical_environment(lexical_environment, c8.u8, 1);
                     sp = vm_push_ref(sp, object);
                 }
                 VM_CONTINUE();
@@ -864,6 +861,7 @@ static int insn_count;
                 {
                     struct evil_object_t *old_program_area;
                     struct evil_object_t *fn;
+                    struct evil_object_t *procedure_base;
                     unsigned char tag;
                     union convert_two_t c2;
                     unsigned short args_passed;
@@ -879,11 +877,13 @@ static int insn_count;
 
                     VM_ASSERT(tag == TAG_PROCEDURE || tag == TAG_SPECIAL_FUNCTION);
 
+                    procedure_base = VECTOR_BASE(fn);
                     return_offset = pc - pc_base;
                     old_program_area = program_area;
                     program_area = sp + 1;
 
                     num_args = vm_extract_num_args(fn);
+
                     assert(num_args == (int)args_passed || num_args == VARIADIC);
 
                     if (tag == TAG_PROCEDURE)
@@ -892,6 +892,7 @@ static int insn_count;
                          * Save the return address and create space for the local slots.
                          */
                         sp = vm_push_ref(sp, old_program_area);
+                        sp = vm_push_ref(sp, evil_resolve_object_handle(lexical_environment_handle));
                         sp = vm_push_return_address(sp, procedure, (unsigned short)return_offset);
                         sp -= vm_extract_num_locals(fn);
 
@@ -901,10 +902,10 @@ static int insn_count;
                         pc = vm_extract_code_pointer(fn);
                         pc_base = pc;
                         procedure = fn;
+                        evil_retarget_object_handle(lexical_environment_handle, &procedure_base[FIELD_LEXICAL_ENVIRONMENT]);
                     }
                     else
                     {
-                        struct evil_object_t *procedure_base;
                         void *environment_address;
                         struct evil_environment_t *fn_environment;
                         evil_special_function_t function_pointer;
@@ -916,11 +917,15 @@ static int insn_count;
                          */
                         environment->stack_ptr = sp;
 
-                        procedure_base = VECTOR_BASE(fn);
                         environment_address = deref(&procedure_base[FIELD_ENVIRONMENT]);
                         fn_environment = environment_address;
                         function_pointer = procedure_base[FIELD_CODE].value.special_function_value;
 
+                        /*
+                         * TODO: This needs to take a lexical somedoohickey
+                         */
+                        BREAK();
+                        
                         result = function_pointer(fn_environment, args_passed, program_area);
 
                         sp += args_passed - 1;
@@ -941,9 +946,12 @@ static int insn_count;
                     union convert_two_t c2;
                     unsigned short args_passed;
                     struct evil_object_t *prev_program_area_ref;
+                    struct evil_object_t *lexical_environment;
                     struct evil_object_t *return_address;
                     struct evil_object_t *moved_prev_program_area_ref;
+                    struct evil_object_t *moved_lexical_environment;
                     struct evil_object_t *moved_return_address;
+                    struct evil_object_t *procedure_base;
 
                     memcpy(c2.bytes, pc, 2);
                     args_passed = c2.u2;
@@ -960,7 +968,7 @@ static int insn_count;
                      * new call. At this point the stack, pre-call, where
                      * function b is performing a tail call to function a, looks
                      * like this:
-                     * [arg a0][arg a1]...[arg an]...[stuff]...[return][PA chain][arg b0][arg b1]...[arg bk]
+                     * [arg a0][arg a1]...[arg an]...[stuff]...[return][lex env chain][PA chain][arg b0][arg b1]...[arg bk]
                      * And we need to move the args a0-an on top of args b0-bk.
                      * The great thing is the return slot and the PA chain don't
                      * need to change, they can just remain the same.
@@ -971,14 +979,17 @@ static int insn_count;
                      * address to the bottom of the stack as we may clobber
                      * these values when we juggle the arguments below.
                      */
-                    prev_program_area_ref = program_area - 1;
-                    return_address = program_area - 2;
-
-                    *(sp) = *prev_program_area_ref;
-                    *(sp - 1) = *return_address;
+                    prev_program_area_ref = program_area - VM_SLOT_PROGRAM_AREA_CHAIN;
+                    lexical_environment = program_area - VM_SLOT_LEXICAL_ENVIRONMENT_CHAIN;
+                    return_address = program_area - VM_SLOT_PC_CHAIN;
 
                     moved_prev_program_area_ref = sp;
-                    moved_return_address = sp - 1;
+                    moved_lexical_environment = sp - 1;
+                    moved_return_address = sp - 2;
+
+                    *(moved_prev_program_area_ref) = *prev_program_area_ref;
+                    *(moved_lexical_environment) = *lexical_environment;
+                    *(moved_return_address) = *return_address;
 
                     /*
                      * Second, calculate where we need to displace the program
@@ -987,6 +998,8 @@ static int insn_count;
                     current_fn_num_args = vm_extract_num_args(procedure);
                     arg_diff = current_fn_num_args - args_passed;
                     arg_slot = program_area + arg_diff;
+
+                    VM_ASSERT(arg_slot <= environment->stack_top);
 
                     /*
                      * Move our arguments.
@@ -1009,11 +1022,13 @@ static int insn_count;
                      * Restore the saved program area chain and return address.
                      */
                     *(program_area - 1) = *moved_prev_program_area_ref;
-                    *(program_area - 2) = *moved_return_address;
+                    *(program_area - 2) = *moved_lexical_environment;
+                    *(program_area - 3) = *moved_return_address;
+
+                    procedure_base = VECTOR_BASE(fn);
 
                     if (tag == TAG_SPECIAL_FUNCTION)
                     {
-                        struct evil_object_t *procedure_base;
                         void *environment_address;
                         struct evil_environment_t *fn_environment;
                         evil_special_function_t function_pointer;
@@ -1025,10 +1040,14 @@ static int insn_count;
                          */
                         environment->stack_ptr = sp;
 
-                        procedure_base = VECTOR_BASE(fn);
                         environment_address = deref(&procedure_base[FIELD_ENVIRONMENT]);
                         fn_environment = environment_address;
                         function_pointer = procedure_base[FIELD_CODE].value.special_function_value;
+
+                        /*
+                         * TODO: Pass lexical environment.
+                         */
+                        BREAK();
 
                         result = function_pointer(fn_environment, args_passed, program_area);
                         *sp-- = result;
@@ -1045,6 +1064,7 @@ static int insn_count;
                         pc = vm_extract_code_pointer(fn);
                         pc_base = pc;
                         procedure = fn;
+                        evil_retarget_object_handle(lexical_environment_handle, deref(&procedure_base[FIELD_LEXICAL_ENVIRONMENT]));
                     }
                 }
                 VM_CONTINUE();
@@ -1053,13 +1073,16 @@ static int insn_count;
                 {
                     struct evil_object_t *return_address;
                     struct evil_object_t *prev_program_area_ref;
+                    struct evil_object_t *prev_lexical_environment;
                     struct evil_object_t *return_value;
                     struct evil_object_t *parent;
 
                     return_value = sp + 1;
-                    return_address = program_area - 2;
-                    prev_program_area_ref = program_area - 1;
+                    return_address = program_area - VM_SLOT_PC_CHAIN;
+                    prev_lexical_environment = program_area - VM_SLOT_LEXICAL_ENVIRONMENT_CHAIN;
+                    prev_program_area_ref = program_area - VM_SLOT_PROGRAM_AREA_CHAIN;
                     VM_ASSERT(return_address->tag_count.tag == TAG_INNER_REFERENCE);
+                    VM_ASSERT(prev_lexical_environment->tag_count.tag == TAG_REFERENCE);
                     VM_ASSERT(prev_program_area_ref->tag_count.tag == TAG_REFERENCE);
                     parent = return_address->value.ref;
 
@@ -1068,15 +1091,16 @@ static int insn_count;
                         pc_base = vm_extract_code_pointer(parent);
                         pc = pc_base + return_address->tag_count.count;
 
-                        sp = program_area + vm_extract_num_args(procedure) - 2;
+                        sp = program_area + vm_extract_num_args(procedure) - VM_SLOT_COUNT;
                         procedure = parent;
                         program_area = deref(prev_program_area_ref);
+                        evil_retarget_object_handle(lexical_environment_handle, prev_lexical_environment->value.ref);
 
                         *(sp + 1) = *return_value;
                     }
                     else
                     {
-                        sp = program_area + vm_extract_num_args(procedure) - 2;
+                        sp = program_area + vm_extract_num_args(procedure) - VM_SLOT_COUNT;
                         *(sp + 1) = *return_value;
 
                         goto vm_execution_done;
