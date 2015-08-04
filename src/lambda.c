@@ -2098,24 +2098,6 @@ evil_disassemble(struct evil_environment_t *environment, int num_args, struct ev
     return make_empty_ref();
 }
 
-static struct stack_slot_t *
-find_stack_slot_for_named_local(struct compiler_context_t *context, uint64_t symbol_hash)
-{
-    struct stack_slot_t *stack_slot;
-
-    for (stack_slot = context->stack_slots; 
-            stack_slot != NULL;
-            stack_slot = (struct stack_slot_t *)stack_slot->link.next)
-    {
-        if (stack_slot->symbol_hash == symbol_hash)
-        {
-            return stack_slot;
-        }
-    }
-    
-    return NULL;
-}
-
 static struct instruction_t *
 demote_closure_references(struct compiler_context_t *context, struct instruction_t *root)
 {
