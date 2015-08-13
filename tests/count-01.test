@@ -1,2 +1,2 @@
 (define count (lambda (item L) (if L (+ (equal? item (first L)) (count item (rest L))) 0)))
-><procedure>
+>

@@ -1,2 +1,2 @@
 (define hello-world-2 (lambda (x) `(foo ,bar ,@(list 1 2 3))))
-><procedure>
+>
