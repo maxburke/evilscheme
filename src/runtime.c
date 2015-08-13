@@ -46,10 +46,10 @@ struct symbol_string_internment_page_t
 };
 
 static struct evil_object_t
-symbol_to_string(struct evil_environment_t *environment, int num_args, struct evil_object_t *args);
+symbol_to_string(struct evil_environment_t *environment, struct evil_object_handle_t *lexical_environment, int num_args, struct evil_object_t *args);
 
 static struct evil_object_t
-string_to_symbol(struct evil_environment_t *environment, int num_args, struct evil_object_t *args);
+string_to_symbol(struct evil_environment_t *environment, struct evil_object_handle_t *lexical_environment, int num_args, struct evil_object_t *args);
 
 void
 environment_initialize(struct evil_environment_t *environment)
@@ -292,6 +292,7 @@ intern_string(struct evil_environment_t *environment, const char *bytes, size_t 
     }
 
     i = calloc(DEFAULT_SYMBOL_INTERNMENT_PAGE_SIZE, 1);
+    assert(i != NULL);
     i->next = environment->symbol_names.string_internment_page_base;
     environment->symbol_names.string_internment_page_base = i;
     i->top = i->data;
@@ -333,6 +334,7 @@ intern_hash(struct evil_environment_t *environment, uint64_t hash, const char *s
     }
 
     i = calloc(DEFAULT_SYMBOL_INTERNMENT_PAGE_SIZE, 1);
+    assert(i != NULL);
     i->next = environment->symbol_names.hash_internment_page_base;
     environment->symbol_names.hash_internment_page_base = i;
     i->num_entries = 0;
@@ -372,12 +374,14 @@ register_symbol_from_bytes(struct evil_environment_t *environment, const void *b
 }
 
 static struct evil_object_t
-symbol_to_string(struct evil_environment_t *environment, int num_args, struct evil_object_t *args)
+symbol_to_string(struct evil_environment_t *environment, struct evil_object_handle_t *lexical_environment, int num_args, struct evil_object_t *args)
 {
     uint64_t hash;
     const char *symbol_string;
     struct evil_object_t *string_object;
     size_t symbol_string_length;
+
+    UNUSED(lexical_environment);
 
     assert(num_args == 1);
     assert(args->tag_count.tag == TAG_SYMBOL);
@@ -399,11 +403,13 @@ symbol_to_string(struct evil_environment_t *environment, int num_args, struct ev
 }
 
 static struct evil_object_t
-string_to_symbol(struct evil_environment_t *environment, int num_args, struct evil_object_t *args)
+string_to_symbol(struct evil_environment_t *environment, struct evil_object_handle_t *lexical_environment, int num_args, struct evil_object_t *args)
 {
     struct evil_object_t *string_object;
     uint64_t hash;
     struct evil_object_t hash_object;
+
+    UNUSED(lexical_environment);
 
     assert(num_args == 1);
     assert(args->tag_count.tag == TAG_REFERENCE);

@@ -353,6 +353,12 @@ evil_create_object_handle_from_value(struct evil_environment_t *environment, str
     return evil_create_object_handle(environment, NULL);
 }
 
+struct evil_object_handle_t *
+evil_duplicate_object_handle(struct evil_environment_t *environment, struct evil_object_handle_t *handle)
+{
+    return evil_create_object_handle(environment, evil_resolve_object_handle(handle));
+}
+
 void
 evil_destroy_object_handle(struct evil_environment_t *environment, struct evil_object_handle_t *handle)
 {

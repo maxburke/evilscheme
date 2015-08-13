@@ -246,7 +246,7 @@ enum vm_context_save_slots_t
 #define VARIADIC 0xffff
 
 struct evil_object_t
-vm_run(struct evil_environment_t *environment, struct evil_object_t *fn, int num_args, struct evil_object_t *args);
+vm_run(struct evil_environment_t *environment, struct evil_object_handle_t *lexical_environment, struct evil_object_t *fn, int num_args, struct evil_object_t *args);
 
 void
 vm_trace_stack(struct evil_environment_t *environment, struct evil_object_t *sp, struct evil_object_t *program_area);

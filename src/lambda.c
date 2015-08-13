@@ -1331,8 +1331,11 @@ compile_form(struct compiler_context_t *context, struct instruction_t *next, str
             closure_root_context->closure_has_allocated_environment = 1;
         }
 
+        /* 
+         * TODO: This is going to leak object handles like woah.
+         */
         lexical_environment_ptr = evil_resolve_object_handle(closure_root_context->lexical_environment);
-        context->parent_environment = evil_create_object_handle(environment, lexical_environment_ptr);
+        context->parent_environment = evil_duplicate_object_handle(environment, closure_root_context->lexical_environment);
         bind(environment, make_ref(lexical_environment_ptr), *symbol_object);
     }
 
@@ -2062,19 +2065,21 @@ disassemble_procedure(struct evil_environment_t *environment, struct evil_object
 }
 
 struct evil_object_t
-evil_disassemble(struct evil_environment_t *environment, int num_args, struct evil_object_t *args)
+evil_disassemble(struct evil_environment_t *environment, struct evil_object_handle_t *lexical_environment, int num_args, struct evil_object_t *args)
 {
     struct evil_object_t symbol;
     struct evil_object_t *slot;
     struct evil_object_t *function;
     const char *name;
 
+    UNUSED(lexical_environment);
     UNUSED(num_args);
+
     assert(num_args == 1);
     symbol = *args;
 
     assert(symbol.tag_count.tag == TAG_SYMBOL);
-    slot = get_bound_location(environment, symbol.value.symbol_hash, 1);
+    slot = get_bound_location_in_lexical_environment(evil_resolve_object_handle(lexical_environment), symbol.value.symbol_hash, 1);
     assert(slot != NULL);
 
     function = deref(slot);
@@ -2275,9 +2280,11 @@ compile_load_function_local(struct compiler_context_t *context, struct instructi
 }
 
 struct evil_object_t
-evil_lambda(struct evil_environment_t *environment, int num_args, struct evil_object_t *lambda_body)
+evil_lambda(struct evil_environment_t *environment, struct evil_object_handle_t *lexical_environment, int num_args, struct evil_object_t *lambda_body)
 {
+    UNUSED(lexical_environment);
     UNUSED(num_args);
+
     assert(num_args == 1);
     
     return compile_form_to_bytecode(NULL, environment, lambda_body);

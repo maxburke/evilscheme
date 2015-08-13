@@ -38,7 +38,7 @@ DISABLE_WARNING(4996)
 #   define VM_ASSERT(x)
 #endif
 
-#define ENABLE_VM_TRACING 0
+#define ENABLE_VM_TRACING 1
 
 #define VM_TRACE_OP_IMPL(x) do { fprintf(stderr, "[vm] %32s program_area begin: %p sp begin: %p", #x, (void *)program_area, (void *)sp); } while (0)
 #define VM_TRACE_IMPL(x) do { fprintf(stderr, "[vm] %s", x); } while (0)
@@ -414,7 +414,7 @@ vm_trace_stack(struct evil_environment_t *environment, struct evil_object_t *sp,
                 fprintf(stderr, "BOOLEAN          %s", stack_top->value.fixnum_value ? "#t" : "#f");
                 break;
             case TAG_SYMBOL:
-                fprintf(stderr, "SYMBOL           %" PRIx64 " %s",
+                fprintf(stderr, "SYMBOL           %016" PRIx64 " %s",
                         stack_top->value.symbol_hash,
                         find_symbol_name(environment, stack_top->value.symbol_hash));
                 break;
@@ -494,7 +494,7 @@ vm_extract_num_locals(struct evil_object_t *procedure)
 }
 
 struct evil_object_t
-vm_run(struct evil_environment_t *environment, struct evil_object_t *initial_function, int num_args, struct evil_object_t *args)
+vm_run(struct evil_environment_t *environment, struct evil_object_handle_t *initial_lexical_environment, struct evil_object_t *initial_function, int num_args, struct evil_object_t *args)
 {
     struct evil_object_handle_t *lexical_environment_handle;
     struct evil_object_t *procedure;
@@ -504,7 +504,7 @@ vm_run(struct evil_environment_t *environment, struct evil_object_t *initial_fun
     unsigned char *pc_base;
     unsigned char *pc;
 
-    lexical_environment_handle = evil_create_object_handle(environment, deref(&environment->lexical_environment));
+    lexical_environment_handle = evil_duplicate_object_handle(environment, initial_lexical_environment);
 
     /*
      * This is going to get really ugly if the GC moves our procedure object
@@ -921,12 +921,7 @@ vm_run(struct evil_environment_t *environment, struct evil_object_t *initial_fun
                         fn_environment = environment_address;
                         function_pointer = procedure_base[FIELD_CODE].value.special_function_value;
 
-                        /*
-                         * TODO: This needs to take a lexical somedoohickey
-                         */
-                        BREAK();
-                        
-                        result = function_pointer(fn_environment, args_passed, program_area);
+                        result = function_pointer(fn_environment, lexical_environment_handle, args_passed, program_area);
 
                         sp += args_passed - 1;
                         *(sp + 1) = result;
@@ -1044,12 +1039,7 @@ vm_run(struct evil_environment_t *environment, struct evil_object_t *initial_fun
                         fn_environment = environment_address;
                         function_pointer = procedure_base[FIELD_CODE].value.special_function_value;
 
-                        /*
-                         * TODO: Pass lexical environment.
-                         */
-                        BREAK();
-
-                        result = function_pointer(fn_environment, args_passed, program_area);
+                        result = function_pointer(fn_environment, lexical_environment_handle, args_passed, program_area);
                         *sp-- = result;
 
                         /*

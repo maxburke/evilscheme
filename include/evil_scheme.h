@@ -82,8 +82,9 @@ struct evil_tag_count_t
 };
 
 struct evil_object_t;
+struct evil_object_handle_t;
 struct evil_environment_t;
-typedef struct evil_object_t (*evil_special_function_t)(struct evil_environment_t *, int, struct evil_object_t *);
+typedef struct evil_object_t (*evil_special_function_t)(struct evil_environment_t *, struct evil_object_handle_t *, int, struct evil_object_t *);
 
 union evil_object_value_t
 {
@@ -106,13 +107,14 @@ struct evil_object_t
  * and, if they are kept by code outside of the Scheme, must be tracked via 
  * these object handles.
  */
-struct evil_object_handle_t;
-
 struct evil_object_handle_t *
 evil_create_object_handle(struct evil_environment_t *environment, struct evil_object_t *object);
 
 struct evil_object_handle_t *
 evil_create_object_handle_from_value(struct evil_environment_t *environment, struct evil_object_t object);
+
+struct evil_object_handle_t *
+evil_duplicate_object_handle(struct evil_environment_t *environment, struct evil_object_handle_t *handle);
 
 void
 evil_destroy_object_handle(struct evil_environment_t *environment, struct evil_object_handle_t *handle);
@@ -129,42 +131,39 @@ evil_retarget_object_handle(struct evil_object_handle_t *handle, struct evil_obj
  */
 
 struct evil_object_t
-evil_read(struct evil_environment_t *environment, int num_args, struct evil_object_t *object);
+evil_read(struct evil_environment_t *environment, struct evil_object_handle_t *lexical_environment, int num_args, struct evil_object_t *object);
 
 struct evil_object_t
-evil_eval(struct evil_environment_t *environment, int num_args, struct evil_object_t *object);
+evil_eval(struct evil_environment_t *environment, struct evil_object_handle_t *lexical_environment, int num_args, struct evil_object_t *object);
 
 struct evil_object_t
-evil_print(struct evil_environment_t *environment, int num_args, struct evil_object_t *object);
+evil_print(struct evil_environment_t *environment, struct evil_object_handle_t *lexical_environment, int num_args, struct evil_object_t *object);
 
 struct evil_object_t
-evil_cons(struct evil_environment_t *environment, int num_args, struct evil_object_t *object);
+evil_cons(struct evil_environment_t *environment, struct evil_object_handle_t *lexical_environment, int num_args, struct evil_object_t *object);
 
 struct evil_object_t
-evil_define(struct evil_environment_t *environment, int num_args, struct evil_object_t *object);
+evil_define(struct evil_environment_t *environment, struct evil_object_handle_t *lexical_environment, int num_args, struct evil_object_t *object);
 
 struct evil_object_t
-evil_lambda(struct evil_environment_t *environment, int num_args, struct evil_object_t *object);
+evil_lambda(struct evil_environment_t *environment, struct evil_object_handle_t *lexical_environment, int num_args, struct evil_object_t *object);
 
 struct evil_object_t
-evil_disassemble(struct evil_environment_t *environment, int num_args, struct evil_object_t *object);
+evil_disassemble(struct evil_environment_t *environment, struct evil_object_handle_t *lexical_environment, int num_args, struct evil_object_t *object);
 
 struct evil_object_t
-evil_apply(struct evil_environment_t *environment, int num_args, struct evil_object_t *object);
+evil_apply(struct evil_environment_t *environment, struct evil_object_handle_t *lexical_environment, int num_args, struct evil_object_t *object);
 
 struct evil_object_t
-evil_vector(struct evil_environment_t *environment, int num_args, struct evil_object_t *object);
+evil_vector(struct evil_environment_t *environment, struct evil_object_handle_t *lexical_environment, int num_args, struct evil_object_t *object);
 
 struct evil_object_t
-evil_make_vector(struct evil_environment_t *environment, int num_args, struct evil_object_t *object);
+evil_make_vector(struct evil_environment_t *environment, struct evil_object_handle_t *lexical_environment, int num_args, struct evil_object_t *object);
 
 struct evil_object_t
-evil_vector_length(struct evil_environment_t *environment, int num_args, struct evil_object_t *object);
+evil_vector_length(struct evil_environment_t *environment, struct evil_object_handle_t *lexical_environment, int num_args, struct evil_object_t *object);
 
 struct evil_object_t
-evil_vector_ref(struct evil_environment_t *environment, int num_args, struct evil_object_t *object);
-
-struct evil_object_t
-evil_vector_fill(struct evil_environment_t *environment, int num_args, struct evil_object_t *object);
+evil_vector_ref(struct evil_environment_t *environment, struct evil_object_handle_t *lexical_environment, int num_args, struct evil_object_t *object);
 
 #endif

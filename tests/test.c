@@ -93,6 +93,7 @@ evil_printf(const char *format, ...)
 
         size = (size_t)(print_buffer_size + reallocation_delta);
         print_buffer = realloc(print_buffer, size);
+        assert(print_buffer != NULL);
         memset(print_buffer + print_buffer_size, 0, reallocation_delta);
         print_buffer_size = size;
 
@@ -208,6 +209,7 @@ read_test_file(const char *filename)
     fseek(fp, 0, SEEK_SET);
 
     buffer = calloc(size + 1, 1);
+    assert(buffer != NULL);
     bytes_read = fread(buffer, 1, size, fp);
     assert(bytes_read == size);
 
@@ -258,25 +260,25 @@ create_string_object(struct evil_environment_t *environment, const char *test)
 }
 
 static struct evil_object_handle_t *
-create_test_ast(struct evil_environment_t *environment, struct evil_object_handle_t *string_handle)
+create_test_ast(struct evil_environment_t *environment, struct evil_object_handle_t *lexical_environment, struct evil_object_handle_t *string_handle)
 {
     struct evil_object_t *string_object;
     struct evil_object_t ast;
 
     string_object = evil_resolve_object_handle(string_handle);
-    ast = evil_read(environment, 1, string_object);
+    ast = evil_read(environment, lexical_environment, 1, string_object);
 
     return evil_create_object_handle_from_value(environment, ast);
 }
 
 static struct evil_object_handle_t *
-evaluate_test_result(struct evil_environment_t *environment, struct evil_object_handle_t *ast_handle)
+evaluate_test_result(struct evil_environment_t *environment, struct evil_object_handle_t *lexical_environment, struct evil_object_handle_t *ast_handle)
 {
     struct evil_object_t *ast_object;
     struct evil_object_t result;
 
     ast_object = evil_resolve_object_handle(ast_handle);
-    result = evil_eval(environment, 1, ast_object);
+    result = evil_eval(environment, lexical_environment, 1, ast_object);
 
     return evil_create_object_handle_from_value(environment, result);
 }
@@ -287,14 +289,17 @@ run_test(struct evil_environment_t *environment, const char *test, const char *e
     struct evil_object_handle_t *string_handle;
     struct evil_object_handle_t *ast_handle;
     struct evil_object_handle_t *result_handle;
+    struct evil_object_handle_t *lexical_environment;
 
     reset_print_buffer();
 
-    string_handle = create_string_object(environment, test);
-    ast_handle = create_test_ast(environment, string_handle);
-    result_handle = evaluate_test_result(environment, ast_handle);
+    lexical_environment = evil_create_object_handle_from_value(environment, environment->lexical_environment);
 
-    evil_print(environment, 1, evil_resolve_object_handle(result_handle));
+    string_handle = create_string_object(environment, test);
+    ast_handle = create_test_ast(environment, lexical_environment, string_handle);
+    result_handle = evaluate_test_result(environment, lexical_environment, ast_handle);
+
+    evil_print(environment, lexical_environment, 1, evil_resolve_object_handle(result_handle));
 
     evil_destroy_object_handle(environment, result_handle);
     evil_destroy_object_handle(environment, ast_handle);
@@ -356,9 +361,7 @@ run_test(struct evil_environment_t *environment, const char *test, const char *e
             return 1;
         }
 
-        strncpy(name_buffer, directory_root, name_buffer_length);
-        strncat(name_buffer, "\\", name_buffer_length);
-        strncat(name_buffer, file_data.cFileName, name_buffer_length);
+        snprintf(name_buffer, name_buffer_length, "%s\\%s", directory_root, file_data.cFileName);
 
         name_buffer[name_buffer_length - 1] = 0;
 

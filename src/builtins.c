@@ -17,11 +17,12 @@
 #include "vm.h"
 
 struct evil_object_t
-evil_cons(struct evil_environment_t *environment, int num_args, struct evil_object_t *args)
+evil_cons(struct evil_environment_t *environment, struct evil_object_handle_t *lexical_environment, int num_args, struct evil_object_t *args)
 {
     struct evil_object_t *object;
 
     UNUSED(environment);
+    UNUSED(lexical_environment);
     UNUSED(num_args);
 
     assert(num_args == 2);
@@ -35,11 +36,13 @@ evil_cons(struct evil_environment_t *environment, int num_args, struct evil_obje
 }
 
 struct evil_object_t
-evil_define(struct evil_environment_t *environment, int num_args, struct evil_object_t *args)
+evil_define(struct evil_environment_t *environment, struct evil_object_handle_t *lexical_environment, int num_args, struct evil_object_t *args)
 {
     struct evil_object_t *place;
     struct evil_object_t *value;
+
     UNUSED(num_args);
+    UNUSED(lexical_environment);
 
     assert(num_args == 2);
 
@@ -50,6 +53,10 @@ evil_define(struct evil_environment_t *environment, int num_args, struct evil_ob
     {
         struct evil_object_t *location;
 
+        /*
+         * define binds variables in the global environment, so the lexical
+         * environment parameter goes unused in this function.
+         */
         location = bind(environment, environment->lexical_environment, *place);
         *location = *value;
     }
@@ -71,11 +78,13 @@ evil_define(struct evil_environment_t *environment, int num_args, struct evil_ob
 }
 
 struct evil_object_t
-evil_vector(struct evil_environment_t *environment, int num_args, struct evil_object_t *args)
+evil_vector(struct evil_environment_t *environment, struct evil_object_handle_t *lexical_environment, int num_args, struct evil_object_t *args)
 {
     struct evil_object_t *vector;
     struct evil_object_t *vector_base;
     int i;
+
+    UNUSED(lexical_environment);
 
     assert(num_args < 65536);
 
@@ -107,37 +116,13 @@ evil_coerce_fixnum(struct evil_object_t *arg)
 }
 
 struct evil_object_t
-evil_make_vector(struct evil_environment_t *environment, int num_args, struct evil_object_t *args)
-{
-    struct evil_object_t *vector;
-    struct evil_object_t *size;
-    struct evil_object_t *fill;
-    size_t fixnum_size;
-    struct evil_object_t vector_fill_args[2];
-
-    assert(num_args == 1 || num_args == 2);
-
-    size = deref(args + 0);
-    fill = deref(args + 1);
-
-    assert(size->tag_count.tag == TAG_FIXNUM);
-    fixnum_size = (size_t)evil_coerce_fixnum(size);
-
-    vector = gc_alloc_vector(environment->heap, fixnum_size);
-    vector_fill_args[0] = make_ref(vector);
-
-    vector_fill_args[1] = (num_args == 2) ? *fill : make_fixnum_object(0);
-
-    return evil_vector_fill(environment, 2, vector_fill_args);
-}
-
-struct evil_object_t
-evil_vector_length(struct evil_environment_t *environment, int num_args, struct evil_object_t *args)
+evil_vector_length(struct evil_environment_t *environment, struct evil_object_handle_t *lexical_environment, int num_args, struct evil_object_t *args)
 {
     struct evil_object_t length;
     struct evil_object_t *vector;
 
     UNUSED(environment);
+    UNUSED(lexical_environment);
     UNUSED(num_args);
 
     vector = deref(args + 0);
@@ -154,13 +139,14 @@ evil_vector_length(struct evil_environment_t *environment, int num_args, struct 
 }
 
 struct evil_object_t
-evil_vector_ref(struct evil_environment_t *environment, int num_args, struct evil_object_t *args)
+evil_vector_ref(struct evil_environment_t *environment, struct evil_object_handle_t *lexical_environment, int num_args, struct evil_object_t *args)
 {
     struct evil_object_t *vector;
     struct evil_object_t *element;
     int64_t index;
 
     UNUSED(environment);
+    UNUSED(lexical_environment);
     UNUSED(num_args);
 
     assert(num_args == 2);
@@ -178,7 +164,7 @@ evil_vector_ref(struct evil_environment_t *environment, int num_args, struct evi
     return make_inner_reference(VECTOR_BASE(vector), index);
 }
 
-struct evil_object_t
+static struct evil_object_t
 evil_vector_fill(struct evil_environment_t *environment, int num_args, struct evil_object_t *args)
 {
     struct evil_object_t *vector;
@@ -208,7 +194,34 @@ evil_vector_fill(struct evil_environment_t *environment, int num_args, struct ev
 }
 
 struct evil_object_t
-evil_apply(struct evil_environment_t *environment, int num_args, struct evil_object_t *args)
+evil_make_vector(struct evil_environment_t *environment, struct evil_object_handle_t *lexical_environment, int num_args, struct evil_object_t *args)
+{
+    struct evil_object_t *vector;
+    struct evil_object_t *size;
+    struct evil_object_t *fill;
+    size_t fixnum_size;
+    struct evil_object_t vector_fill_args[2];
+
+    UNUSED(lexical_environment);
+
+    assert(num_args == 1 || num_args == 2);
+
+    size = deref(args + 0);
+    fill = deref(args + 1);
+
+    assert(size->tag_count.tag == TAG_FIXNUM);
+    fixnum_size = (size_t)evil_coerce_fixnum(size);
+
+    vector = gc_alloc_vector(environment->heap, fixnum_size);
+    vector_fill_args[0] = make_ref(vector);
+
+    vector_fill_args[1] = (num_args == 2) ? *fill : make_fixnum_object(0);
+
+    return evil_vector_fill(environment, 2, vector_fill_args);
+}
+
+struct evil_object_t
+evil_apply(struct evil_environment_t *environment, struct evil_object_handle_t *lexical_environment, int num_args, struct evil_object_t *args)
 {
     struct evil_object_t *fn;
     struct evil_object_t *fn_args;
@@ -238,10 +251,10 @@ evil_apply(struct evil_environment_t *environment, int num_args, struct evil_obj
                 evil_special_function_t special_fn;
 
                 special_fn = fn->value.special_function_value;
-                return special_fn(environment, num_args_for_fn, fn_args);
+                return special_fn(environment, lexical_environment, num_args_for_fn, fn_args);
             }
         case TAG_PROCEDURE:
-            return vm_run(environment, fn, num_args_for_fn, fn_args);
+            return vm_run(environment, lexical_environment, fn, num_args_for_fn, fn_args);
             break;
         default:
             BREAK();
@@ -255,7 +268,7 @@ evil_apply(struct evil_environment_t *environment, int num_args, struct evil_obj
  * eval
  */
 struct evil_object_t
-evil_eval(struct evil_environment_t *environment, int num_args, struct evil_object_t *args)
+evil_eval(struct evil_environment_t *environment, struct evil_object_handle_t *lexical_environment, int num_args, struct evil_object_t *args)
 {
     struct evil_object_t *object;
 
@@ -278,7 +291,7 @@ evil_eval(struct evil_environment_t *environment, int num_args, struct evil_obje
             {
                 struct evil_object_t *bound_location;
 
-                bound_location = get_bound_location(environment, object->value.symbol_hash, 1);
+                bound_location = get_bound_location_in_lexical_environment(evil_resolve_object_handle(lexical_environment), object->value.symbol_hash, 1);
                 assert(bound_location != NULL);
                 return *bound_location;
             }
@@ -310,8 +323,8 @@ evil_eval(struct evil_environment_t *environment, int num_args, struct evil_obje
                 *RAW_CAR(wrapper_body) = make_ref(object);
                 *RAW_CDR(wrapper_body) = make_empty_ref();
 
-                fn = evil_lambda(environment, 1, wrapper_args);
-                return vm_run(environment, &fn, 0, empty_pair);
+                fn = evil_lambda(environment, lexical_environment, 1, wrapper_args);
+                return vm_run(environment, lexical_environment, &fn, 0, empty_pair);
             }
             break;
         default:
@@ -339,6 +352,11 @@ print_impl(struct evil_environment_t *environment, int num_args, struct evil_obj
     if (object == empty_pair)
     {
         evil_printf("'()");
+        return;
+    }
+
+    if (object == NULL)
+    {
         return;
     }
 
@@ -418,8 +436,10 @@ print_impl(struct evil_environment_t *environment, int num_args, struct evil_obj
 }
 
 struct evil_object_t
-evil_print(struct evil_environment_t *environment, int num_args, struct evil_object_t *args)
+evil_print(struct evil_environment_t *environment, struct evil_object_handle_t *lexical_environment, int num_args, struct evil_object_t *args)
 {
+    UNUSED(lexical_environment);
+
     print_impl(environment, num_args, args);
     evil_printf("\n");
 

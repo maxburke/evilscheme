@@ -646,12 +646,14 @@ tokenize(struct evil_environment_t *environment, const char *input)
 }
 
 struct evil_object_t
-evil_read(struct evil_environment_t *environment, int num_args, struct evil_object_t *args)
+evil_read(struct evil_environment_t *environment, struct evil_object_handle_t *lexical_environment, int num_args, struct evil_object_t *args)
 {
     struct evil_object_t *arg;
     struct evil_object_handle_t *head;
 
     UNUSED(environment);
+    UNUSED(lexical_environment);
+
     assert(num_args == 1);
 
     arg = deref(args);
