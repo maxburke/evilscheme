@@ -1005,7 +1005,7 @@ vm_run(struct evil_environment_t *environment, struct evil_object_handle_t *init
                      * Adjust the stack pointer down below the program area and
                      * below where the locals go.
                      */
-                    sp = arg_slot - 4;
+                    sp = arg_slot - VM_SLOT_COUNT - 1;
                     sp -= vm_extract_num_locals(fn);
 
                     /*
