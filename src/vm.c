@@ -38,7 +38,7 @@ DISABLE_WARNING(4996)
 #   define VM_ASSERT(x)
 #endif
 
-#define ENABLE_VM_TRACING 1
+#define ENABLE_VM_TRACING 0
 
 #define VM_TRACE_OP_IMPL(x) do { fprintf(stderr, "[vm] %32s program_area begin: %p sp begin: %p", #x, (void *)program_area, (void *)sp); } while (0)
 #define VM_TRACE_IMPL(x) do { fprintf(stderr, "[vm] %s", x); } while (0)
@@ -541,7 +541,7 @@ vm_run(struct evil_environment_t *environment, struct evil_object_handle_t *init
      */
     program_area = sp + 1;
 
-    sp = vm_push_ref(sp, program_area);
+    sp = vm_push_null_ref(sp);                  /* program area chain */
     sp = vm_push_null_ref(sp);                  /* environment chain */
     sp = vm_push_return_address(sp, NULL, 0);   /* return address */
     sp -= vm_extract_num_locals(procedure);
@@ -1005,7 +1005,7 @@ vm_run(struct evil_environment_t *environment, struct evil_object_handle_t *init
                      * Adjust the stack pointer down below the program area and
                      * below where the locals go.
                      */
-                    sp = arg_slot - 3;
+                    sp = arg_slot - 4;
                     sp -= vm_extract_num_locals(fn);
 
                     /*
