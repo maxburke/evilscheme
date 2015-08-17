@@ -173,6 +173,7 @@ bind(struct evil_environment_t *environment, struct evil_object_t lexical_enviro
     }
 
     SYMBOL_AT(new_fragment, 0) = symbol;
+    OBJECT_AT(new_fragment, 0) = make_ref(empty_pair);
 
     /*
      * TODO: Return an inner reference.
