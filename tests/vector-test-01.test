@@ -1,2 +1,2 @@
-(define vector-test #(1 2 3))
+(begin (define vector-test #(1 2 3)) vector-test)
 >#(1 2 3)
