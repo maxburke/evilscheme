@@ -25,6 +25,7 @@
 #endif
 
 #define FLAG_MARKED 1
+#define FLAG_UNMARKED 0
 #define INITIAL_COST 0
 
 struct evil_object_handle_t
@@ -384,7 +385,7 @@ evil_retarget_object_handle(struct evil_object_handle_t *handle, struct evil_obj
 }
 
 static void
-mark_object(struct heap_t *heap, struct evil_object_t *object)
+mark_object(struct heap_t *heap, struct evil_object_t *object, unsigned char flag)
 {
     char *object_address;
     size_t object_offset;
@@ -394,7 +395,15 @@ mark_object(struct heap_t *heap, struct evil_object_t *object)
     object_address = (char *)object;
     object_offset = (size_t)object_address - (size_t)heap->base;
 
-    object->tag_count.flag = FLAG_MARKED;
+    object->tag_count.flag = flag;
+
+    /*
+     * TODO: Specialize marking/unmarking code.
+     */
+    if (flag == FLAG_UNMARKED)
+    {
+        return;
+    }
 
     /*
      * This check uses the overflow of unsigned arithmetic to check if an 
@@ -420,7 +429,7 @@ mark_object(struct heap_t *heap, struct evil_object_t *object)
 }
 
 static inline int
-scan_object(struct heap_t *heap, struct evil_object_t *object)
+scan_object(struct heap_t *heap, struct evil_object_t *object, unsigned char flag)
 {
     unsigned char tag;
 
@@ -429,7 +438,12 @@ scan_object(struct heap_t *heap, struct evil_object_t *object)
         return 0;
     }
 
-    mark_object(heap, object);
+    if (object->tag_count.flag == flag)
+    {
+        return 0;
+    }
+
+    mark_object(heap, object, flag);
 
     tag = object->tag_count.tag;
 
@@ -458,7 +472,7 @@ scan_object(struct heap_t *heap, struct evil_object_t *object)
 
                 for (i = 0; i < elements; ++i)
                 {
-                    scan_object(heap, base + i);
+                    scan_object(heap, base + i, flag);
                 }
 
                 return 1;
@@ -473,7 +487,7 @@ scan_object(struct heap_t *heap, struct evil_object_t *object)
             break;
 
         case TAG_REFERENCE:
-            scan_object(heap, object->value.ref);
+            scan_object(heap, object->value.ref, flag);
             return 0;
 
         case TAG_INNER_REFERENCE:
@@ -482,12 +496,12 @@ scan_object(struct heap_t *heap, struct evil_object_t *object)
 
                 parent = object->value.ref;
 
-                if (scan_object(heap, parent))
+                if (scan_object(heap, parent, flag))
                 {
                     struct evil_object_t *base;
 
                     base = VECTOR_BASE(parent);
-                    scan_object(heap, base + object->tag_count.count);
+                    scan_object(heap, base + object->tag_count.count, flag);
                 }
             }
             return 0;
@@ -504,18 +518,18 @@ scan_object(struct heap_t *heap, struct evil_object_t *object)
 }
 
 static void
-mark_evaluation_stack(struct heap_t *heap, struct evil_object_t *stack_ptr, struct evil_object_t *stack_top)
+mark_evaluation_stack(struct heap_t *heap, struct evil_object_t *stack_ptr, struct evil_object_t *stack_top, unsigned char flag)
 {
     struct evil_object_t *i;
 
     for (i = stack_ptr + 1; i < stack_top; ++i)
     {
-        scan_object(heap, i);
+        scan_object(heap, i, flag);
     }
 }
 
 static void
-mark_object_handles(struct heap_t *heap)
+mark_object_handles(struct heap_t *heap, unsigned char flag)
 {
     struct dlist_t *i;
 
@@ -524,16 +538,16 @@ mark_object_handles(struct heap_t *heap)
         struct evil_object_handle_t *handle;
 
         handle = (struct evil_object_handle_t *)i;
-        scan_object(heap, handle->object);
+        scan_object(heap, handle->object, flag);
     }
 }
 
 static void
-mark_roots(struct heap_t *heap, struct evil_environment_t *environment)
+mark_roots(struct heap_t *heap, struct evil_environment_t *environment, unsigned char flag)
 {
-    mark_evaluation_stack(heap, environment->stack_ptr, environment->stack_top);
-    scan_object(heap, &environment->lexical_environment);
-    mark_object_handles(heap);
+    mark_evaluation_stack(heap, environment->stack_ptr, environment->stack_top, flag);
+    scan_object(heap, &environment->lexical_environment, flag);
+    mark_object_handles(heap, flag);
 }
 
 static void
@@ -618,13 +632,15 @@ gc_collect(struct heap_t *heap)
     assert(environment != NULL);
 
     initialize_bucket_costs(heap);
-    mark_roots(heap, environment);
+    mark_roots(heap, environment, FLAG_MARKED);
 
     /*
      * Pick through all the buckets that are empty and reclaim them.
      */
 
     num_reclaimed = reclaim_empty_buckets(heap);
+
+    mark_roots(heap, environment, FLAG_UNMARKED);
 
     if (num_reclaimed > 0)
     {
