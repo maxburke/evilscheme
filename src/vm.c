@@ -525,10 +525,10 @@ vm_run(struct evil_environment_t *environment, struct evil_object_handle_t *init
      * Stack layout for VM:
      * [high addresses]..................................................................................[low addresses]
      * [arg n - 1][...][arg 1][arg 0][program area chain][environment chain][return address][stack top]...[stack_bottom]
-     *                                      ^                                 ^
-     *                  program_area -------+                           ------+
+     *                           ^
+     *       program_area -------+
      *
-     * arg0 is at program_area[1]
+     * arg0 is at program_area[0]
      */
 
     vm_push_args_to_stack(environment, num_args, args);
@@ -1061,6 +1061,7 @@ vm_run(struct evil_environment_t *environment, struct evil_object_handle_t *init
             case OPCODE_RETURN:
                 VM_TRACE_OP(OPCODE_RETURN);
                 {
+#define RETURN_VALUE_OFFSET 2
                     struct evil_object_t *return_address;
                     struct evil_object_t *prev_program_area_ref;
                     struct evil_object_t *prev_lexical_environment;
@@ -1071,9 +1072,11 @@ vm_run(struct evil_environment_t *environment, struct evil_object_handle_t *init
                     return_address = program_area - VM_SLOT_PC_CHAIN;
                     prev_lexical_environment = program_area - VM_SLOT_LEXICAL_ENVIRONMENT_CHAIN;
                     prev_program_area_ref = program_area - VM_SLOT_PROGRAM_AREA_CHAIN;
+
                     VM_ASSERT(return_address->tag_count.tag == TAG_INNER_REFERENCE);
                     VM_ASSERT(prev_lexical_environment->tag_count.tag == TAG_REFERENCE);
                     VM_ASSERT(prev_program_area_ref->tag_count.tag == TAG_REFERENCE);
+
                     parent = return_address->value.ref;
 
                     if (parent != NULL)
@@ -1081,7 +1084,13 @@ vm_run(struct evil_environment_t *environment, struct evil_object_handle_t *init
                         pc_base = vm_extract_code_pointer(parent);
                         pc = pc_base + return_address->tag_count.count;
 
-                        sp = program_area + vm_extract_num_args(procedure) - VM_SLOT_COUNT;
+                        /*
+                         * The return value subsumes the slot for the topmost
+                         * passed argument (program_area - arg_count - 1).
+                         * The stack pointer is one below this (rv slot - 1).
+                         */
+
+                        sp = program_area + vm_extract_num_args(procedure) - RETURN_VALUE_OFFSET;
                         procedure = parent;
                         program_area = deref(prev_program_area_ref);
                         evil_retarget_object_handle(lexical_environment_handle, prev_lexical_environment->value.ref);
@@ -1090,11 +1099,12 @@ vm_run(struct evil_environment_t *environment, struct evil_object_handle_t *init
                     }
                     else
                     {
-                        sp = program_area + vm_extract_num_args(procedure) - VM_SLOT_COUNT;
+                        sp = program_area + vm_extract_num_args(procedure) - RETURN_VALUE_OFFSET;
                         *(sp + 1) = *return_value;
 
                         goto vm_execution_done;
                     }
+#undef RETURN_VALUE_OFFSET
                 }
                 VM_CONTINUE();
             case OPCODE_ADD:
