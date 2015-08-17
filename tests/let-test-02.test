@@ -1,15 +1,15 @@
 (disassemble 'let-test)
 >let-test:
         0: 04 01                         LDIMM_1_FIXNUM 1
-        2: 11 FD FF                      STSLOT -3
+        2: 11 FC FF                      STSLOT -4
         5: 04 01                         LDIMM_1_FIXNUM 1
-        7: 01 FD FF                      LDSLOT -3
+        7: 01 FC FF                      LDSLOT -4
        10: 21                            ADD
-       11: 11 FC FF                      STSLOT -4
-       14: 01 FD FF                      LDSLOT -3
+       11: 11 FB FF                      STSLOT -5
+       14: 01 FC FF                      LDSLOT -4
        17: 01 00 00                      LDSLOT 0
        20: 21                            ADD
-       21: 01 FC FF                      LDSLOT -4
+       21: 01 FB FF                      LDSLOT -5
        24: 21                            ADD
        25: 1F                            RETURN
 '()

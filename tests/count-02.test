@@ -1,4 +1,4 @@
-(disassemble 'count)
+(begin (disassemble 'count) '())
 >count:
         0: 01 01 00                      LDSLOT 1
         3: 1C 03 00                      COND_BRANCH 9
