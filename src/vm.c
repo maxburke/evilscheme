@@ -5,6 +5,7 @@
  ***********************************************************************/
 
 #include <assert.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -31,18 +32,25 @@ DISABLE_WARNING(4996)
 #   endif
 #endif
 
+#define ENABLE_VM_TRACING 0
+#define ENABLE_VM_BUFFER_TRACE 0
+
+#if ENABLE_VM_BUFFER_TRACE
+#   define VM_TRACE_FN(format, ...) vm_trace_fn(format, __VA_ARGS__)
+#else
+#   define VM_TRACE_FN(format, ...) fprintf(stderr, format, __VA_ARGS__)
+#endif
+
 #if ENABLE_VM_ASSERTS
-#   define VM_ASSERT_NOTRACE(x) if (!(x)) { fprintf(stderr, "%s:%d: Assertion failed: %s", __FILE__, __LINE__, #x); BREAK(); } else (void)0
-#   define VM_ASSERT(x) if (!(x)) { vm_trace_stack(environment, sp, program_area); fprintf(stderr, "%s:%d: Assertion failed: %s", __FILE__, __LINE__, #x); BREAK(); } else (void)0
+#   define VM_ASSERT_NOTRACE(x) if (!(x)) { VM_TRACE_FN("%s:%d: Assertion failed: %s", __FILE__, __LINE__, #x); BREAK(); } else (void)0
+#   define VM_ASSERT(x) if (!(x)) { vm_trace_stack(environment, sp, program_area); VM_TRACE_FN("%s:%d: Assertion failed: %s", __FILE__, __LINE__, #x); BREAK(); } else (void)0
 #else
 #   define VM_ASSERT(x)
 #endif
 
-#define ENABLE_VM_TRACING 0
-
-#define VM_TRACE_OP_IMPL(x) do { fprintf(stderr, "[vm] %32s program_area begin: %p sp begin: %p", #x, (void *)program_area, (void *)sp); } while (0)
-#define VM_TRACE_IMPL(x) do { fprintf(stderr, "[vm] %s", x); } while (0)
-#define VM_TRACE_STACK() fprintf(stderr, " sp end: %p\n", (void *)sp); vm_trace_stack(environment, sp, program_area)
+#define VM_TRACE_OP_IMPL(x) do { VM_TRACE_FN("[vm] %32s program_area begin: %p sp begin: %p", #x, (void *)program_area, (void *)sp); } while (0)
+#define VM_TRACE_IMPL(x) do { VM_TRACE_FN("[vm] %s", x); } while (0)
+#define VM_TRACE_STACK() VM_TRACE_FN(" sp end: %p\n", (void *)sp); vm_trace_stack(environment, sp, program_area)
 
 #if ENABLE_VM_TRACING
 #   define VM_TRACE_OP(x) VM_TRACE_OP_IMPL(x)
@@ -54,6 +62,10 @@ DISABLE_WARNING(4996)
 #   define VM_CONTINUE() continue
 #endif
 
+#ifndef MIN
+#   define MIN(a, b) ((a) < (b) ? (a) : (b))
+#endif
+
 #define STACK_PUSH(stack, x) do { *(stack--) = x; } while (0)
 #define STACK_POP(stack) *(++stack)
 #ifndef NDEBUG
@@ -62,6 +74,12 @@ DISABLE_WARNING(4996)
 #else
 #   define VALIDATE_STACK(env)
 #endif
+
+static char trace_buf[1048576];
+static size_t trace_buf_idx;
+
+static void
+vm_trace_fn(const char *format, ...);
 
 static inline int
 vm_compare_equal(const struct evil_object_t *a, const struct evil_object_t *b);
@@ -388,75 +406,75 @@ vm_trace_stack(struct evil_environment_t *environment, struct evil_object_t *sp,
 {
     struct evil_object_t *stack_top;
 
-    fprintf(stderr, "\n");
+    VM_TRACE_FN("\n");
 
     for (stack_top = environment->stack_top - 1; stack_top >= sp; --stack_top)
     {
         if (stack_top == sp)
         {
-            fprintf(stderr, "[vm] sp->\n");
+            VM_TRACE_FN("[vm] sp->\n");
             break;
         }
         else if (stack_top == program_area)
         {
-            fprintf(stderr, "[vm] pa-> ");
+            VM_TRACE_FN("[vm] pa-> ");
         }
         else
         {
-            fprintf(stderr, "[vm]      ");
+            VM_TRACE_FN("[vm]      ");
         }
 
-        fprintf(stderr, "%p ", (void *)stack_top);
+        VM_TRACE_FN("%p ", (void *)stack_top);
 
         switch (stack_top->tag_count.tag)
         {
             case TAG_BOOLEAN:
-                fprintf(stderr, "BOOLEAN          %s", stack_top->value.fixnum_value ? "#t" : "#f");
+                VM_TRACE_FN("BOOLEAN          %s", stack_top->value.fixnum_value ? "#t" : "#f");
                 break;
             case TAG_SYMBOL:
-                fprintf(stderr, "SYMBOL           %016" PRIx64 " %s",
+                VM_TRACE_FN("SYMBOL           %016" PRIx64 " %s",
                         stack_top->value.symbol_hash,
                         find_symbol_name(environment, stack_top->value.symbol_hash));
                 break;
             case TAG_CHAR:
-                fprintf(stderr, "CHAR             %c", (char)stack_top->value.fixnum_value);
+                VM_TRACE_FN("CHAR             %c", (char)stack_top->value.fixnum_value);
                 break;
             case TAG_FIXNUM:
-                fprintf(stderr, "FIXNUM           %" PRId64, stack_top->value.fixnum_value);
+                VM_TRACE_FN("FIXNUM           %" PRId64, stack_top->value.fixnum_value);
                 break;
             case TAG_FLONUM:
-                fprintf(stderr, "FLONUM           %lf", stack_top->value.flonum_value);
+                VM_TRACE_FN("FLONUM           %lf", stack_top->value.flonum_value);
                 break;
             case TAG_REFERENCE:
-                fprintf(stderr, "REFERENCE        %p", (void *)stack_top->value.ref);
+                VM_TRACE_FN("REFERENCE        %p", (void *)stack_top->value.ref);
                 break;
             case TAG_INNER_REFERENCE:
-                fprintf(stderr, "INNER REFERENCE  %p,%d", (void *)stack_top->value.ref, stack_top->tag_count.count);
+                VM_TRACE_FN("INNER REFERENCE  %p,%d", (void *)stack_top->value.ref, stack_top->tag_count.count);
                 break;
             case TAG_SPECIAL_FUNCTION:
                 {
                     union function_pointer_cast_t function_pointer_cast;
 
                     function_pointer_cast.special_function = stack_top->value.special_function_value;
-                    fprintf(stderr, "SPECIAL FUNCTION %p", function_pointer_cast.pointer);
+                    VM_TRACE_FN("SPECIAL FUNCTION %p", function_pointer_cast.pointer);
                 }
                 break;
                 break;
             case TAG_PROCEDURE:
-                fprintf(stderr, "ERROR: PROCEDURE TYPE ON STACK");
+                VM_TRACE_FN("ERROR: PROCEDURE TYPE ON STACK");
                 break;
             case TAG_PAIR:
-                fprintf(stderr, "ERROR: PAIR TYPE ON STACK");
+                VM_TRACE_FN("ERROR: PAIR TYPE ON STACK");
                 break;
             case TAG_VECTOR:
-                fprintf(stderr, "ERROR: VECTOR TYPE ON STACK");
+                VM_TRACE_FN("ERROR: VECTOR TYPE ON STACK");
                 break;
             case TAG_STRING:
-                fprintf(stderr, "ERROR: STRING TYPE ON STACK");
+                VM_TRACE_FN("ERROR: STRING TYPE ON STACK");
                 break;
         }
 
-        fprintf(stderr, "\n");
+        VM_TRACE_FN("\n");
     }
 }
 
@@ -491,6 +509,51 @@ vm_extract_num_locals(struct evil_object_t *procedure)
     assert(num_locals->tag_count.tag == TAG_FIXNUM);
 
     return (int)num_locals->value.fixnum_value;
+}
+
+static void
+vm_trace_fn(const char *format, ...)
+{
+    static char buf[512];
+    va_list args;
+    size_t len;
+    size_t copy_len;
+    size_t remainder;
+
+    va_start(args, format);
+    vsnprintf(buf, sizeof buf, format, args);
+    va_end(args);
+
+    len = strlen(buf);
+
+    copy_len = MIN(len, (sizeof trace_buf) - trace_buf_idx);
+    assert(len >= copy_len);
+
+    remainder = len - copy_len;
+    memcpy(&trace_buf[trace_buf_idx], buf, copy_len);
+
+    if (remainder == 0)
+    {
+        trace_buf_idx += len;
+    }
+    else
+    {
+        trace_buf_idx = 0;
+        memcpy(&trace_buf[0], buf + copy_len, remainder);
+        trace_buf_idx = remainder;
+    }
+}
+
+void
+vm_dump_trace_buf(void)
+{
+    char c;
+
+    c = trace_buf[trace_buf_idx];
+    fputs(&trace_buf[trace_buf_idx], stdout);
+    trace_buf[trace_buf_idx] = 0;
+    fputs(trace_buf, stdout);
+    trace_buf[trace_buf_idx] = c;
 }
 
 struct evil_object_t
