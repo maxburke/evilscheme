@@ -1,4 +1,3 @@
-#!broken
 (begin
 
  (define a (lambda (i j)
@@ -36,7 +35,7 @@
 
  (define dot (lambda (v u n)
               (let* ((f (lambda (v u n i sum)
-                          (if (eq n i)
+                          (if (= n i)
                             sum
                             (let ((v0 (vector-ref v i))
                                   (u0 (vector-ref u i)))
