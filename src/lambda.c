@@ -64,6 +64,7 @@ struct stack_slot_t
     struct slist_t link;
     uint64_t symbol_hash;
     struct instruction_t *initializer;
+    int demoted;
     short index;
 };
 
@@ -125,6 +126,12 @@ struct instruction_t
         char string[1];
     } data;
 };
+
+static struct compiler_context_t *
+identify_local_in_previous_context(struct compiler_context_t *context, uint64_t symbol_hash, struct stack_slot_t **slot);
+
+static void
+bind_symbol_for_scoped_environment(struct compiler_context_t *context, struct compiler_context_t *closure_root_context, struct evil_object_t *symbol_object, struct stack_slot_t *previous_local_slot);
 
 static struct instruction_t *
 compile_form(struct compiler_context_t *context, struct instruction_t *next, struct evil_object_t *body);
@@ -612,6 +619,8 @@ compile_direct_call(struct compiler_context_t *context, struct instruction_t *ne
     struct instruction_t *bound_location;
     struct instruction_t *function_symbol;
     struct stack_slot_t *slot;
+    struct stack_slot_t *previous_local_slot;
+    struct compiler_context_t *closure_root_context;
 
     /*
      * Optimization opportunity -- tail calls to self can be replaced with
@@ -634,14 +643,19 @@ compile_direct_call(struct compiler_context_t *context, struct instruction_t *ne
      */
     slot = get_stack_slot(context->stack_slots, function->value.symbol_hash);
 
-    if (slot == NULL)
+    if (slot != NULL)
     {
-        bound_location = compile_get_bound_location(context, evaluated_args, function);
-        function_symbol = compile_load(context, bound_location);
+        function_symbol = compile_load_slot(context, evaluated_args, slot);
     }
     else
     {
-        function_symbol = compile_load_slot(context, evaluated_args, slot);
+        if ((closure_root_context = identify_local_in_previous_context(context, function->value.symbol_hash, &previous_local_slot)) != NULL)
+        {
+            bind_symbol_for_scoped_environment(context, closure_root_context, function, previous_local_slot);
+        }
+
+        bound_location = compile_get_bound_location(context, evaluated_args, function);
+        function_symbol = compile_load(context, bound_location);
     }
 
     return emit_call(context, function_symbol, num_args);
@@ -878,6 +892,24 @@ compile_let(struct compiler_context_t *context, struct instruction_t *next, stru
 
         assert(symbol->tag_count.tag == TAG_SYMBOL);
 
+        slot_index = current_active_stack_slots++;
+        assert(slot_index >= 0 && slot_index < 65536);
+
+        /*
+         * The stack is arranged, from high address to low:
+         * [arg 1][arg 0][return][env chain][pa chain][first slot]
+         *    1      0       -1     -2          -3        -4
+         * This bit of strange math below calculates the stack slot:
+         */
+        slot_index = -((short)slot_index + VM_SLOT_COUNT + 1);
+
+        stack_slot = linear_allocator_alloc(context->pool, sizeof(struct stack_slot_t));
+        stack_slot->symbol_hash = symbol->value.symbol_hash;
+        stack_slot->link.next = &context->stack_slots->link;
+        stack_slot->index = (short)slot_index;
+
+        context->stack_slots = stack_slot;
+
         if (CDR(symbol) != empty_pair)
         {
             struct evil_object_t *initializer_form;
@@ -903,26 +935,19 @@ compile_let(struct compiler_context_t *context, struct instruction_t *next, stru
             initializer->link.next = &next->link;
         }
 
-        slot_index = current_active_stack_slots++;
-        assert(slot_index >= 0 && slot_index < 65536);
+        if (stack_slot->demoted)
+        {
+            struct instruction_t *get_bound_location;
 
-        /*
-         * The stack is arranged, from high address to low:
-         * [arg 1][arg 0][return][env chain][pa chain][first slot]
-         *    1      0       -1     -2          -3        -4
-         * This bit of strange math below calculates the stack slot:
-         */
-        slot_index = -((short)slot_index + VM_SLOT_COUNT + 1);
+            get_bound_location = compile_get_bound_location(context, initializer, symbol);
+            initializer_store = compile_store(context, get_bound_location);
+        }
+        else
+        {
+            initializer_store = compile_store_slot(context, initializer, slot_index);
+        }
 
-        initializer_store = compile_store_slot(context, initializer, slot_index);
-
-        stack_slot = linear_allocator_alloc(context->pool, sizeof(struct stack_slot_t));
-        stack_slot->symbol_hash = symbol->value.symbol_hash;
         stack_slot->initializer = initializer;
-        stack_slot->link.next = &context->stack_slots->link;
-        stack_slot->index = (short)slot_index;
-
-        context->stack_slots = stack_slot;
         next = initializer_store;
     }
 
@@ -1158,7 +1183,7 @@ compile_type_predicate(struct compiler_context_t *context, struct instruction_t 
 }
 
 static struct compiler_context_t *
-identify_local_in_previous_context(struct compiler_context_t *context, uint64_t symbol_hash)
+identify_local_in_previous_context(struct compiler_context_t *context, uint64_t symbol_hash, struct stack_slot_t **slot)
 {
     struct compiler_context_t *previous_context;
     struct stack_slot_t *slots;
@@ -1179,6 +1204,8 @@ identify_local_in_previous_context(struct compiler_context_t *context, uint64_t 
             continue;
         }
 
+        *slot = slots;
+
         closure_variable = linear_allocator_alloc(previous_context->pool, sizeof(struct closure_variable_t));
         closure_variable->link.next = &previous_context->closure_variables->link;
         closure_variable->symbol_hash = symbol_hash;
@@ -1188,7 +1215,47 @@ identify_local_in_previous_context(struct compiler_context_t *context, uint64_t 
         return previous_context;
     }
 
-    return identify_local_in_previous_context(previous_context, symbol_hash);
+    return identify_local_in_previous_context(previous_context, symbol_hash, slot);
+}
+
+static void
+bind_symbol_for_scoped_environment(struct compiler_context_t *context, struct compiler_context_t *closure_root_context, struct evil_object_t *symbol_object, struct stack_slot_t *previous_local_slot)
+{
+    struct evil_object_t *lexical_environment_ptr;
+    struct evil_environment_t *environment;
+
+    assert(previous_local_slot != NULL);
+
+    environment = context->environment;
+    if (closure_root_context->lexical_environment == NULL)
+    {
+        struct evil_object_t *parent_environment;
+
+        lexical_environment_ptr = gc_alloc_vector(environment->heap, FIELD_LEX_ENV_NUM_FIELDS);
+
+        parent_environment = closure_root_context->parent_environment
+            ? evil_resolve_object_handle(closure_root_context->parent_environment)
+            : &closure_root_context->environment->lexical_environment;
+
+        VECTOR_BASE(lexical_environment_ptr)[FIELD_LEX_ENV_PARENT_ENVIRONMENT] = make_ref(parent_environment);
+        VECTOR_BASE(lexical_environment_ptr)[FIELD_LEX_ENV_SYMBOL_TABLE_FRAGMENT] = make_empty_ref();
+
+        closure_root_context->lexical_environment = evil_create_object_handle(environment, lexical_environment_ptr);
+        closure_root_context->closure_has_allocated_environment = 1;
+    }
+
+    /* 
+     * TODO: This is going to leak object handles like woah.
+     */
+    lexical_environment_ptr = evil_resolve_object_handle(closure_root_context->lexical_environment);
+    context->parent_environment = evil_duplicate_object_handle(environment, closure_root_context->lexical_environment);
+    previous_local_slot->demoted = 1;
+#if 0
+#error stack slot record needs to note that this variable has been demoted for a closure
+#error then the stack slot initialization code needs to know where the storage for this variable
+#error exists so that it can set the initializer properly.
+#endif
+    bind(environment, make_ref(lexical_environment_ptr), *symbol_object);
 }
 
 static struct instruction_t *
@@ -1197,6 +1264,7 @@ compile_form(struct compiler_context_t *context, struct instruction_t *next, str
     struct evil_object_t *symbol_object;
     uint64_t symbol_hash;
     struct stack_slot_t *slot;
+    struct stack_slot_t *previous_local_slot;
     struct instruction_t *bound_location;
     struct compiler_context_t *closure_root_context;
 
@@ -1309,34 +1377,9 @@ compile_form(struct compiler_context_t *context, struct instruction_t *next, str
         return compile_load_slot(context, next, slot);
     }
 
-    if ((closure_root_context = identify_local_in_previous_context(context, symbol_object->value.symbol_hash)) != NULL)
+    if ((closure_root_context = identify_local_in_previous_context(context, symbol_object->value.symbol_hash, &previous_local_slot)) != NULL)
     {
-        struct evil_object_t *lexical_environment_ptr;
-        struct evil_environment_t *environment;
-
-        environment = context->environment;
-        if (closure_root_context->lexical_environment == NULL)
-        {
-            struct evil_object_t *parent_environment;
-
-            lexical_environment_ptr = gc_alloc_vector(environment->heap, FIELD_LEX_ENV_NUM_FIELDS);
-
-            parent_environment = closure_root_context->parent_environment
-                ? evil_resolve_object_handle(closure_root_context->parent_environment)
-                : &closure_root_context->environment->lexical_environment;
-
-            VECTOR_BASE(lexical_environment_ptr)[FIELD_LEX_ENV_PARENT_ENVIRONMENT] = make_ref(parent_environment);
-            VECTOR_BASE(lexical_environment_ptr)[FIELD_LEX_ENV_SYMBOL_TABLE_FRAGMENT] = make_empty_ref();
-            closure_root_context->lexical_environment = evil_create_object_handle(environment, lexical_environment_ptr);
-            closure_root_context->closure_has_allocated_environment = 1;
-        }
-
-        /* 
-         * TODO: This is going to leak object handles like woah.
-         */
-        lexical_environment_ptr = evil_resolve_object_handle(closure_root_context->lexical_environment);
-        context->parent_environment = evil_duplicate_object_handle(environment, closure_root_context->lexical_environment);
-        bind(environment, make_ref(lexical_environment_ptr), *symbol_object);
+        bind_symbol_for_scoped_environment(context, closure_root_context, symbol_object, previous_local_slot);
     }
 
     bound_location = compile_get_bound_location(context, next, symbol_object);
