@@ -1249,12 +1249,9 @@ bind_symbol_for_scoped_environment(struct compiler_context_t *context, struct co
      */
     lexical_environment_ptr = evil_resolve_object_handle(closure_root_context->lexical_environment);
     context->parent_environment = evil_duplicate_object_handle(environment, closure_root_context->lexical_environment);
+    context->lexical_environment = evil_duplicate_object_handle(environment, closure_root_context->lexical_environment);
     previous_local_slot->demoted = 1;
-#if 0
-#error stack slot record needs to note that this variable has been demoted for a closure
-#error then the stack slot initialization code needs to know where the storage for this variable
-#error exists so that it can set the initializer properly.
-#endif
+
     bind(environment, make_ref(lexical_environment_ptr), *symbol_object);
 }
 
@@ -2188,16 +2185,16 @@ demote_closure_references(struct compiler_context_t *context, struct instruction
             }
             else
             {
+                struct evil_object_t symbol;
                 struct instruction_t *get_bound_location;
+                struct instruction_t *load;
 
-                get_bound_location = allocate_instruction(context);
-                get_bound_location->opcode = OPCODE_GET_BOUND_LOCATION;
-                get_bound_location->size = 8;
-                get_bound_location->data.u8 = closure_variable->symbol_hash;
-                get_bound_location->link.next = i->link.next;
-                i->link.next = &get_bound_location->link;
+                symbol.tag_count.tag = TAG_SYMBOL;
+                symbol.value.symbol_hash = closure_variable->symbol_hash;
 
-BREAK();
+                get_bound_location = compile_get_bound_location(context, (struct instruction_t *)i->link.next, &symbol);
+                load = compile_load(context, get_bound_location);
+                memcpy(i, load, sizeof(struct instruction_t));
             }
         }
     }
