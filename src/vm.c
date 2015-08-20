@@ -126,19 +126,21 @@ vm_compare_equal(const struct evil_object_t *a, const struct evil_object_t *b);
 #define LDIMM_8_SYMBOL() LDIMM_8_IMPL(TAG_SYMBOL, symbol_hash, u8)
 
 #if ENABLE_VM_ASSERTS
-    #define ENSURE_NUMERIC(X) VM_ASSERT(X == TAG_FIXNUM || X == TAG_FLONUM)
+#define ENSURE_NUMERIC(X) VM_ASSERT(X == TAG_FIXNUM || X == TAG_FLONUM)
 #else
-    #define ENSURE_NUMERIC(X)
+#define ENSURE_NUMERIC(X)
 #endif
 
 #define CONDITIONAL_DEMOTE(A, B) do {                                                       \
         if (a_tag == TAG_FIXNUM && b_tag == TAG_FLONUM)                                     \
         {                                                                                   \
             vm_demote_numeric(A);                                                           \
+            a_tag = TAG_FLONUM;                                                             \
         }                                                                                   \
         else if (a_tag == TAG_FLONUM && b_tag == TAG_FIXNUM)                                \
         {                                                                                   \
             vm_demote_numeric(B);                                                           \
+            b_tag = TAG_FLONUM;                                                             \
         }                                                                                   \
     } while (0)
 
@@ -774,7 +776,10 @@ vm_run(struct evil_environment_t *environment, struct evil_object_handle_t *init
                     }
                     else
                     {
-                        *deref(ref) = *object;
+                        struct evil_object_t *ptr;
+
+                        ptr = deref(ref);
+                        *ptr = *object;
                     }
 
                     sp += 2;
@@ -915,6 +920,7 @@ vm_run(struct evil_environment_t *environment, struct evil_object_handle_t *init
                     memcpy(c8.bytes, pc, 8);
                     pc += 8;
                     lexical_environment = evil_resolve_object_handle(lexical_environment_handle);
+
                     object = get_bound_location_in_lexical_environment(lexical_environment, c8.u8, 1);
                     sp = vm_push_ref(sp, object);
                 }
