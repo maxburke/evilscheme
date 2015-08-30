@@ -36,9 +36,9 @@ DISABLE_WARNING(4996)
 #define ENABLE_VM_BUFFER_TRACE 0
 
 #if ENABLE_VM_BUFFER_TRACE
-#   define VM_TRACE_FN(format, ...) vm_trace_fn(format, __VA_ARGS__)
+#   define VM_TRACE_FN(...) vm_trace_fn(__VA_ARGS__)
 #else
-#   define VM_TRACE_FN(format, ...) fprintf(stderr, format, __VA_ARGS__)
+#   define VM_TRACE_FN(...) fprintf(stderr, __VA_ARGS__)
 #endif
 
 #if ENABLE_VM_ASSERTS
@@ -78,8 +78,10 @@ DISABLE_WARNING(4996)
 static char trace_buf[1048576];
 static size_t trace_buf_idx;
 
-static void
-vm_trace_fn(const char *format, ...);
+#if ENABLE_VM_BUFFER_TRACE
+    static void
+    vm_trace_fn(const char *format, ...);
+#endif
 
 static inline int
 vm_compare_equal(const struct evil_object_t *a, const struct evil_object_t *b);
@@ -513,38 +515,40 @@ vm_extract_num_locals(struct evil_object_t *procedure)
     return (int)num_locals->value.fixnum_value;
 }
 
-static void
-vm_trace_fn(const char *format, ...)
-{
-    static char buf[512];
-    va_list args;
-    size_t len;
-    size_t copy_len;
-    size_t remainder;
-
-    va_start(args, format);
-    vsnprintf(buf, sizeof buf, format, args);
-    va_end(args);
-
-    len = strlen(buf);
-
-    copy_len = MIN(len, (sizeof trace_buf) - trace_buf_idx);
-    assert(len >= copy_len);
-
-    remainder = len - copy_len;
-    memcpy(&trace_buf[trace_buf_idx], buf, copy_len);
-
-    if (remainder == 0)
+#if ENABLE_VM_BUFFER_TRACE
+    static void
+    vm_trace_fn(const char *format, ...)
     {
-        trace_buf_idx += len;
+        static char buf[512];
+        va_list args;
+        size_t len;
+        size_t copy_len;
+        size_t remainder;
+
+        va_start(args, format);
+        vsnprintf(buf, sizeof buf, format, args);
+        va_end(args);
+
+        len = strlen(buf);
+
+        copy_len = MIN(len, (sizeof trace_buf) - trace_buf_idx);
+        assert(len >= copy_len);
+
+        remainder = len - copy_len;
+        memcpy(&trace_buf[trace_buf_idx], buf, copy_len);
+
+        if (remainder == 0)
+        {
+            trace_buf_idx += len;
+        }
+        else
+        {
+            trace_buf_idx = 0;
+            memcpy(&trace_buf[0], buf + copy_len, remainder);
+            trace_buf_idx = remainder;
+        }
     }
-    else
-    {
-        trace_buf_idx = 0;
-        memcpy(&trace_buf[0], buf + copy_len, remainder);
-        trace_buf_idx = remainder;
-    }
-}
+#endif
 
 void
 vm_dump_trace_buf(void)
