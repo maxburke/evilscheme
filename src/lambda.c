@@ -860,6 +860,47 @@ count_active_stack_slots(struct stack_slot_t *slots)
 }
 
 static struct instruction_t *
+recursive_set_slot_initializers(struct compiler_context_t *context, struct stack_slot_t *slot, struct stack_slot_t *last_slot, struct instruction_t *next)
+{
+    short slot_index;
+    struct instruction_t *initializer_store;
+    struct instruction_t *initializer;
+
+    if (slot != last_slot)
+    {
+        next = recursive_set_slot_initializers(context, (struct stack_slot_t *)slot->link.next, last_slot, next);
+    }
+
+    if (slot == last_slot)
+    {
+        return next;
+    }
+
+    slot_index = slot->index;
+    initializer = slot->initializer;
+
+    if (slot->demoted)
+    {
+        struct evil_object_t symbol;
+        struct instruction_t *get_bound_location;
+
+        symbol.tag_count.tag = TAG_SYMBOL;
+        symbol.value.symbol_hash = slot->symbol_hash;
+
+        get_bound_location = compile_get_bound_location(context, initializer, &symbol);
+        initializer_store = compile_store(context, get_bound_location);
+    }
+    else
+    {
+        initializer_store = compile_store_slot(context, initializer, slot_index);
+    }
+
+    next = initializer_store;
+
+    return next;
+}
+
+static struct instruction_t *
 compile_let(struct compiler_context_t *context, struct instruction_t *next, struct evil_object_t *args)
 {
     int i;
@@ -868,6 +909,7 @@ compile_let(struct compiler_context_t *context, struct instruction_t *next, stru
     struct evil_object_t *binding_list;
     struct evil_object_t *body;
     struct stack_slot_t *slot;
+    struct stack_slot_t *last_slot;
 
     /*
      * This code evaluates the let statements in program order and so is able
@@ -877,6 +919,7 @@ compile_let(struct compiler_context_t *context, struct instruction_t *next, stru
     num_slots = 0;
     current_active_stack_slots = count_active_stack_slots(context->stack_slots);
     body = CAR(CDR(args));
+    last_slot = (struct stack_slot_t *)&context->stack_slots->link;
 
     for (binding_list = CAR(args); binding_list != empty_pair; binding_list = CDR(binding_list), ++num_slots)
     {
@@ -884,7 +927,6 @@ compile_let(struct compiler_context_t *context, struct instruction_t *next, stru
         struct evil_object_t *symbol;
         struct stack_slot_t *stack_slot;
         struct instruction_t *initializer;
-        struct instruction_t *initializer_store;
         int slot_index;
 
         binding_pair = CAR(binding_list);
@@ -934,7 +976,7 @@ compile_let(struct compiler_context_t *context, struct instruction_t *next, stru
             initializer->opcode = OPCODE_LDEMPTY;
             initializer->link.next = &next->link;
         }
-
+        /*
         if (stack_slot->demoted)
         {
             struct instruction_t *get_bound_location;
@@ -947,16 +989,22 @@ compile_let(struct compiler_context_t *context, struct instruction_t *next, stru
             initializer_store = compile_store_slot(context, initializer, slot_index);
         }
 
-        stack_slot->initializer = initializer;
         next = initializer_store;
+        */
+        stack_slot->initializer = initializer;
     }
+
+    next = recursive_set_slot_initializers(context, context->stack_slots, last_slot, next);
 
     context->max_stack_slots = MAX(context->max_stack_slots, current_active_stack_slots);
 
     /*
      * Compile body of let here.
      */
-    next = compile_form(context, next, body);
+    for (; body != empty_pair; body = CDR(body))
+    {
+        next = compile_form(context, next, body);
+    }
 
     /*
      * Collapse scopes so that the symbols are no longer visible after control
@@ -2118,14 +2166,21 @@ evil_disassemble(struct evil_environment_t *environment, struct evil_object_hand
     assert(num_args == 1);
     symbol = *args;
 
-    assert(symbol.tag_count.tag == TAG_SYMBOL);
-    slot = get_bound_location_in_lexical_environment(evil_resolve_object_handle(lexical_environment), symbol.value.symbol_hash, 1);
-    assert(slot != NULL);
+    if (args->tag_count.tag == TAG_SYMBOL)
+    {
+        slot = get_bound_location_in_lexical_environment(evil_resolve_object_handle(lexical_environment), symbol.value.symbol_hash, 1);
+        assert(slot != NULL);
 
-    function = deref(slot);
+        function = deref(slot);
+        name = find_symbol_name(environment, symbol.value.symbol_hash);
+    }
+    else
+    {
+        function = deref(args);
+        name = "(unknown)";
+    }
+
     assert(function != NULL);
-
-    name = find_symbol_name(environment, symbol.value.symbol_hash);
 
     switch (function->tag_count.tag)
     {
