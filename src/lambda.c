@@ -935,7 +935,7 @@ compile_let(struct compiler_context_t *context, struct instruction_t *next, stru
 
     num_slots = 0;
     current_active_stack_slots = count_active_stack_slots(context->stack_slots);
-    body = CAR(CDR(args));
+    body = CDR(args);
     last_slot = (struct stack_slot_t *)&context->stack_slots->link;
 
     for (binding_list = CAR(args); binding_list != empty_pair; binding_list = CDR(binding_list), ++num_slots)
