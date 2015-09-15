@@ -1,4 +1,16 @@
-(begin (define fn (lambda () (let ((x 0) (y (lambda () (set! x (+ 1 x)) x))) y))) (let ((x (fn))) (begin (print (x)) (print (x)) (print (x)) '() )))
+(begin 
+  (define fn (lambda () 
+               (let* ((x 0)
+                      (y (lambda ()
+                          (set! x (+ 1 x)) x)))
+                     (begin
+                      y))))
+
+  (let ((z (fn)))
+      (print (z)) 
+      (print (z)) 
+      (print (z)) 
+      '()))
 >1
 2
 3
