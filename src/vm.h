@@ -218,6 +218,11 @@ enum opcode_t
     OPCODE_POP,
 
     /*
+     * Break into the debugger
+     */
+    OPCODE_BREAK,
+
+    /*
      * This last opcode is for VM tracing to help identify bad data in the
      * bytecode stream.
      */

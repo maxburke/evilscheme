@@ -58,6 +58,7 @@
 #define SYMBOL_VECTORP      0x77b7e53c30b17583
 #define SYMBOL_STRINGP      0x54dddb4b267e2d75
 #define SYMBOL_PROCEDUREP   0x80dd3f7b72e0d2fb
+#define SYMBOL_BREAK        0x328df3be92946046
 
 struct stack_slot_t
 {
@@ -859,25 +860,47 @@ count_active_stack_slots(struct stack_slot_t *slots)
     return i;
 }
 
+static void
+link_initializer_sequence(struct slist_t *initializer, struct slist_t *next)
+{
+    if (initializer->next == NULL)
+    {
+        initializer->next = next;
+    }
+    else
+    {
+        link_initializer_sequence(initializer->next, next);
+    }
+}
+
 static struct instruction_t *
 recursive_set_slot_initializers(struct compiler_context_t *context, struct stack_slot_t *slot, struct stack_slot_t *last_slot, struct instruction_t *next)
 {
     short slot_index;
-    struct instruction_t *initializer_store;
     struct instruction_t *initializer;
 
     if (slot != last_slot)
     {
         next = recursive_set_slot_initializers(context, (struct stack_slot_t *)slot->link.next, last_slot, next);
     }
-
-    if (slot == last_slot)
+    else
     {
         return next;
     }
 
     slot_index = slot->index;
     initializer = slot->initializer;
+
+    /*
+     * TODO:
+     * This breaks because the instruction sequence isn't set up correctly.
+     * We need to chain the initializers together with the stores. Instead
+     * this code is just using the initializers as the "next" which will
+     * not be correct.
+     */
+//    BREAK();
+
+    link_initializer_sequence(&initializer->link, &next->link);
 
     if (slot->demoted)
     {
@@ -888,16 +911,10 @@ recursive_set_slot_initializers(struct compiler_context_t *context, struct stack
         symbol.value.symbol_hash = slot->symbol_hash;
 
         get_bound_location = compile_get_bound_location(context, initializer, &symbol);
-        initializer_store = compile_store(context, get_bound_location);
-    }
-    else
-    {
-        initializer_store = compile_store_slot(context, initializer, slot_index);
+        return compile_store(context, get_bound_location);
     }
 
-    next = initializer_store;
-
-    return next;
+    return compile_store_slot(context, initializer, slot_index);
 }
 
 static struct instruction_t *
@@ -964,7 +981,13 @@ compile_let(struct compiler_context_t *context, struct instruction_t *next, stru
              */
 
             initializer_form = CAR(CDR(binding_pair));
-            initializer = compile_form(context, next, initializer_form);
+
+            /*
+             * Next fields are set to NULL here because we assemble the
+             * proper initializer ordering below, after we've determined
+             * if any need to be demoted because of closure capture
+             */
+            initializer = compile_form(context, NULL, initializer_form);
         }
         else
         {
@@ -974,7 +997,11 @@ compile_let(struct compiler_context_t *context, struct instruction_t *next, stru
              */
             initializer = allocate_instruction(context);
             initializer->opcode = OPCODE_LDEMPTY;
-            initializer->link.next = &next->link;
+
+            /*
+             * Deliberately set next as NULL. See above for explanation.
+             */
+            initializer->link.next = NULL;
         }
         /*
         if (stack_slot->demoted)
@@ -1304,6 +1331,18 @@ bind_symbol_for_scoped_environment(struct compiler_context_t *context, struct co
 }
 
 static struct instruction_t *
+compile_break(struct compiler_context_t *context, struct instruction_t *next)
+{
+    struct instruction_t *breakpoint;
+
+    breakpoint = allocate_instruction(context);
+    breakpoint->opcode = OPCODE_BREAK;
+    breakpoint->link.next = &next->link;
+
+    return breakpoint;
+}
+
+static struct instruction_t *
 compile_form(struct compiler_context_t *context, struct instruction_t *next, struct evil_object_t *body)
 {
     struct evil_object_t *symbol_object;
@@ -1397,6 +1436,8 @@ compile_form(struct compiler_context_t *context, struct instruction_t *next, str
                     return compile_type_predicate(context, next, function_args, TAG_STRING);
                 case SYMBOL_PROCEDUREP:
                     return compile_type_predicate(context, next, function_args, TAG_PROCEDURE);
+                case SYMBOL_BREAK:
+                    return compile_break(context, next);
                 default:
                     /*
                      * The function/procedure isn't one that is handled by the
@@ -2123,6 +2164,11 @@ disassemble_bytecode(struct evil_environment_t *environment, const unsigned char
             case OPCODE_NOP:
                 print_hex_bytes(ptr + i, 1);
                 evil_printf("NOP\n");
+                ++i;
+                break;
+            case OPCODE_BREAK:
+                print_hex_bytes(ptr + i, 1);
+                evil_printf("BREAK\n");
                 ++i;
                 break;
             default:

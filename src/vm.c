@@ -1215,6 +1215,10 @@ vm_run(struct evil_environment_t *environment, struct evil_object_handle_t *init
             case OPCODE_NOP:
                 VM_TRACE_OP(OPCODE_NOP);
                 VM_CONTINUE();
+            case OPCODE_BREAK:
+                VM_TRACE_OP(OPCODE_BREAK);
+                BREAK();
+                VM_CONTINUE();
             default:
                 VM_TRACE_OP_IMPL(OPCODE_UNKNOWN);
                 VM_TRACE_STACK();
