@@ -256,6 +256,9 @@ vm_run(struct evil_environment_t *environment, struct evil_object_handle_t *lexi
 void
 vm_trace_stack(struct evil_environment_t *environment, struct evil_object_t *sp, struct evil_object_t *program_area);
 
+int
+vm_slot_index(int slot_index);
+
 union convert_two_t
 {
     unsigned char bytes[2];

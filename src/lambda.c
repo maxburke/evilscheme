@@ -960,7 +960,7 @@ compile_let(struct compiler_context_t *context, struct instruction_t *next, stru
          *    1      0       -1     -2          -3        -4
          * This bit of strange math below calculates the stack slot:
          */
-        slot_index = -((short)slot_index + VM_SLOT_COUNT + 1);
+        slot_index = (short)vm_slot_index(slot_index);
 
         stack_slot = linear_allocator_alloc(context->pool, sizeof(struct stack_slot_t));
         stack_slot->symbol_hash = symbol->value.symbol_hash;
@@ -1030,7 +1030,7 @@ compile_let(struct compiler_context_t *context, struct instruction_t *next, stru
      */
     for (; body != empty_pair; body = CDR(body))
     {
-        next = compile_form(context, next, body);
+        next = compile_form(context, next, CAR(body));
     }
 
     /*

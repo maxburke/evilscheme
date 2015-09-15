@@ -32,7 +32,7 @@ DISABLE_WARNING(4996)
 #   endif
 #endif
 
-#define ENABLE_VM_TRACING 0
+#define ENABLE_VM_TRACING 1
 #define ENABLE_VM_BUFFER_TRACE 0
 
 #if ENABLE_VM_BUFFER_TRACE
@@ -55,7 +55,7 @@ DISABLE_WARNING(4996)
 #if ENABLE_VM_TRACING
 #   define VM_TRACE_OP(x) VM_TRACE_OP_IMPL(x)
 #   define VM_TRACE(x) VM_TRACE_IMPL(x)
-#   define VM_CONTINUE() VM_TRACE_STACK(); continue
+#   define VM_CONTINUE() VM_TRACE_STACK(); vm_trace_fn_locals(environment, procedure, program_area); continue
 #else
 #   define VM_TRACE_OP(x)
 #   define VM_TRACE(x)
@@ -403,6 +403,60 @@ union function_pointer_cast_t
     void *pointer;
 };
 
+static void
+vm_trace_object(struct evil_environment_t *environment, struct evil_object_t *object)
+{
+    VM_TRACE_FN("%p ", (void *)object);
+
+    switch (object->tag_count.tag)
+    {
+        case TAG_BOOLEAN:
+            VM_TRACE_FN("BOOLEAN          %s", object->value.fixnum_value ? "#t" : "#f");
+            break;
+        case TAG_SYMBOL:
+            VM_TRACE_FN("SYMBOL           %016" PRIx64 " %s",
+                    object->value.symbol_hash,
+                    find_symbol_name(environment, object->value.symbol_hash));
+            break;
+        case TAG_CHAR:
+            VM_TRACE_FN("CHAR             %c", (char)object->value.fixnum_value);
+            break;
+        case TAG_FIXNUM:
+            VM_TRACE_FN("FIXNUM           %" PRId64, object->value.fixnum_value);
+            break;
+        case TAG_FLONUM:
+            VM_TRACE_FN("FLONUM           %lf", object->value.flonum_value);
+            break;
+        case TAG_REFERENCE:
+            VM_TRACE_FN("REFERENCE        %p", (void *)object->value.ref);
+            break;
+        case TAG_INNER_REFERENCE:
+            VM_TRACE_FN("INNER REFERENCE  %p,%d", (void *)object->value.ref, object->tag_count.count);
+            break;
+        case TAG_SPECIAL_FUNCTION:
+            {
+                union function_pointer_cast_t function_pointer_cast;
+
+                function_pointer_cast.special_function = object->value.special_function_value;
+                VM_TRACE_FN("SPECIAL FUNCTION %p", function_pointer_cast.pointer);
+            }
+            break;
+            break;
+        case TAG_PROCEDURE:
+            VM_TRACE_FN("ERROR: PROCEDURE TYPE ON STACK");
+            break;
+        case TAG_PAIR:
+            VM_TRACE_FN("ERROR: PAIR TYPE ON STACK");
+            break;
+        case TAG_VECTOR:
+            VM_TRACE_FN("ERROR: VECTOR TYPE ON STACK");
+            break;
+        case TAG_STRING:
+            VM_TRACE_FN("ERROR: STRING TYPE ON STACK");
+            break;
+    }
+}
+
 void
 vm_trace_stack(struct evil_environment_t *environment, struct evil_object_t *sp, struct evil_object_t *program_area)
 {
@@ -426,55 +480,7 @@ vm_trace_stack(struct evil_environment_t *environment, struct evil_object_t *sp,
             VM_TRACE_FN("[vm]      ");
         }
 
-        VM_TRACE_FN("%p ", (void *)stack_top);
-
-        switch (stack_top->tag_count.tag)
-        {
-            case TAG_BOOLEAN:
-                VM_TRACE_FN("BOOLEAN          %s", stack_top->value.fixnum_value ? "#t" : "#f");
-                break;
-            case TAG_SYMBOL:
-                VM_TRACE_FN("SYMBOL           %016" PRIx64 " %s",
-                        stack_top->value.symbol_hash,
-                        find_symbol_name(environment, stack_top->value.symbol_hash));
-                break;
-            case TAG_CHAR:
-                VM_TRACE_FN("CHAR             %c", (char)stack_top->value.fixnum_value);
-                break;
-            case TAG_FIXNUM:
-                VM_TRACE_FN("FIXNUM           %" PRId64, stack_top->value.fixnum_value);
-                break;
-            case TAG_FLONUM:
-                VM_TRACE_FN("FLONUM           %lf", stack_top->value.flonum_value);
-                break;
-            case TAG_REFERENCE:
-                VM_TRACE_FN("REFERENCE        %p", (void *)stack_top->value.ref);
-                break;
-            case TAG_INNER_REFERENCE:
-                VM_TRACE_FN("INNER REFERENCE  %p,%d", (void *)stack_top->value.ref, stack_top->tag_count.count);
-                break;
-            case TAG_SPECIAL_FUNCTION:
-                {
-                    union function_pointer_cast_t function_pointer_cast;
-
-                    function_pointer_cast.special_function = stack_top->value.special_function_value;
-                    VM_TRACE_FN("SPECIAL FUNCTION %p", function_pointer_cast.pointer);
-                }
-                break;
-                break;
-            case TAG_PROCEDURE:
-                VM_TRACE_FN("ERROR: PROCEDURE TYPE ON STACK");
-                break;
-            case TAG_PAIR:
-                VM_TRACE_FN("ERROR: PAIR TYPE ON STACK");
-                break;
-            case TAG_VECTOR:
-                VM_TRACE_FN("ERROR: VECTOR TYPE ON STACK");
-                break;
-            case TAG_STRING:
-                VM_TRACE_FN("ERROR: STRING TYPE ON STACK");
-                break;
-        }
+        vm_trace_object(environment, stack_top);
 
         VM_TRACE_FN("\n");
     }
@@ -511,6 +517,30 @@ vm_extract_num_locals(struct evil_object_t *procedure)
     assert(num_locals->tag_count.tag == TAG_FIXNUM);
 
     return (int)num_locals->value.fixnum_value;
+}
+
+static void
+vm_trace_fn_locals(struct evil_environment_t *environment, struct evil_object_t *procedure, struct evil_object_t *program_area)
+{
+    int num_locals;
+    int i;
+
+    num_locals = vm_extract_num_locals(procedure);
+
+    for (i = 0; i < num_locals; ++i)
+    {
+        int slot_index;
+        struct evil_object_t *object;
+
+        slot_index = vm_slot_index(i);
+        object = program_area + slot_index;
+
+        VM_TRACE_FN("[fn]  %2d: ", slot_index);
+        vm_trace_object(environment, object);
+        VM_TRACE_FN("\n");
+    }
+
+    VM_TRACE_FN("\n");
 }
 
 static void
@@ -556,6 +586,12 @@ vm_dump_trace_buf(void)
     trace_buf[trace_buf_idx] = 0;
     fputs(trace_buf, stdout);
     trace_buf[trace_buf_idx] = c;
+}
+
+int
+vm_slot_index(int slot_index)
+{
+    return -(slot_index + VM_SLOT_COUNT + 1);
 }
 
 struct evil_object_t
