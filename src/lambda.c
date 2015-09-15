@@ -954,14 +954,7 @@ compile_let(struct compiler_context_t *context, struct instruction_t *next, stru
         slot_index = current_active_stack_slots++;
         assert(slot_index >= 0 && slot_index < 65536);
 
-        /*
-         * The stack is arranged, from high address to low:
-         * [arg 1][arg 0][return][env chain][pa chain][first slot]
-         *    1      0       -1     -2          -3        -4
-         * This bit of strange math below calculates the stack slot:
-         */
         slot_index = (short)vm_slot_index(slot_index);
-
         stack_slot = linear_allocator_alloc(context->pool, sizeof(struct stack_slot_t));
         stack_slot->symbol_hash = symbol->value.symbol_hash;
         stack_slot->link.next = &context->stack_slots->link;

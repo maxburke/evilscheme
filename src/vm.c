@@ -591,6 +591,12 @@ vm_dump_trace_buf(void)
 int
 vm_slot_index(int slot_index)
 {
+    /*
+    * The stack is arranged, from high address to low:
+    * [arg 1][arg 0][return][env chain][pa chain][first slot]
+    *    1      0       -1     -2          -3        -4
+    * This bit of strange math below calculates the stack slot:
+    */
     return -(slot_index + VM_SLOT_COUNT + 1);
 }
 
