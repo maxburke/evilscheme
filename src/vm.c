@@ -36,9 +36,9 @@ DISABLE_WARNING(4996)
 #define ENABLE_VM_BUFFER_TRACE 0
 
 #if ENABLE_VM_BUFFER_TRACE
-#   define VM_TRACE_FN(format, ...) vm_trace_fn(format, __VA_ARGS__)
+#   define VM_TRACE_FN(...) vm_trace_fn(__VA_ARGS__)
 #else
-#   define VM_TRACE_FN(format, ...) fprintf(stderr, format, __VA_ARGS__)
+#   define VM_TRACE_FN(...) fprintf(stderr, __VA_ARGS__)
 #endif
 
 #if ENABLE_VM_ASSERTS
@@ -78,8 +78,10 @@ DISABLE_WARNING(4996)
 static char trace_buf[1048576];
 static size_t trace_buf_idx;
 
-static void
-vm_trace_fn(const char *format, ...);
+#if ENABLE_VM_BUFFER_TRACE
+    static void
+    vm_trace_fn(const char *format, ...);
+#endif
 
 static inline int
 vm_compare_equal(const struct evil_object_t *a, const struct evil_object_t *b);
