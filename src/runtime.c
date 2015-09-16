@@ -164,14 +164,14 @@ evil_environment_create(void *stack, size_t stack_size, void *heap_mem, size_t h
 }
 
 static void
-evil_destroy_hash_internemnt_pages(struct symbol_hash_internment_page_t *page)
+evil_destroy_hasn_internment_pages(struct symbol_hash_internment_page_t *page)
 {
     if (page == NULL)
     {
         return;
     }
 
-    evil_destroy_hash_internemnt_pages(page->next);
+    evil_destroy_hasn_internment_pages(page->next);
     free(page);
 }
 
@@ -192,7 +192,7 @@ evil_environment_destroy(struct evil_environment_t *environment)
 {
     gc_destroy(environment->heap);
 
-    evil_destroy_hash_internemnt_pages(environment->symbol_names.hash_internment_page_base);
+    evil_destroy_hasn_internment_pages(environment->symbol_names.hash_internment_page_base);
     evil_destroy_string_internment_pages(environment->symbol_names.string_internment_page_base);
     evil_aligned_free(environment);
 }
