@@ -104,5 +104,3 @@ linear_allocator_alloc(struct linear_allocator_t *allocator, size_t size)
     return top;
 }
 
-
-
