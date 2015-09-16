@@ -891,15 +891,6 @@ recursive_set_slot_initializers(struct compiler_context_t *context, struct stack
     slot_index = slot->index;
     initializer = slot->initializer;
 
-    /*
-     * TODO:
-     * This breaks because the instruction sequence isn't set up correctly.
-     * We need to chain the initializers together with the stores. Instead
-     * this code is just using the initializers as the "next" which will
-     * not be correct.
-     */
-//    BREAK();
-
     link_initializer_sequence(&initializer->link, &next->link);
 
     if (slot->demoted)
@@ -996,21 +987,7 @@ compile_let(struct compiler_context_t *context, struct instruction_t *next, stru
              */
             initializer->link.next = NULL;
         }
-        /*
-        if (stack_slot->demoted)
-        {
-            struct instruction_t *get_bound_location;
 
-            get_bound_location = compile_get_bound_location(context, initializer, symbol);
-            initializer_store = compile_store(context, get_bound_location);
-        }
-        else
-        {
-            initializer_store = compile_store_slot(context, initializer, slot_index);
-        }
-
-        next = initializer_store;
-        */
         stack_slot->initializer = initializer;
     }
 
@@ -2423,3 +2400,4 @@ evil_lambda(struct evil_environment_t *environment, struct evil_object_handle_t 
     
     return compile_form_to_bytecode(NULL, environment, lambda_body);
 }
+
