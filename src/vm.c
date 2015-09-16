@@ -521,6 +521,7 @@ vm_extract_num_locals(struct evil_object_t *procedure)
     return (int)num_locals->value.fixnum_value;
 }
 
+#if ENABLE_VM_TRACING
 static void
 vm_trace_fn_locals(struct evil_environment_t *environment, struct evil_object_t *procedure, struct evil_object_t *program_area)
 {
@@ -577,6 +578,7 @@ vm_trace_fn(const char *format, ...)
         trace_buf_idx = remainder;
     }
 }
+#endif
 
 void
 vm_dump_trace_buf(void)
