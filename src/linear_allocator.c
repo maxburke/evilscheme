@@ -1,5 +1,5 @@
 /***********************************************************************
- * evilscheme, Copyright (c) 2012-2013, Maximilian Burke
+ * evilscheme, Copyright (c) 2012-2015, Maximilian Burke
  * This file is distributed under the FreeBSD license.
  * See LICENSE.TXT for details.
  ***********************************************************************/
