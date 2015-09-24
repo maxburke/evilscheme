@@ -93,8 +93,6 @@ append_symbol_table_fragment(struct evil_object_t *symbol_table_fragment, struct
 struct evil_object_t *
 bind(struct evil_environment_t *environment, struct evil_object_t lexical_environment, struct evil_object_t symbol)
 {
-    assert(symbol.tag_count.tag == TAG_SYMBOL);
-
     struct evil_object_t *lexical_environment_ptr;
     uint64_t symbol_hash;
     struct evil_object_t *location;
@@ -103,6 +101,8 @@ bind(struct evil_environment_t *environment, struct evil_object_t lexical_enviro
     int i;
     struct evil_object_t default_symbol_value;
     struct evil_object_handle_t *handle;
+
+    assert(symbol.tag_count.tag == TAG_SYMBOL);
 
     lexical_environment_ptr = deref(&lexical_environment);
     symbol_hash = symbol.value.symbol_hash;

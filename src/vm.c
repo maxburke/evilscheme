@@ -848,13 +848,16 @@ vm_run(struct evil_environment_t *environment, struct evil_object_handle_t *init
                 {
                     struct evil_object_t *source = sp + 2;
                     struct evil_object_t *ref = sp + 1;
+                    struct evil_object_t *ref_obj;
+                    unsigned short ref_index;
+                    unsigned char target_type;
 
                     VM_ASSERT(ref->tag_count.tag == TAG_REFERENCE || ref->tag_count.tag == TAG_INNER_REFERENCE);
 
-                    struct evil_object_t *ref_obj = deref(ref);
+                    ref_obj = deref(ref);
 
-                    unsigned short ref_index = ref->tag_count.count;
-                    unsigned char target_type = ref_obj->tag_count.tag;
+                    ref_index = ref->tag_count.count;
+                    target_type = ref_obj->tag_count.tag;
 
                     if (target_type == TAG_STRING)
                     {
