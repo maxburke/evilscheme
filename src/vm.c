@@ -83,8 +83,8 @@ static size_t trace_buf_idx;
     vm_trace_fn(const char *format, ...);
 #endif
 
-static inline int
-vm_compare_equal(const struct evil_object_t *a, const struct evil_object_t *b);
+    static inline int
+        vm_compare_equal(const struct evil_object_t *a, const struct evil_object_t *b);
 
 #define LDIMM_1_IMPL(FIELD, TYPE, TAG) {        \
         sp->tag_count.tag = TAG;                \
@@ -165,26 +165,30 @@ vm_compare_equal(const struct evil_object_t *a, const struct evil_object_t *b);
 #define NUMERIC_BINOP(OP) {                                                                 \
         struct evil_object_t *a = value_deref(sp + 2);                                      \
         struct evil_object_t *b = value_deref(sp + 1);                                      \
+        struct evil_object_t v;                                                             \
         unsigned char a_tag = a->tag_count.tag;                                             \
         unsigned char b_tag = b->tag_count.tag;                                             \
                                                                                             \
         ENSURE_NUMERIC(a->tag_count.tag);                                                   \
         ENSURE_NUMERIC(b->tag_count.tag);                                                   \
         CONDITIONAL_DEMOTE(a, b);                                                           \
+        ++sp;                                                                               \
+        v.tag_count = a->tag_count;                                                         \
         if (a_tag == TAG_FIXNUM)                                                            \
         {                                                                                   \
-            a->value.fixnum_value = a->value.fixnum_value OP b->value.fixnum_value;         \
+            v.value.fixnum_value = a->value.fixnum_value OP b->value.fixnum_value;          \
         }                                                                                   \
         else                                                                                \
         {                                                                                   \
-            a->value.flonum_value = a->value.flonum_value OP b->value.flonum_value;         \
+            v.value.flonum_value = a->value.flonum_value OP b->value.flonum_value;          \
         }                                                                                   \
-        ++sp;                                                                               \
+        *(sp + 1) = v;                                                                      \
     }
 
 #define FIXNUM_BINOP(OP) {                                                                  \
         struct evil_object_t *a = value_deref(sp + 2);                                      \
         struct evil_object_t *b = value_deref(sp + 1);                                      \
+        struct evil_object_t v;                                                             \
         unsigned char a_tag = a->tag_count.tag;                                             \
         unsigned char b_tag = b->tag_count.tag;                                             \
         UNUSED(a_tag);                                                                      \
@@ -193,8 +197,12 @@ vm_compare_equal(const struct evil_object_t *a, const struct evil_object_t *b);
         ENSURE_NUMERIC(a->tag_count.tag);                                                   \
         ENSURE_NUMERIC(b->tag_count.tag);                                                   \
         VM_ASSERT(a_tag == b_tag);                                                          \
-        a->value.fixnum_value = a->value.fixnum_value OP b->value.fixnum_value;             \
         ++sp;                                                                               \
+        v.tag_count.tag = TAG_FIXNUM;                                                       \
+        v.tag_count.flag = 0;                                                               \
+        v.tag_count.count = 0;                                                              \
+        v.value.fixnum_value = a->value.fixnum_value OP b->value.fixnum_value;              \
+        *(sp + 1) = v;                                                                      \
     }
 
 static void
