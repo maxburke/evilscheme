@@ -1,49 +1,59 @@
 (begin
-
+ ; double eval_A(int i, int j) { return 1.0/((i+j)*(i+j+1)/2+i+1); }
  (define a (lambda (i j)
             (/ 1.0 (+ (* (+ i j)
                          (/ (+ i (+ j 1)) 2.0)) 
                       (+ i 1)))))
 
- (define av-core (lambda (i j n v av)
-                   (let ((x (vector-ref av i)))
-                     (set! (vector-ref av i) (+ x (* (a i j) (vector-ref v j)))))))
+ (define a-times-u-core (lambda (i j n u au)
+                         (if (< j n)
+                          (begin
+                           (let ((x (vector-ref au i))
+                                 (y (+ x (* (a i j) (vector-ref u j)))))
+                            (set! (vector-ref au i) y)
+                            (a-times-u-core i (+ 1 j) n u au))))))
 
- (define multiply-av (lambda (i n v av)
-                       (set! (vector-ref av i) 0)
-                       (av-core i 0 n v av)
+ (define a-times-u (lambda (i n u au)
                        (if (< i n)
-                         (multiply-av (+ 1 i) n v av))))
+                        (begin
+                         (set! (vector-ref au i) 0)
+                         (a-times-u-core i 0 n u au)
+                         (a-times-u (+ 1 i) n u au)))))
 
- (define at-v-core (lambda (i j n v at-v)
-                     (let ((x (vector-ref at-v i)))
-                       (set! (vector-ref at-v i) (+ x (* (a j i) (vector-ref v j)))))))
+ (define at-times-u-core (lambda (i j n u at-u)
+                          (if (< j n)
+                           (begin
+                            (let ((x (vector-ref at-u i))
+                                  (y (+ x (* (a j i) (vector-ref u j)))))
+                             (set! (vector-ref at-u i) y)
+                             (at-times-u-core i (+ 1 j) n u at-u))))))
 
- (define multiply-at-v (lambda (i n v at-v)
-                         (set! (vector-ref at-v i) 0)
-                         (at-v-core i 0 n v at-v)
+ (define at-times-u (lambda (i n u at-u)
                          (if (< i n)
-                           (multiply-at-v (+ 1 i) n v at-v))))
+                          (begin
+                           (set! (vector-ref at-u i) 0)
+                           (at-times-u-core i 0 n u at-u)
+                           (at-times-u (+ 1 i) n u at-u)))))
 
- (define at-times-av (lambda (n v at-av)
-                       (let ((u (make-vector (+ n 1))))
+ (define ata-times-u (lambda (n u at-au)
+                       (let ((v (make-vector n)))
                          (begin
-                         (multiply-av 0 n v u)
-                         (multiply-at-v 0 n u at-av)))))
+                         (a-times-u 0 n u v) ;; review
+                         (at-times-u 0 n v at-au))))) ;; review
 
  (define spectral-norm-test-core (lambda (u v n i limit)
                                   (if (< i limit)
                                    (begin
-                                    (at-times-av n u v)
-                                    (at-times-av n v u)
+                                    (ata-times-u n u v)
+                                    (ata-times-u n v u)
                                     (spectral-norm-test-core u v n (+ i 1) limit)))))
  (define dot (lambda (v u n i sum)
-                          (if (> i n)
-                            sum
+                          (if (< i n)
                             (let ((v0 (vector-ref v i))
                                   (u0 (vector-ref u i)))
                               (begin
-                              (dot v u n (+ i 1) (+ sum (+ (* v0 v0) (* u0 u0)))))))))
+                               (dot v u n (+ i 1) (+ sum (* u0 v0)))))
+                            sum)))
 
  (define spectral-norm-test (lambda (u v n i limit)
                              (begin
@@ -51,9 +61,9 @@
                               (/ (dot u v n 0 0.0) (dot v v n 0 0.0)))))
 
  (define spectral-norm (lambda (n)
-                        (let ((u (make-vector (+ n 1) 1.0))
-                              (v (make-vector (+ n 1) 0.0)))
-                         (spectral-norm-test u v (- n 1) 0 10))))
+                        (let ((u (make-vector n 1.0))
+                              (v (make-vector n 0.0)))
+                         (spectral-norm-test u v n 0 10))))
 
  (spectral-norm 128))
->1.345559
+>1.623642
