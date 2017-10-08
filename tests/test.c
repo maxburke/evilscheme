@@ -431,6 +431,8 @@ run_test(struct evil_environment_t *environment, const char *test, const char *e
 
         for (;;)
         {
+            const char *extension;
+
             entry = readdir(dir);
 
             if (entry == NULL)
@@ -438,7 +440,9 @@ run_test(struct evil_environment_t *environment, const char *test, const char *e
                 return 1;
             }
 
-            if (strstr(entry->d_name, ".test") != 0)
+            extension = strstr(entry->d_name, ".test");
+
+            if (extension != 0 && strcmp(extension, ".test") == 0)
             {
                 snprintf(name_buffer, name_buffer_length, "%s/%s", directory_root, entry->d_name);
                 return 0;
