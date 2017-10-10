@@ -89,8 +89,6 @@ linear_allocator_alloc(struct linear_allocator_t *allocator, size_t size)
 
     if ((size_t)(end - top) < rounded_size)
     {
-        struct linear_allocator_chunk_t *chunk;
-        
         chunk = linear_allocator_create_chunk(rounded_size);
         chunk->next = allocator->head;
         allocator->head = chunk;
