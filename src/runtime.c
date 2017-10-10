@@ -74,7 +74,8 @@ environment_initialize(struct evil_environment_t *environment)
         { "make-vector", evil_make_vector, VARIADIC },
         { "vector-length", evil_vector_ref, 1 },
         { "vector-ref", evil_vector_ref, 2 },
-        { "vector-fill!", evil_vector_ref, 2 },
+        { "vector-set!", evil_vector_set, 3 },
+        { "vector-fill!", evil_vector_fill, 2 },
         { "disassemble", evil_disassemble, 1 },
         { "string->symbol", string_to_symbol, 1 },
         { "symbol->string", symbol_to_string, 1 }
