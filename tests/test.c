@@ -371,7 +371,7 @@ run_test(struct evil_environment_t *environment, const char *test, const char *e
         {
             if (GetLastError() != ERROR_NO_MORE_FILES)
             {
-                printf("Unknown error in FindNextFile: %d\n", GetLastError());
+                printf("Unknown error in FindNextFile: %lu\n", GetLastError());
                 return 1;
             }
 
