@@ -13,10 +13,10 @@
 #include "base.h"
 #include "environment.h"
 #include "gc.h"
+#include "lambda.h"
 #include "linear_allocator.h"
 #include "object.h"
 #include "runtime.h"
-#include "slist.h"
 #include "vm.h"
 
 #define UNKNOWN_ARG -1
@@ -101,31 +101,6 @@ struct compiler_context_t
     struct evil_object_handle_t *lexical_environment;
     struct evil_object_handle_t *parent_environment;
     int closure_has_allocated_environment;
-};
-
-struct instruction_t
-{
-    struct slist_t link;
-
-    unsigned char opcode;
-    int offset;
-    size_t size;
-    struct instruction_t *reloc;
-
-    union data
-    {
-        unsigned char u1;
-                 char s1;
-        unsigned short u2;
-                 short s2;
-        unsigned int u4;
-                 int s4;
-        float f4;
-        uint64_t u8;
-        int64_t s8;
-        double f8;
-        char string[1];
-    } data;
 };
 
 static struct compiler_context_t *
