@@ -151,7 +151,6 @@ evil_vector_ref(struct evil_environment_t *environment, struct evil_object_handl
 
     assert(num_args == 2);
 
-    index = 0;
     vector = deref(args + 0);
     element = deref(args + 1);
 
@@ -164,8 +163,35 @@ evil_vector_ref(struct evil_environment_t *environment, struct evil_object_handl
     return make_inner_reference(VECTOR_BASE(vector), index);
 }
 
-static struct evil_object_t
-evil_vector_fill(struct evil_environment_t *environment, int num_args, struct evil_object_t *args)
+struct evil_object_t
+evil_vector_set(struct evil_environment_t *environment, struct evil_object_handle_t *lexical_environment, int num_args, struct evil_object_t *args)
+{
+    struct evil_object_t *vector;
+    struct evil_object_t *element;
+    struct evil_object_t value;
+    int64_t index;
+
+    UNUSED(environment);
+    UNUSED(lexical_environment);
+    UNUSED(num_args);
+
+    assert(num_args == 3);
+
+    vector = deref(args + 0);
+    element = deref(args + 1);
+    value = args[2];
+
+    index = evil_coerce_fixnum(element);
+    assert(index < 65536);
+    assert(index < vector->tag_count.count);
+
+    VECTOR_BASE(vector)[index] = value;
+
+    return value;
+}
+
+struct evil_object_t
+evil_vector_fill(struct evil_environment_t *environment, struct evil_object_handle_t *lexical_environment, int num_args, struct evil_object_t *args)
 {
     struct evil_object_t *vector;
     struct evil_object_t *vector_base;
@@ -174,6 +200,7 @@ evil_vector_fill(struct evil_environment_t *environment, int num_args, struct ev
     int i;
 
     UNUSED(environment);
+    UNUSED(lexical_environment);
     UNUSED(num_args);
 
     assert(num_args == 2);
@@ -217,7 +244,7 @@ evil_make_vector(struct evil_environment_t *environment, struct evil_object_hand
 
     vector_fill_args[1] = (num_args == 2) ? *fill : make_fixnum_object(0);
 
-    return evil_vector_fill(environment, 2, vector_fill_args);
+    return evil_vector_fill(environment, lexical_environment, 2, vector_fill_args);
 }
 
 struct evil_object_t
