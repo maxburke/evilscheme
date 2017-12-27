@@ -38,7 +38,7 @@ DISABLE_WARNING(4996)
 #if ENABLE_VM_BUFFER_TRACE
 #   define VM_TRACE_FN(...) vm_trace_fn(__VA_ARGS__)
 #else
-#   define VM_TRACE_FN(...) fprintf(stderr, __VA_ARGS__)
+#   define VM_TRACE_FN(...) printf(__VA_ARGS__)
 #endif
 
 #if ENABLE_VM_ASSERTS
@@ -554,6 +554,7 @@ vm_trace_fn_locals(struct evil_environment_t *environment, struct evil_object_t 
     VM_TRACE_FN("\n");
 }
 
+#if ENABLE_VM_BUFFER_TRACE
 static void
 vm_trace_fn(const char *format, ...)
 {
@@ -586,6 +587,8 @@ vm_trace_fn(const char *format, ...)
         trace_buf_idx = remainder;
     }
 }
+#endif
+
 #endif
 
 void
