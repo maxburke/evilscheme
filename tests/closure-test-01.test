@@ -4,14 +4,20 @@
                       (y (lambda ()
                           (set! x (+ 1 x)) x)))
                      (begin
+                      (disassemble y)
                       y))))
 
-  (let ((z (fn)))
+  (disassemble 'fn)
+
+  (let ((z (fn))
+        (w (fn)))
       (print (z)) 
       (print (z)) 
-      (print (z)) 
+      (print (z))
+      (print (w))
       '()))
 >1
 2
 3
+1
 '()
