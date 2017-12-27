@@ -18,6 +18,7 @@
 
 DISABLE_WARNING(4127)
 DISABLE_WARNING(4996)
+DISABLE_WARNING(4710)
 
 /*
  * Stack etiquette:
@@ -1065,7 +1066,7 @@ vm_run(struct evil_environment_t *environment, struct evil_object_handle_t *init
                     struct evil_object_t *arg_slot;
                     unsigned char tag;
                     int current_fn_num_args;
-                    int num_args;
+                    int tailcall_num_args;
                     int arg_diff;
                     union convert_two_t c2;
                     unsigned short args_passed;
@@ -1085,8 +1086,8 @@ vm_run(struct evil_environment_t *environment, struct evil_object_handle_t *init
                     ++sp;
                     tag = fn->tag_count.tag;
 
-                    num_args = vm_extract_num_args(fn);
-                    assert(num_args == (int)args_passed || num_args == VARIADIC);
+                    tailcall_num_args = vm_extract_num_args(fn);
+                    assert(tailcall_num_args == (int)args_passed || tailcall_num_args == VARIADIC);
                     /*
                      * This code erases the current frame replacing it with the
                      * new call. At this point the stack, pre-call, where

@@ -166,4 +166,10 @@ evil_vector_length(struct evil_environment_t *environment, struct evil_object_ha
 struct evil_object_t
 evil_vector_ref(struct evil_environment_t *environment, struct evil_object_handle_t *lexical_environment, int num_args, struct evil_object_t *object);
 
+struct evil_object_t
+evil_vector_set(struct evil_environment_t *environment, struct evil_object_handle_t *lexical_environment, int num_args, struct evil_object_t *object);
+
+struct evil_object_t
+evil_vector_fill(struct evil_environment_t *environment, struct evil_object_handle_t *lexical_environment, int num_args, struct evil_object_t *object);
+
 #endif
